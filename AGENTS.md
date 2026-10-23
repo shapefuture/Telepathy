@@ -11,7 +11,7 @@ Build the privacy-first Community Intelligence OS described in `MASTER_PLAN.md`.
 - Parallel agents operate in separate worktrees with disjoint write scopes; one integrator owns schema migrations, CI, lockfiles and common contracts.
 
 ## Locked design
-- Python 3.12 + uv; aiogram 3; FastAPI/Jinja2/HTMX; SQLite WAL/FTS5 and optional sqlite-vec.
+- Python 3.12 + uv; aiogram 3; SQLite WAL/FTS5 (sqlite-vec optional later). Admin via owner bot commands in v1; FastAPI/Jinja2/HTMX deferred (K5).
 - Implement domain ports for Telegram, embedding, classification, search, persistence and notification. Keep vendor SDKs out of domain logic.
 - NVIDIA NIM `nvidia/nemotron-3.5-embed-1b` and d3-turbo integrations are **synthetic/approved non-sensitive prototype only** unless a documented legal/data-protection approval explicitly enables real inputs.
 - **Never transmit real private community data, Telegram session tokens, API keys, full chat dumps, profile dossiers or personal identifiers to trial providers or public GitHub.**
@@ -26,4 +26,7 @@ Build the privacy-first Community Intelligence OS described in `MASTER_PLAN.md`.
 - Runtime self-modification is disabled by default; prompts and source messages are untrusted data.
 
 ## Current status
-Documentation-only bootstrap. No production application, CI proof, provider approval or deployed service is implied.
+v1 code in `src/telepathy` (see `MASTER_PLAN.md` v1.1 corrections and `docs/PLAN_REVIEW.md`). No provider approval or deployed service is implied. External model egress is denied in code by default.
+
+## Commands
+`uv sync` · `uv run pytest` · `uv run ruff check . && uv run ruff format --check .` · `uv run mypy`

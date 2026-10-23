@@ -92,7 +92,11 @@ def test_crash_recovery_marks_dispatching_uncertain(conn):
 def test_one_live_invitation_per_need(conn, owner):
     import sqlite3
 
-    conn.execute("INSERT INTO needs VALUES ('n1','c1',?, 'x','open',NULL,'t')", (owner,))
+    conn.execute(
+        "INSERT INTO needs(id, community_id, member_id, description, status, created_at) "
+        "VALUES ('n1','c1',?,'x','open','t')",
+        (owner,),
+    )
     from telepathy.storage import acl
 
     a = acl.upsert_member(conn, "c1", 1)

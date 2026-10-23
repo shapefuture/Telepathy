@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from zoneinfo import ZoneInfo
 
-from telepathy.domain.text import content_terms, normalize, snippet
+from telepathy.domain.text import content_terms, normalize, snippet, term_present
 from telepathy.domain.types import AccessContext, from_iso
 from telepathy.retrieval.search import Hit, search
 
@@ -47,8 +47,7 @@ def _coverage(body: str, terms: list[str]) -> float:
     if not terms:
         return 0.0
     folded = normalize(body)
-    # Prefix-tolerant to match FTS prefix search on inflected words.
-    hits = sum(1 for t in terms if (t[: max(4, len(t) - 2)] if len(t) >= 6 else t) in folded)
+    hits = sum(1 for t in terms if term_present(t, folded))
     return hits / len(terms)
 
 

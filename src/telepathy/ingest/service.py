@@ -11,6 +11,7 @@ import sqlite3
 from dataclasses import dataclass
 from enum import StrEnum
 
+from telepathy.domain.classify import classify_rules
 from telepathy.domain.text import normalize, sha256_hex
 from telepathy.domain.types import Visibility, new_id, to_iso, utcnow
 from telepathy.ingest.normalize import NormalizedMessage, citation_uri
@@ -24,6 +25,7 @@ class IngestOutcome(StrEnum):
     STORED = "stored"
     UPDATED = "updated"  # newer edit applied
     STALE_EDIT = "stale_edit"  # older revision arrived late; recorded, not applied
+    OPTED_OUT = "opted_out"  # sender withdrew collection consent: nothing stored
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,10 +153,17 @@ def _add_excerpt(
     )
 
 
-def _retire_excerpts(conn: sqlite3.Connection, message_id: str, now: str) -> str | None:
-    """Mark live excerpts of a message stale and drop their FTS/vector rows (C06)."""
+def _retire_excerpts(
+    conn: sqlite3.Connection, message_id: str, now: str, *, include_documents: bool = True
+) -> str | None:
+    """Mark live excerpts of a message stale and drop their FTS/vector rows (C06).
+
+    A caption edit keeps the attached document's excerpts (include_documents=False).
+    """
+    doc_filter = "" if include_documents else " AND document_id IS NULL"
     rows = conn.execute(
-        "SELECT rowid, id FROM excerpts WHERE message_id=? AND valid_to IS NULL", (message_id,)
+        "SELECT rowid, id FROM excerpts WHERE message_id=? AND valid_to IS NULL" + doc_filter,
+        (message_id,),
     ).fetchall()
     for r in rows:
         conn.execute("UPDATE excerpts SET valid_to=? WHERE id=?", (now, r["id"]))
@@ -176,6 +185,14 @@ def ingest(
     now = to_iso(utcnow())
 
     with transaction(conn):
+        if msg.sender_tg_id is not None:
+            opted = conn.execute(
+                "SELECT 1 FROM members WHERE community_id=? AND telegram_user_id=? "
+                "AND collection_opt_out=1",
+                (community_id, str(msg.sender_tg_id)),
+            ).fetchone()
+            if opted:
+                return IngestOutcome.OPTED_OUT
         cur = conn.execute(
             "INSERT OR IGNORE INTO raw_events(id, source_id, dedup_key, observed_at, raw_json) "
             "VALUES (?,?,?,?,?)",
@@ -202,12 +219,14 @@ def ingest(
         ).fetchone()
 
         outcome: IngestOutcome
+        intent = classify_rules(msg.text)  # local only; never sent anywhere
         if existing is None:
             message_id = new_id()
             conn.execute(
                 "INSERT INTO messages(id, source_id, external_message_id, author_member_id, body, "
                 "media_kind, media_file_id, event_at, observed_at, edited_at, edit_version, "
-                "topic_id, reply_to_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "topic_id, reply_to_id, intent, intent_confidence) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     message_id,
                     src.id,
@@ -222,6 +241,8 @@ def ingest(
                     msg.edit_version,
                     str(msg.topic_id) if msg.topic_id else None,
                     str(msg.reply_to_message_id) if msg.reply_to_message_id else None,
+                    intent.intent.value,
+                    intent.confidence,
                 ),
             )
             if msg.text.strip():
@@ -233,18 +254,20 @@ def ingest(
             message_id = existing["id"]
             conn.execute(
                 "UPDATE messages SET body=?, edited_at=?, edit_version=?, revision=revision+1, "
-                "media_kind=COALESCE(?, media_kind), media_file_id=COALESCE(?, media_file_id) "
-                "WHERE id=?",
+                "media_kind=COALESCE(?, media_kind), media_file_id=COALESCE(?, media_file_id), "
+                "intent=?, intent_confidence=? WHERE id=?",
                 (
                     msg.text,
                     msg.edited_at,
                     msg.edit_version,
                     msg.media_kind,
                     msg.media_file_id,
+                    intent.intent.value,
+                    intent.confidence,
                     message_id,
                 ),
             )
-            prev = _retire_excerpts(conn, message_id, now)
+            prev = _retire_excerpts(conn, message_id, now, include_documents=False)
             if msg.text.strip():
                 _add_excerpt(conn, src, message_id, msg, now, prev)
             outcome = IngestOutcome.UPDATED
@@ -263,6 +286,45 @@ def ingest(
     return outcome
 
 
+def purge_message_row(conn: sqlite3.Connection, message_row_id: str, now: str) -> None:
+    """Revoke all evidence for one message. Caller must hold a transaction."""
+    row = conn.execute(
+        "SELECT m.source_id, m.external_message_id, s.platform, s.external_ref FROM messages m "
+        "JOIN sources s ON s.id = m.source_id WHERE m.id=?",
+        (message_row_id,),
+    ).fetchone()
+    if row is None:
+        return
+    _retire_excerpts(conn, message_row_id, now)
+    conn.execute(
+        "UPDATE messages SET removed_at=COALESCE(removed_at, ?), body=NULL, media_file_id=NULL "
+        "WHERE id=?",
+        (now, message_row_id),
+    )
+    conn.execute(
+        "UPDATE documents SET status='removed', removed_at=? WHERE message_id=?",
+        (now, message_row_id),
+    )
+    # Raw events carry the text too; keep the dedup key, drop the content.
+    prefix = f"{row['platform']}:{row['external_ref']}:{row['external_message_id']}:"
+    conn.execute(
+        "UPDATE raw_events SET raw_json='{\"removed\": true}' WHERE source_id=? "
+        "AND substr(dedup_key, 1, ?) = ?",
+        (row["source_id"], len(prefix), prefix),
+    )
+
+
+def message_row_id(
+    conn: sqlite3.Connection, source_id: str, external_message_id: str
+) -> str | None:
+    row = conn.execute(
+        "SELECT id FROM messages WHERE source_id=? AND external_message_id=? "
+        "AND removed_at IS NULL",
+        (source_id, external_message_id),
+    ).fetchone()
+    return str(row["id"]) if row else None
+
+
 def remove_message(
     conn: sqlite3.Connection,
     source_id: str,
@@ -274,27 +336,15 @@ def remove_message(
     """Deletion handling (P03-08 / P07-08): message body cleared, evidence revoked."""
     now = to_iso(utcnow())
     with transaction(conn):
-        row = conn.execute(
-            "SELECT id FROM messages WHERE source_id=? AND external_message_id=? "
-            "AND removed_at IS NULL",
-            (source_id, external_message_id),
-        ).fetchone()
-        if row is None:
+        mid = message_row_id(conn, source_id, external_message_id)
+        if mid is None:
             return False
-        _retire_excerpts(conn, row["id"], now)
-        conn.execute("UPDATE messages SET removed_at=?, body=NULL WHERE id=?", (now, row["id"]))
-        # Raw events carry the text too; keep the dedup key, drop the content.
-        conn.execute(
-            "UPDATE raw_events SET raw_json='{\"removed\": true}' WHERE source_id=? "
-            "AND dedup_key LIKE (SELECT platform || ':' || external_ref FROM sources WHERE id=?) "
-            "|| ':' || ? || ':%'",
-            (source_id, source_id, external_message_id),
-        )
+        purge_message_row(conn, mid, now)
         audit(
             conn,
             "message.remove",
             actor_member_id=actor_member_id,
-            subject=row["id"],
+            subject=mid,
             detail_json=json.dumps({"reason": reason}),
         )
     return True

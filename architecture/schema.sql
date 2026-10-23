@@ -1,4 +1,4 @@
--- Reference schema only, not a deployed migration.
+-- Historical reference schema (v1.0). AUTHORITATIVE schema: src/telepathy/storage/migrations/ (K8).
 PRAGMA foreign_keys=ON;
 PRAGMA journal_mode=WAL;
 CREATE TABLE IF NOT EXISTS communities(id TEXT PRIMARY KEY, label TEXT NOT NULL, timezone TEXT NOT NULL DEFAULT 'Asia/Jerusalem', created_at TEXT NOT NULL);

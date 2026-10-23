@@ -1,4 +1,4 @@
-schema_version: 1
+schema_version: 2  # v1.1 corrections, see MASTER_PLAN.md
 single_node: true
 python: '3.12'
 database:
@@ -8,7 +8,7 @@ database:
   authoritative_tables: [raw_events, messages, documents, excerpts, consent, skill_claims, introductions, jobs, effect_intents]
 interfaces:
   telegram: {implementation: aiogram, mode: long_polling, allowed_chat_scope: allowlist}
-  backend: {implementation: FastAPI, ui: Jinja2_HTMX, public_admin: false}
+  backend: {implementation: owner_bot_commands_and_cli, ui: deferred_v1x, public_admin: false}
   embeddings:
     slot: embedding.v1
     development_provider: nvidia_nim
@@ -20,6 +20,7 @@ interfaces:
     truncate: NONE
     production_with_trial: forbidden
     outage_fallback: fts5_only
+    v1_status: deferred  # K2: no adapter in v1; FTS5 + translit is the production path
   classification:
     slot: classifier.v1
     development_provider: vllm_semantic_router
@@ -28,26 +29,35 @@ interfaces:
     max_state_chars: 1200
     outage_fallback: explicit_rule_based
     production_with_private_text: forbidden
+    v1_status: deferred  # K2: local rule classifier only
   retrieval:
     lexical_top_k: 40
     semantic_top_k: 40
     rrf_k: 60
     evidence_expand_limit: 30
+    query_expansion: [prefix, ru_latin_transliteration]
+    min_term_coverage: 0.5
     authorization_stage: before_any_scoring_and_before_response
   experts:
     scoring_weights: {domain: 0.40, confirmed_help: 0.25, evidence: 0.15, context: 0.10, workload_fairness: 0.10}
     consent_required: true
+    expert_search_returns: counts_only  # K4
   introductions:
     invitation_expiry_hours: 72
     request_expiry_days: 14
     per_expert_pending_weekly_max: 2
+    per_requester_open_weekly_max: 2  # K3: both caps apply
+    max_candidates_per_request: 3
     reminders_hours: 24
   scheduling:
     timezone_storage: UTC
     community_timezone: Asia/Jerusalem
     daily_digest_local_time: '09:00'
     polling_seconds: 5
+    retention_local_time: '03:30'
+    backup_local_time: '04:00'
   genai:
     initial_mode: extractive_evidence_only
     local_optional_model: Qwen/Qwen3-4B-Instruct-2507
-  backup: {cadence: daily, encrypted_off_host: true, restore_test: monthly}
+  backup: {cadence: daily, keep: 14, encrypted_off_host: via_TELEPATHY_BACKUP_COMMAND, restore_test: monthly}
+  retention: {default_days: 90, owner_configurable: true}

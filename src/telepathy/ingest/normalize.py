@@ -33,6 +33,8 @@ class NormalizedMessage:
     chat_title: str | None
     media_kind: str | None
     media_file_id: str | None
+    file_name: str | None = None
+    file_size: int | None = None
 
     @property
     def dedup_key(self) -> str:
@@ -55,15 +57,15 @@ def _ts(value: Any) -> datetime:
     raise ValueError(f"unsupported timestamp {value!r}")
 
 
-def _media(msg: dict[str, Any]) -> tuple[str | None, str | None]:
+def _media(msg: dict[str, Any]) -> tuple[str | None, dict[str, Any]]:
     for kind in MEDIA_KINDS:
         item = msg.get(kind)
         if not item:
             continue
         if isinstance(item, list):  # photo sizes: keep the largest
             item = item[-1]
-        return kind, item.get("file_id") if isinstance(item, dict) else None
-    return None, None
+        return kind, item if isinstance(item, dict) else {}
+    return None, {}
 
 
 def normalize_message(msg: dict[str, Any], *, platform: str = "telegram") -> NormalizedMessage:
@@ -72,7 +74,7 @@ def normalize_message(msg: dict[str, Any], *, platform: str = "telegram") -> Nor
     edit_date = msg.get("edit_date")
     edit_dt = _ts(edit_date) if edit_date else None
     reply = msg.get("reply_to_message") or {}
-    media_kind, media_file_id = _media(msg)
+    media_kind, media = _media(msg)
     topic_id = msg.get("message_thread_id") if msg.get("is_topic_message") else None
     return NormalizedMessage(
         platform=platform,
@@ -89,7 +91,9 @@ def normalize_message(msg: dict[str, Any], *, platform: str = "telegram") -> Nor
         chat_username=chat.get("username"),
         chat_title=chat.get("title"),
         media_kind=media_kind,
-        media_file_id=media_file_id,
+        media_file_id=media.get("file_id"),
+        file_name=media.get("file_name") if media_kind == "document" else None,
+        file_size=int(media["file_size"]) if media.get("file_size") else None,
     )
 
 

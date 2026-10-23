@@ -23,6 +23,10 @@ class DefiniteFailure(Exception):
     """The provider definitely did not deliver (e.g. HTTP 400/403). Safe to mark failed."""
 
 
+class RetryLater(Exception):
+    """The provider definitely did not deliver yet (e.g. 429 flood control). Safe to retry."""
+
+
 def create_intent(
     conn: sqlite3.Connection,
     kind: str,
@@ -103,6 +107,9 @@ async def dispatch(
     except DefiniteFailure as exc:
         _set(conn, effect_id, "dispatching", "failed", now(), error=str(exc))
         return "failed"
+    except RetryLater as exc:
+        _set(conn, effect_id, "dispatching", "pending", now(), error=str(exc))
+        return "pending"
     except (asyncio.CancelledError, Exception) as exc:
         # Timeout, connection reset, cancellation: we do not know if Telegram delivered.
         _set(conn, effect_id, "dispatching", "uncertain", now(), error=repr(exc))
@@ -129,3 +136,22 @@ def reconcile(
     """Operator/reconciler decision for an uncertain intent. Never triggers a resend itself."""
     to = "reconciled" if delivered else "failed"
     return _set(conn, effect_id, "uncertain", to, now, error=note)
+
+
+def pending_ids(conn: sqlite3.Connection, limit: int = 20) -> list[str]:
+    return [
+        r[0]
+        for r in conn.execute(
+            "SELECT id FROM effect_intents WHERE state='pending' ORDER BY created_at LIMIT ?",
+            (limit,),
+        )
+    ]
+
+
+def states_for_keys(conn: sqlite3.Connection, keys: list[str]) -> dict[str, str]:
+    rows = conn.execute(
+        "SELECT idempotency_key, state FROM effect_intents WHERE idempotency_key IN "
+        "(SELECT value FROM json_each(?))",
+        (json.dumps(keys),),
+    ).fetchall()
+    return {r[0]: r[1] for r in rows}

@@ -1,13 +1,13 @@
 # Community Intelligence OS — Execution Master Plan v1.0
 
-> Status: SPECIFICATION ONLY. All engineering tasks are unchecked. Do not infer build completion, successful provider authorization, or production rights from this document.
+> Status: IMPLEMENTATION IN PROGRESS (see v1.1 corrections). All engineering tasks are unchecked. Do not infer build completion, successful provider authorization, or production rights from this document.
 
 Version date: 2026-10-23. Scope: single community, Telegram-first, source-cited knowledge, expert finder, consent-based introductions.
 
 ## Canonical authority and usage
 
 - **Authoritative status:** GitHub Issues once bootstrapped in the target repo. This Markdown is the portable initial backlog and coverage map, not a second live status tracker.
-- **No target repo has been specified:** do not create issues, branches, PRs or deployments before an owner approves a repository.
+- **Target repo:** shapefuture/Telepathy (approved by the owner). Deployments still require P00-10 sign-off.
 - **A checklist item is complete only with linked evidence:** CI job, commit SHA, independent reviewer, test artifact and requirement ID.
 - **No credentials, Telegram content or personal data in GitHub issues, prompts or public artifacts.**
 - Use isolated worktrees for independent workers. Schema, manifests, lockfile, CI and migrations have one integrator.
@@ -35,6 +35,27 @@ Version date: 2026-10-23. Scope: single community, Telegram-first, source-cited 
 | Deployment | One Linux host + encrypted off-host backup; no Next.js, graph DB, PostgreSQL, Redis or Kubernetes |
 | AI agent runtime | AAA runtime autonomy AG0/AG1 only; no self-modifying runtime, persistent learning reviewed by humans |
 | Tracker | GitHub Issues authoritative once wired; issue ID recorded for each task and gate |
+
+## v1.1 corrections (2026-10-23) — fastest safe path to production
+
+These override the sections below where they conflict. Rationale: `docs/PLAN_REVIEW.md`.
+Checkboxes and issue status are unchanged; completion still requires recorded evidence.
+
+| # | Area | Correction |
+|---|---|---|
+| K1 | Delivery model | Ship **vertical slices**, not 10-items-per-phase gates. v1 launch = P02, P03, P06 (FTS5), P07 (no OCR/ASR), P08, P09, P10 (admin-only), P11 ops minus web UI. Each slice still needs CI, tests and independent review. |
+| K2 | External providers | NVIDIA NIM and d3-turbo adapters (P04-01..08, P05-01..06) are **deferred**. They are not on the v1 critical path, because legal approval (P00-08/QG09) is required before any real input. v1 production retrieval is FTS5 + prefix matching + RU↔Latin transliteration. Semantic search plugs into `retrieval.search(semantic=...)` via RRF once a **local** embedder (multilingual-e5-small) or an approved provider exists. |
+| K3 | Introduction caps | **Both** limits apply: requester ≤ 2 open requests / 7 days, **and** expert ≤ 2 pending invitations / 7 days. At most 3 candidates per request, invited one at a time. |
+| K4 | Expert discovery | `/expert` returns **counts only**. Identities are revealed only through a mutually confirmed introduction. Self-claimed skills are confirmed by the member's own statement; auto-detected skills stay private suggestions. |
+| K5 | Admin UI | P11-01/02 (FastAPI/HTMX) deferred to v1.x. v1 admin = owner-only bot commands (`/enable`, `/disable`, `/retention`, `/forget`, `/status`, `/sources`, `/uncertain`, `/digest_now`) + CLI (`migrate`, `import`, `backup`, `verify`, `status`). No HTTP surface, so no CSRF or public-debug risk. |
+| K6 | History import | P00-01 "no user history is imported" conflicts with P03-06. Resolution: import is allowed only for an already-enabled source, run by the operator on the host (no upload endpoint), through the same idempotent ingest path. Retention still applies. |
+| K7 | Digest | Deterministic, extractive digest is the default (no LLM in v1). Recipients are admins/owners only (P10-05), and each digest is built from the recipient's own readable sources. |
+| K8 | Schema authority | `src/telepathy/storage/migrations/*.sql` is authoritative. `architecture/schema.sql` is the historical reference. Added: roles, `source_access`, `edit_version`, outbox `dispatching`, one-live-invite index, collection opt-out, documents/locators, community settings. |
+| K9 | Calendar (P09-07) | Dropped for v1. After mutual confirmation both parties get each other's live contact and arrange time directly. |
+| K10 | OCR/ASR (P07-03/04) | Scanned PDFs are marked `needs_ocr` and reported in `/status`. No OCR or transcription runs in v1. Uploaded `.vtt/.srt` transcripts are supported. |
+| K11 | Quality gates | QG01, QG05, QG06, QG07, QG09 stay **release-blocking**. QG02 (retrieval) is blocking for the canary and needs the P00-04 gold set, which an independent person must create **before** P12. QG03 (classifier) is non-blocking in v1, because the rule classifier only labels digest items and triggers no actions. QG04 needs ≥ 30 approved intents during the pilot. |
+| K12 | Retention | Default 90 days per source, configurable by an owner (`/retention`). Nightly purge also blanks raw events. Backups keep 14 days. |
+| K13 | Data rights | `/forget_me` deletes a member's messages, documents, skills, consents and live intros, and sets `collection_opt_out`, so future messages are not stored until `/resume_collection`. |
 
 ## Phase sequence and dependency gates
 

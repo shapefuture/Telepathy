@@ -6,6 +6,8 @@ import hashlib
 import re
 import unicodedata
 
+from telepathy.domain.translit import variants
+
 _WORD = re.compile(r"\w+", re.UNICODE)
 
 # Small RU/EN stopword lists: only used for evidence-coverage scoring, never for indexing.
@@ -149,20 +151,36 @@ def sha256_hex(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def fts_query(text: str, *, prefix: bool = True) -> str | None:
-    """Build a safe FTS5 MATCH expression (OR of quoted terms).
+def fts_query(text: str, *, prefix: bool = True, translit: bool = True) -> str | None:
+    """Build a safe FTS5 MATCH expression (OR of quoted terms and their variants).
 
     Every term is double-quoted so user input cannot inject FTS5 operators.
     """
     terms = content_terms(text) or [t for t in tokens(text) if len(t) > 1]
     if not terms:
         return None
-    parts = []
+    expanded: dict[str, None] = {}
     for term in terms[:16]:
+        expanded.setdefault(term, None)
+        if translit:
+            for v in variants(term):
+                expanded.setdefault(v, None)
+    parts = []
+    for term in expanded:
         quoted = '"' + term.replace('"', '""') + '"'
         # Prefix matching helps Russian inflection (e.g. "бухгалтер" ~ "бухгалтера").
         parts.append(quoted + "*" if prefix and len(term) >= 4 else quoted)
     return " OR ".join(parts)
+
+
+def stem_key(term: str) -> str:
+    """Prefix used for inflection-tolerant containment checks."""
+    return term[: max(4, len(term) - 2)] if len(term) >= 6 else term
+
+
+def term_present(term: str, folded_body: str) -> bool:
+    """True if the term, or a transliterated spelling of it, appears in the body."""
+    return any(stem_key(t) in folded_body for t in (term, *variants(term)))
 
 
 def snippet(body: str, terms: list[str], width: int = 280) -> str:

@@ -42,7 +42,7 @@ def test_migrations_are_idempotent(tmp_path):
     from telepathy.storage import db
 
     c = db.connect(tmp_path / "t.db")
-    assert db.migrate(c) == ["0001_init"]
+    assert db.migrate(c) == ["0001_init", "0002_features"]
     assert db.migrate(c) == []
     assert c.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
     assert c.execute("PRAGMA foreign_keys").fetchone()[0] == 1

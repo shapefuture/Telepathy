@@ -1,0 +1,7 @@
+Build Community Intelligence OS to the locked contracts in MASTER_PLAN.md and the minimal AAA constitution.
+
+The named benchmarks are unread (source-grounded search), Telebrief (daily digests), TelAnalysis (activity insight), and TGTLDR (catch-up). First fetch pinned real artifacts, run them on the same consented/synthetic gold corpus, and record measured baselines. Never invent an A/B result.
+
+Follow the GitHub issue dependency DAG. Use isolated worktrees for each small workcell; builders may change only assigned files. A fresh independent critic reviews each immutable candidate blind against the appropriate benchmark, identifies the single largest measurable gap, and requests a correction. Continue only while improving relevant criteria; all privacy, consent, citation, recovery, licensing, and architecture hard gates remain non-negotiable.
+
+Keep GitHub Issues as the one live progress authority, linking candidate commits, check outputs, review decisions and unresolved blockers. The active evaluator, hidden tests, and production policy cannot be modified by builders. Integrate only versioned contract-compatible components, verify a clean artifact, then shadow/canary before any production promotion. Never claim success without observed evidence.

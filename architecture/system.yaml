@@ -1,0 +1,53 @@
+schema_version: 1
+single_node: true
+python: '3.12'
+database:
+  engine: sqlite
+  pragmas: {journal_mode: WAL, foreign_keys: ON, busy_timeout_ms: 5000}
+  vector_extension: sqlite-vec
+  authoritative_tables: [raw_events, messages, documents, excerpts, consent, skill_claims, introductions, jobs, effect_intents]
+interfaces:
+  telegram: {implementation: aiogram, mode: long_polling, allowed_chat_scope: allowlist}
+  backend: {implementation: FastAPI, ui: Jinja2_HTMX, public_admin: false}
+  embeddings:
+    slot: embedding.v1
+    development_provider: nvidia_nim
+    model: nvidia/nemotron-3.5-embed-1b
+    endpoint: https://integrate.api.nvidia.com/v1/embeddings
+    dimension: 1024
+    passage_input_type: passage
+    query_input_type: query
+    truncate: NONE
+    production_with_trial: forbidden
+    outage_fallback: fts5_only
+  classification:
+    slot: classifier.v1
+    development_provider: vllm_semantic_router
+    model: vllm-sr/d3-turbo
+    endpoint: https://decision.vllm-sr.ai/v1/systemone
+    max_state_chars: 1200
+    outage_fallback: explicit_rule_based
+    production_with_private_text: forbidden
+  retrieval:
+    lexical_top_k: 40
+    semantic_top_k: 40
+    rrf_k: 60
+    evidence_expand_limit: 30
+    authorization_stage: before_any_scoring_and_before_response
+  experts:
+    scoring_weights: {domain: 0.40, confirmed_help: 0.25, evidence: 0.15, context: 0.10, workload_fairness: 0.10}
+    consent_required: true
+  introductions:
+    invitation_expiry_hours: 72
+    request_expiry_days: 14
+    per_expert_pending_weekly_max: 2
+    reminders_hours: 24
+  scheduling:
+    timezone_storage: UTC
+    community_timezone: Asia/Jerusalem
+    daily_digest_local_time: '09:00'
+    polling_seconds: 5
+  genai:
+    initial_mode: extractive_evidence_only
+    local_optional_model: Qwen/Qwen3-4B-Instruct-2507
+  backup: {cadence: daily, encrypted_off_host: true, restore_test: monthly}

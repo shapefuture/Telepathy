@@ -27,6 +27,8 @@ export interface Hit {
   event_at: string;
   url: string | null;
   score: number;
+  canonical: number;
+  superseded_by: number | null;
 }
 
 interface Row {
@@ -39,13 +41,31 @@ interface Row {
   topic_id: number | null;
   chat_id: number;
   username: string | null;
+  canonical: number;
+  superseded_by: number | null;
 }
 
-const CANDIDATES_SQL =
-  "SELECT p.id, p.source_id, p.body, p.label, p.event_at, p.msg_id, p.topic_id, s.chat_id, s.username " +
-  "FROM passages_fts f JOIN passages p ON p.id = f.rowid JOIN sources s ON s.id = p.source_id " +
-  "WHERE passages_fts MATCH ? AND p.removed_at IS NULL AND p.body IS NOT NULL AND s.enabled = 1 " +
-  "AND p.source_id IN (SELECT value FROM json_each(?)) ORDER BY bm25(passages_fts) LIMIT ?";
+/** P13-08 filters. They only narrow results; the readable set is never widened. */
+export interface SearchFilters {
+  since?: string; // ISO timestamp
+  hasFile?: boolean;
+}
+
+function candidatesSql(f: SearchFilters): string {
+  return (
+    "SELECT p.id, p.source_id, p.body, p.label, p.event_at, p.msg_id, p.topic_id, p.canonical, p.superseded_by, s.chat_id, s.username " +
+    "FROM passages_fts f JOIN passages p ON p.id = f.rowid JOIN sources s ON s.id = p.source_id " +
+    "WHERE passages_fts MATCH ? AND p.removed_at IS NULL AND p.body IS NOT NULL AND s.enabled = 1 " +
+    "AND p.source_id IN (SELECT value FROM json_each(?)) " +
+    (f.since ? "AND p.event_at >= ? " : "") +
+    (f.hasFile ? "AND p.part > 0 " : "") +
+    "ORDER BY bm25(passages_fts) LIMIT ?"
+  );
+}
+
+/** P13-07: canonical answers rank first; superseded ones sink (but stay findable, labelled). */
+export const CANONICAL_BOOST = 0.01;
+export const OUTDATED_PENALTY = 0.006;
 
 export function rrf(lists: number[][], k = RRF_K): [number, number][] {
   const scores = new Map<number, number>();
@@ -111,7 +131,12 @@ export async function voteBoost(db: D1Database, ids: number[]): Promise<Map<numb
   return out;
 }
 
-export async function search(db: D1Database, readable: Set<string>, query: string): Promise<{ hits: Hit[]; terms: string[]; fixes: Map<string, string> }> {
+export async function search(
+  db: D1Database,
+  readable: Set<string>,
+  query: string,
+  filters: SearchFilters = {},
+): Promise<{ hits: Hit[]; terms: string[]; fixes: Map<string, string> }> {
   const terms = contentTerms(query);
   const base = terms.length ? terms : tokens(query).filter((t) => t.length > 1);
   const fixes = new Map<string, string>();
@@ -121,7 +146,9 @@ export async function search(db: D1Database, readable: Set<string>, query: strin
   const fuzzy = fixes.size ? ftsQuery([...fixes.values()]) : null;
   const src = JSON.stringify([...readable].sort());
   const queries = [lexical, fuzzy].filter((q): q is string => !!q);
-  const results = await db.batch(queries.map((q) => db.prepare(CANDIDATES_SQL).bind(q, src, TOP_K)));
+  const sql = candidatesSql(filters);
+  const bind = (q: string) => (filters.since ? [q, src, filters.since, TOP_K] : [q, src, TOP_K]);
+  const results = await db.batch(queries.map((q) => db.prepare(sql).bind(...bind(q))));
   const rows = new Map<number, Row>();
   const lists = results.map((r) =>
     (r.results as unknown as Row[]).map((row) => {
@@ -132,7 +159,11 @@ export async function search(db: D1Database, readable: Set<string>, query: strin
   const fused = rrf(lists);
   const boost = await voteBoost(db, fused.map(([id]) => id));
   const hits = fused
-    .map(([id, score]) => [id, score + (boost.get(id) ?? 0)] as [number, number])
+    .map(([id, score]) => {
+      const r = rows.get(id)!;
+      const editorial = r.canonical ? CANONICAL_BOOST : r.superseded_by ? -OUTDATED_PENALTY : 0;
+      return [id, score + (boost.get(id) ?? 0) + editorial] as [number, number];
+    })
     .sort((a, b) => b[1] - a[1] || a[0] - b[0])
     .map(([id, score]) => {
     const r = rows.get(id)!;
@@ -145,6 +176,8 @@ export async function search(db: D1Database, readable: Set<string>, query: strin
       event_at: r.event_at,
       url: citation(r.chat_id, r.msg_id, r.username, r.topic_id),
       score,
+      canonical: r.canonical,
+      superseded_by: r.superseded_by,
     };
   });
   // Belt and braces: re-check authorization on the final list (C02).
@@ -160,13 +193,14 @@ export interface Quote {
   event_at: string;
   url: string | null;
   coverage: number;
+  tag?: "canonical" | "outdated";
 }
 
-export async function answer(db: D1Database, readable: Set<string>, query: string): Promise<Answer> {
+export async function answer(db: D1Database, readable: Set<string>, query: string, filters: SearchFilters = {}): Promise<Answer> {
   const terms = contentTerms(query);
   if (!terms.length) return { status: "empty", quotes: [], fixes: new Map() };
   if (!readable.size) return { status: "no_access", quotes: [], fixes: new Map() };
-  const { hits, fixes } = await search(db, readable, query);
+  const { hits, fixes } = await search(db, readable, query, filters);
   const quotes: Quote[] = [];
   for (const h of hits) {
     const folded = normalize(h.body);
@@ -174,10 +208,12 @@ export async function answer(db: D1Database, readable: Set<string>, query: strin
     const coverage = present / terms.length;
     if (coverage >= MIN_COVERAGE) {
       const keys = terms.flatMap((t) => [t, ...(fixes.has(t) ? [fixes.get(t)!] : [])]);
-      quotes.push({ id: h.id, text: snippet(h.body, keys), label: h.label, event_at: h.event_at, url: h.url, coverage });
+      const tag = h.canonical ? "canonical" : h.superseded_by ? "outdated" : undefined;
+      quotes.push({ id: h.id, text: snippet(h.body, keys), label: h.label, event_at: h.event_at, url: h.url, coverage, ...(tag ? { tag } : {}) });
     }
   }
-  quotes.sort((a, b) => b.coverage - a.coverage); // stable: keeps RRF order among ties
+  // Canonical answers first, then coverage; stable sort keeps rank order among ties.
+  quotes.sort((a, b) => Number(b.tag === "canonical") - Number(a.tag === "canonical") || b.coverage - a.coverage);
   return { status: quotes.length ? "answered" : "insufficient", quotes: quotes.slice(0, MAX_QUOTES), fixes };
 }
 
@@ -203,7 +239,7 @@ export function renderAnswer(
   a.quotes.forEach((q, i) => {
     const when = date.format(new Date(q.event_at));
     const src = q.url ? `<a href="${escapeHtml(q.url)}">${m.source}</a>` : m.sourceUnavailable;
-    const label = q.label ? ` · ${escapeHtml(q.label)}` : "";
+    const label = (q.label ? ` · ${escapeHtml(q.label)}` : "") + (q.tag === "canonical" ? ` · ${m.canonicalTag}` : q.tag === "outdated" ? ` · ${m.outdatedTag}` : "");
     lines.push(`\n${i + 1}. <blockquote>${escapeHtml(q.text)}</blockquote>\n${when}${label} · ${src}`);
   });
   if (!opts.answerId) return { text: lines.join("\n") };
@@ -216,4 +252,41 @@ export function renderAnswer(
     a.quotes.map((_, i) => ({ text: m.fbWrong(i + 1), callback_data: `f:${id}:bad${i}` })),
   ];
   return { text: lines.join("\n"), buttons };
+}
+
+/**
+ * P13-08: parse `in:<group> since:<date|Nd|Nh> has:file` out of a query.
+ * `in:` keeps only readable groups whose title contains the word, so it can only narrow access.
+ */
+export async function parseFilters(
+  db: D1Database,
+  readable: Set<string>,
+  raw: string,
+  now = new Date(),
+): Promise<{ query: string; readable: Set<string>; filters: SearchFilters }> {
+  const filters: SearchFilters = {};
+  let scope = readable;
+  const rest: string[] = [];
+  for (const tok of raw.split(/\s+/)) {
+    const m = /^(in|since|has):(.+)$/i.exec(tok);
+    if (!m) {
+      rest.push(tok);
+      continue;
+    }
+    const [, key, val] = m as unknown as [string, string, string];
+    if (key.toLowerCase() === "has" && val.toLowerCase() === "file") filters.hasFile = true;
+    else if (key.toLowerCase() === "since") {
+      const rel = /^(\d+)([hd])$/i.exec(val);
+      const t = rel ? now.getTime() - Number(rel[1]) * (rel[2]!.toLowerCase() === "h" ? 3_600_000 : 86_400_000) : Date.parse(val);
+      if (Number.isFinite(t)) filters.since = new Date(t).toISOString().replace(/\.\d{3}Z$/, "Z");
+      else rest.push(tok);
+    } else if (key.toLowerCase() === "in") {
+      const { results } = await db
+        .prepare("SELECT id FROM sources WHERE enabled = 1 AND lower(COALESCE(title, '')) LIKE ? AND id IN (SELECT value FROM json_each(?))")
+        .bind(`%${val.toLowerCase().replaceAll("%", "").replaceAll("_", "")}%`, JSON.stringify([...scope]))
+        .all<{ id: string }>();
+      scope = new Set(results.map((r) => r.id).filter((id) => scope.has(id)));
+    } else rest.push(tok);
+  }
+  return { query: rest.join(" ").trim(), readable: scope, filters };
 }

@@ -21,6 +21,13 @@ export function localParts(d: Date, tz: string): { date: string; hour: number } 
   return { date: `${get("year")}-${get("month")}-${get("day")}`, hour: Number(get("hour")) };
 }
 
+/** Minutes the timezone is ahead of UTC at that instant (e.g. +180 for Asia/Jerusalem in summer). */
+export function tzOffsetMinutes(d: Date, tz: string): number {
+  const p = new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).formatToParts(d);
+  const g = (t: string) => Number(p.find((x) => x.type === t)?.value);
+  return Math.round((Date.UTC(g("year"), g("month") - 1, g("day"), g("hour"), g("minute")) - Math.floor(d.getTime() / 60_000) * 60_000) / 60_000);
+}
+
 /** Constant-time string comparison for secrets. */
 export function safeEqual(a: string, b: string): boolean {
   const enc = new TextEncoder();

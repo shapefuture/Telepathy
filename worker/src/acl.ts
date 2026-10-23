@@ -23,6 +23,8 @@ export interface Member {
   removed_at: string | null;
   lang: Lang | null;
   lang_explicit: number;
+  routing: number;
+  catchup_at: string | null;
 }
 
 /** Interface language for a member (stored choice, else English). */

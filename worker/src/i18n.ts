@@ -27,7 +27,8 @@ const EN = {
     "/expert <i>topic</i> — how many opted-in experts match\n/requests — your open requests\n\n" +
     "<b>Your profile</b>\n/profile — view and change settings\n/digest on · /digest off — daily digest (opt-in)\n" +
     "/optin · /optout — expert discoverability\n/skills · /skills add <i>skill</i> · /skills remove <i>skill</i> · /skills all\n" +
-    "/language en · /language ru — interface language\n\n" +
+    "/language en · /language ru — interface language\n/catchup — what's new since last time · /events — upcoming events · /pings on|off\n" +
+    "Search filters: <code>in:group since:2026-01-01 has:file</code>\n\n" +
     "<b>Your data</b>\n/privacy · /forget_me · /resume_collection",
   privacy:
     "<b>Telepathy privacy notice</b>\n" +
@@ -188,6 +189,34 @@ const EN = {
   bNotDelivered: "Not delivered",
   recorded: "Recorded.",
   alreadyResolved: "Already resolved.",
+
+  // v2.1b
+  routingUsage: "Usage: /routing on or /routing off (owner, in an enabled group).",
+  routingOn: "Routing is <b>on</b>: questions with no reply after 4 hours are sent privately to up to 2 opted-in experts who can read this group.",
+  routingOff: "Routing is off.",
+  routePing: (labels: string, snippet: string, link: string) =>
+    `<b>A question in your group is waiting for an answer</b> (<i>${labels}</i>):\n<blockquote>${snippet}</blockquote>\n${link}\n\nYou get this because you opted in as an expert. Stop these: /pings off`,
+  openQuestion: "open the question",
+  pingsUsage: "Usage: /pings on or /pings off",
+  pingsOn: "You'll get occasional pings about unanswered questions in your skills.",
+  pingsOff: "No more pings about unanswered questions.",
+  catchupUsage: "Usage: <code>/catchup</code>, <code>/catchup 12h</code> or <code>/catchup 3d</code>",
+  catchupNothing: "Nothing new in your groups since then.",
+  canonicalSet: "⭐ Marked as the canonical answer. It will rank first for this topic.",
+  canonicalSuperseded: (n: number) => `⭐ Marked as the canonical answer. ${n} older canonical answer(s) are now labelled outdated.`,
+  canonicalTag: "⭐ canonical",
+  outdatedTag: "⚠️ outdated",
+  suggestSkill: (label: string) =>
+    `You've answered several questions about <b>${label}</b>. Add it to your skills? Only you can see this suggestion, and nothing changes unless you accept.`,
+  bAddSkill: "Add skill",
+  bNoThanks: "No thanks",
+  suggestAdded: "Added to your skills.",
+  suggestDismissed: "OK, I won't suggest it again.",
+  eventsTitle: "<b>Upcoming events</b>",
+  eventsNone: "No upcoming events found in your groups.",
+  eventsIcs: "Calendar file for these events:",
+  eventHidden: "Hidden from /events.",
+  appButton: "Open app",
 };
 
 export type Messages = typeof EN;
@@ -209,7 +238,8 @@ const RU: Messages = {
     "/expert <i>тема</i> — сколько экспертов подходит\n/requests — ваши открытые запросы\n\n" +
     "<b>Ваш профиль</b>\n/profile — настройки\n/digest on · /digest off — ежедневная сводка (по желанию)\n" +
     "/optin · /optout — видимость как эксперта\n/skills · /skills add <i>навык</i> · /skills remove <i>навык</i> · /skills all\n" +
-    "/language ru · /language en — язык интерфейса\n\n" +
+    "/language ru · /language en — язык интерфейса\n/catchup — что нового · /events — ближайшие события · /pings on|off\n" +
+    "Фильтры поиска: <code>in:группа since:2026-01-01 has:file</code>\n\n" +
     "<b>Ваши данные</b>\n/privacy · /forget_me · /resume_collection",
   privacy:
     "<b>Telepathy: конфиденциальность</b>\n" +
@@ -362,6 +392,33 @@ const RU: Messages = {
   bNotDelivered: "Не дошло",
   recorded: "Записано.",
   alreadyResolved: "Уже решено.",
+
+  routingUsage: "Использование: /routing on или /routing off (владелец, в подключённой группе).",
+  routingOn: "Маршрутизация <b>включена</b>: вопросы без ответа через 4 часа приватно отправляются максимум 2 экспертам, которые согласились и могут читать эту группу.",
+  routingOff: "Маршрутизация выключена.",
+  routePing: (labels: string, snippet: string, link: string) =>
+    `<b>Вопрос в вашей группе ждёт ответа</b> (<i>${labels}</i>):\n<blockquote>${snippet}</blockquote>\n${link}\n\nВы получили это, потому что согласились быть экспертом. Отключить: /pings off`,
+  openQuestion: "открыть вопрос",
+  pingsUsage: "Использование: /pings on или /pings off",
+  pingsOn: "Иногда буду присылать вопросы без ответа по вашим навыкам.",
+  pingsOff: "Больше не буду присылать вопросы без ответа.",
+  catchupUsage: "Использование: <code>/catchup</code>, <code>/catchup 12h</code> или <code>/catchup 3d</code>",
+  catchupNothing: "С тех пор в ваших группах ничего нового.",
+  canonicalSet: "⭐ Отмечено как основной ответ. Он будет первым по этой теме.",
+  canonicalSuperseded: (n: number) => `⭐ Отмечено как основной ответ. Старых основных ответов помечено устаревшими: ${n}.`,
+  canonicalTag: "⭐ основной ответ",
+  outdatedTag: "⚠️ устарело",
+  suggestSkill: (label: string) =>
+    `Вы ответили на несколько вопросов по теме <b>${label}</b>. Добавить её в ваши навыки? Это предложение видите только вы, и ничего не изменится без вашего согласия.`,
+  bAddSkill: "Добавить навык",
+  bNoThanks: "Нет, спасибо",
+  suggestAdded: "Добавлено в ваши навыки.",
+  suggestDismissed: "Хорошо, больше не предложу.",
+  eventsTitle: "<b>Ближайшие события</b>",
+  eventsNone: "В ваших группах не найдено предстоящих событий.",
+  eventsIcs: "Файл календаря с этими событиями:",
+  eventHidden: "Скрыто из /events.",
+  appButton: "Открыть приложение",
 };
 
 export const MESSAGES: Record<Lang, Messages> = { en: EN, ru: RU };

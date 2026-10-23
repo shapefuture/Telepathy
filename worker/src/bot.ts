@@ -8,16 +8,18 @@ import { ensureMember, grantStatement, langOf, memberByTg, readable, revoke, VIS
 import { digestHour, ownerIds, timezone, type Env } from "./env";
 import { eligibleCandidates, label, labelIn, labelsFor, matchSkills, resolveSkill, TAXONOMY } from "./experts";
 import { recordAnswer, vote } from "./feedback";
+import { build as buildDigest } from "./digest";
+import { answerSuggestion, detectEvent, markCanonical, toIcs, upcomingEvents } from "./features";
 import { maybeHint } from "./hints";
 import { langFromCode, T, type Lang, type Messages } from "./i18n";
-import { docOffloadable, docSupported, EDGE_DOC_MAX_BYTES, enabledSource, ingestMessage, removeMessage, storeDocument, type TgMessage, type TgUser } from "./ingest";
+import { citation, docOffloadable, docSupported, EDGE_DOC_MAX_BYTES, enabledSource, ingestMessage, removeMessage, storeDocument, type TgMessage, type TgUser } from "./ingest";
 import { act, cancelNeed, IntroError, requestIntro } from "./intros";
 import { reconcile } from "./outbox";
 import { forgetMember } from "./rights";
-import { answer, renderAnswer } from "./search";
+import { answer, parseFilters, renderAnswer } from "./search";
 import type { InlineButton, Telegram } from "./telegram";
 import { escapeHtml } from "./text";
-import { audit, newId, nowIso } from "./util";
+import { audit, DAY, HOUR, localParts, newId, nowIso, tzOffsetMinutes } from "./util";
 
 export interface App {
   env: Env;
@@ -48,7 +50,7 @@ export interface Update {
 /** Kept for tests and docs: the English privacy notice. */
 export const PRIVACY_NOTICE = T("en").privacy;
 
-const PRIVATE_ONLY = new Set(["intro", "expert", "profile", "optin", "optout", "skills", "forget_me", "digest", "requests", "language"]);
+const PRIVATE_ONLY = new Set(["intro", "expert", "profile", "optin", "optout", "skills", "forget_me", "digest", "requests", "language", "catchup", "events", "pings", "app"]);
 const GROUP_TYPES = new Set(["group", "supergroup"]);
 const btn = (text: string, data: string): InlineButton => ({ text, callback_data: data });
 
@@ -86,6 +88,9 @@ export function rateOk(userId: number, perMinute: number, now = Date.now()): boo
   return true;
 }
 export const resetRateLimits = () => hits.clear();
+
+/** Public origin for links back to this Worker (set PUBLIC_URL; falls back to workers.dev naming). */
+const appOrigin = (app: App) => (app.env.PUBLIC_URL ?? "").replace(/\/$/, "");
 
 const isOwner = (app: App, userId?: number) => userId !== undefined && ownerIds(app.env).has(userId);
 const rateLimit = (app: App) => Number(app.env.ASK_RATE_PER_MINUTE ?? "10") || 10;
@@ -156,7 +161,10 @@ async function onMessage(app: App, msg: TgMessage, edited: boolean): Promise<str
       if (command.cmd === "enable") return cmdEnable(app, msg, command.args);
       if (command.cmd === "disable") return cmdDisable(app, msg);
       if (command.cmd === "retention") return cmdRetention(app, msg, command.args);
-      if (command.cmd === "hints") return cmdHints(app, msg, command.args);
+      if (command.cmd === "hints") return cmdToggle(app, msg, command.args, "hints");
+      if (command.cmd === "routing") return cmdToggle(app, msg, command.args, "routing");
+      if (command.cmd === "canonical") return cmdCanonical(app, msg);
+      if (command.cmd === "notevent") return cmdNotEvent(app, msg);
       if (command.cmd === "forget") return cmdForgetMessage(app, msg);
     }
     const keys: string[] = [];
@@ -174,6 +182,8 @@ async function ingest(app: App, msg: TgMessage, edited: boolean): Promise<string
   const { outcome, source } = await ingestMessage(app.db, msg);
   if (outcome !== "stored" || !source || edited || msg.edit_date) return [];
   const keys: string[] = [];
+  const text = msg.text ?? msg.caption ?? "";
+  if (text) await detectEvent(app.db, source.id, msg.message_id, text, new Date(), tzOffsetMinutes(new Date(), timezone(app.env)));
   if (!msg.document) {
     const hint = await maybeHint(app.db, source, msg, await langForUser(app, msg.from));
     if (hint) keys.push(hint);
@@ -210,7 +220,8 @@ async function groupAsk(app: App, msg: TgMessage, question: string): Promise<str
   }
   const asker = await ensureMember(app.db, msg.from.id, undefined, msg.from.language_code);
   if (asker.collection_opt_out || asker.removed_at) return [];
-  const a = await answer(app.db, new Set([source.id]), question);
+  const f = await parseFilters(app.db, new Set([source.id]), question);
+  const a = await answer(app.db, f.readable, f.query, f.filters);
   const answerId = a.status === "answered" ? await recordAnswer(app.db, asker.id, a.quotes.map((q) => q.id)) : undefined;
   const r = renderAnswer(a, timezone(app.env), lang, { scope: "group", answerId });
   await reply(app, msg.chat.id, r.text, r.buttons, msg.message_id);
@@ -270,19 +281,45 @@ async function cmdRetention(app: App, msg: TgMessage, args: string): Promise<str
   return [];
 }
 
-/** P13-02: per-group opt-in for "already answered" hints. Turning it on is the owner's sign-off. */
-async function cmdHints(app: App, msg: TgMessage, args: string): Promise<string[]> {
+/** Per-group opt-ins that make the bot speak unprompted: hints (P13-02) and routing (P13-03). */
+async function cmdToggle(app: App, msg: TgMessage, args: string, col: "hints" | "routing"): Promise<string[]> {
   if (!(await ownerInGroup(app, msg))) return [];
   const m = T(await langForUser(app, msg.from));
   const src = await enabledSource(app.db, msg.chat.id);
   const arg = args.trim().toLowerCase();
   if (!src || (arg !== "on" && arg !== "off")) {
-    await reply(app, msg.chat.id, m.hintsUsage);
+    await reply(app, msg.chat.id, col === "hints" ? m.hintsUsage : m.routingUsage);
     return [];
   }
-  await app.db.prepare("UPDATE sources SET hints=? WHERE id=?").bind(arg === "on" ? 1 : 0, src.id).run();
-  await audit(app.db, "source.hints", String(msg.from!.id), src.id, { on: arg === "on" });
-  await reply(app, msg.chat.id, arg === "on" ? m.hintsOn : m.hintsOff);
+  await app.db.prepare(`UPDATE sources SET ${col}=? WHERE id=?`).bind(arg === "on" ? 1 : 0, src.id).run();
+  await audit(app.db, `source.${col}`, String(msg.from!.id), src.id, { on: arg === "on" });
+  const text = col === "hints" ? (arg === "on" ? m.hintsOn : m.hintsOff) : arg === "on" ? m.routingOn : m.routingOff;
+  await reply(app, msg.chat.id, text);
+  return [];
+}
+
+/** P13-07: an owner (chat admin) replies /canonical to the best answer on a topic. */
+async function cmdCanonical(app: App, msg: TgMessage): Promise<string[]> {
+  const target = msg.reply_to_message;
+  const src = await enabledSource(app.db, msg.chat.id);
+  if (!target || !src || !(await ownerInGroup(app, msg))) return [];
+  const m = T(await langForUser(app, msg.from));
+  const r = await markCanonical(app.db, src.id, target.message_id);
+  if (!r.ok) await reply(app, msg.chat.id, m.nothingStored, undefined, msg.message_id);
+  else {
+    await audit(app.db, "passage.canonical", String(msg.from!.id), `${src.id}:${target.message_id}`, { superseded: r.superseded });
+    await reply(app, msg.chat.id, r.superseded ? m.canonicalSuperseded(r.superseded) : m.canonicalSet, undefined, msg.message_id);
+  }
+  return [];
+}
+
+/** P13-10: moderators hide a false-positive event by replying /notevent to it. */
+async function cmdNotEvent(app: App, msg: TgMessage): Promise<string[]> {
+  const target = msg.reply_to_message;
+  const src = await enabledSource(app.db, msg.chat.id);
+  if (!target || !src || !(await ownerInGroup(app, msg))) return [];
+  await app.db.prepare("UPDATE events SET hidden=1 WHERE source_id=? AND msg_id=?").bind(src.id, target.message_id).run();
+  await reply(app, msg.chat.id, T(await langForUser(app, msg.from)).eventHidden, undefined, msg.message_id);
   return [];
 }
 
@@ -380,7 +417,8 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
         await reply(app, chat, m.tooMany);
         return [];
       }
-      const a = await answer(app.db, await readable(app.db, mem), args);
+      const f = await parseFilters(app.db, await readable(app.db, mem), args);
+      const a = await answer(app.db, f.readable, f.query, f.filters);
       const answerId = a.status === "answered" ? await recordAnswer(app.db, mem.id, a.quotes.map((q) => q.id)) : undefined;
       const r = renderAnswer(a, timezone(app.env), lang, { answerId });
       await reply(app, chat, r.text, r.buttons);
@@ -456,6 +494,55 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
     }
     case "forget_me":
       await reply(app, chat, m.forgetConfirm, [[btn(m.bForgetYes, "fm:yes"), btn(m.bCancel, "fm:no")]]);
+      return [];
+    case "catchup": {
+      if (!rateOk(from.id, rateLimit(app))) {
+        await reply(app, chat, m.tooMany);
+        return [];
+      }
+      const rel = /^(\d+)([hd])$/i.exec(args.trim());
+      if (args.trim() && !rel) {
+        await reply(app, chat, m.catchupUsage);
+        return [];
+      }
+      const now = new Date();
+      const startMs = rel ? now.getTime() - Number(rel[1]) * (rel[2]!.toLowerCase() === "h" ? HOUR : DAY) : mem.catchup_at ? Date.parse(mem.catchup_at) : now.getTime() - DAY;
+      const start = nowIso(new Date(Math.max(startMs, now.getTime() - 30 * DAY)));
+      // End is exclusive and second-precise: include this very second; the next window starts there.
+      const end = nowIso(new Date(now.getTime() + 1000));
+      const text = await buildDigest(app.db, await readable(app.db, mem), start, end, localParts(now, timezone(app.env)).date, lang);
+      await app.db.prepare("UPDATE members SET catchup_at=? WHERE id=?").bind(end, mem.id).run();
+      await reply(app, chat, text ?? m.catchupNothing);
+      return [];
+    }
+    case "events": {
+      const evs = await upcomingEvents(app.db, await readable(app.db, mem));
+      if (!evs.length) {
+        await reply(app, chat, m.eventsNone);
+        return [];
+      }
+      const fmt = new Intl.DateTimeFormat(lang === "ru" ? "ru-RU" : "en-GB", { timeZone: timezone(app.env), dateStyle: "medium", timeStyle: "short" });
+      const lines = evs.map((e) => {
+        const url = citation(e.chat_id, e.msg_id, e.username);
+        return `• ${fmt.format(new Date(e.starts_at))} — ${url ? `<a href="${escapeHtml(url)}">${escapeHtml(e.title)}</a>` : escapeHtml(e.title)}`;
+      });
+      await reply(app, chat, `${m.eventsTitle}\n${lines.join("\n")}`);
+      await app.tg.sendFile(chat, "telepathy-events.ics", toIcs(evs), "text/calendar", m.eventsIcs);
+      return [];
+    }
+    case "pings": {
+      const arg = args.trim().toLowerCase();
+      if (arg !== "on" && arg !== "off") {
+        await reply(app, chat, m.pingsUsage);
+        return [];
+      }
+      await app.db.prepare("UPDATE members SET routing=? WHERE id=?").bind(arg === "on" ? 1 : 0, mem.id).run();
+      await reply(app, chat, arg === "on" ? m.pingsOn : m.pingsOff);
+      return [];
+    }
+    case "app":
+      // Without PUBLIC_URL the chat menu button (set by /admin/setup) is the way in.
+      await reply(app, chat, m.appButton, appOrigin(app) ? [[{ text: m.appButton, web_app: { url: `${appOrigin(app)}/app` } } as unknown as InlineButton]] : undefined);
       return [];
     case "resume_collection":
       await app.db.prepare("UPDATE members SET collection_opt_out=0 WHERE id=?").bind(mem.id).run();
@@ -583,6 +670,12 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
   }
   const m = T(langOf(mem));
   let keys: string[] = [];
+  if (kind === "s") {
+    const ok = await answerSuggestion(app.db, mem.id, a, b === "add");
+    await answerCb(!ok ? m.notAvailable : b === "add" ? m.suggestAdded : m.suggestDismissed);
+    await clearButtons();
+    return [];
+  }
   if (kind === "f") {
     // Feedback stays on the message (others in a group may vote too); only a toast confirms it.
     const r = await vote(app.db, a, mem.id, b);

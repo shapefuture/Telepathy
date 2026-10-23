@@ -24,7 +24,10 @@ export function fakeTelegram(opts: { admins?: number[]; files?: Record<string, s
       return new Response(opts.files?.[path] ?? "", { status: 200 });
     }
     const method = url.split("/").pop()!;
-    const params = JSON.parse(String(init.body ?? "{}"));
+    const params: Record<string, any> =
+      init.body instanceof FormData
+        ? Object.fromEntries([...init.body.entries()].map(([k, v]) => [k, typeof v === "string" ? v : { name: (v as File).name, text: v }]))
+        : JSON.parse(String(init.body ?? "{}"));
     calls.push({ method, params });
     const f = opts.fail?.[method];
     if (f === "network") throw new TypeError("network connection lost");

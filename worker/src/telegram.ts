@@ -17,6 +17,8 @@ export interface Telegram {
     text: string,
     opts?: { buttons?: InlineButton[][]; replyTo?: number },
   ): Promise<{ message_id: number }>;
+  /** Send a small generated file (e.g. an .ics calendar) as a document. */
+  sendFile(chatId: number, fileName: string, content: string, mime: string, caption?: string): Promise<{ message_id: number }>;
   /** Download a file as UTF-8 text, refusing anything larger than maxBytes. */
   fileText(fileId: string, maxBytes: number): Promise<string>;
   /** Number of outbound calls made by this instance (Workers cap subrequests). */
@@ -63,6 +65,22 @@ export function createTelegram(token: string, fetcher: Fetcher = fetch): Telegra
       if (opts.buttons) params.reply_markup = { inline_keyboard: opts.buttons };
       if (opts.replyTo) params.reply_parameters = { message_id: opts.replyTo, allow_sending_without_reply: true };
       return call("sendMessage", params);
+    },
+    async sendFile(chatId, fileName, content, mime, caption) {
+      calls += 1;
+      const form = new FormData();
+      form.set("chat_id", String(chatId));
+      if (caption) {
+        form.set("caption", caption);
+        form.set("parse_mode", "HTML");
+      }
+      form.set("document", new Blob([content], { type: mime }), fileName);
+      const res = await fetcher(`https://api.telegram.org/bot${token}/sendDocument`, { method: "POST", body: form });
+      const data = (await res.json()) as { ok?: boolean; result?: { message_id: number }; error_code?: number; description?: string };
+      if (data.ok && data.result) return data.result;
+      const code = data.error_code ?? res.status;
+      if (code === 400 || code === 403) throw new DefiniteFailure(`telegram sendDocument: ${code} ${data.description ?? ""}`);
+      throw new Error(`telegram sendDocument: ${code}`);
     },
     async fileText(fileId, maxBytes) {
       const f = await call<{ file_path?: string; file_size?: number }>("getFile", { file_id: fileId });

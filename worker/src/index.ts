@@ -1,6 +1,7 @@
 // Worker entry: Telegram webhook, operator endpoints, and the cron trigger.
 
 import { handleUpdate, status, type App, type Update } from "./bot";
+import { handleApp } from "./app";
 import { runCron } from "./cron";
 import type { Env } from "./env";
 import { MAX_CHUNKS, storeChunks } from "./ingest";
@@ -21,6 +22,9 @@ export const COMMANDS = [
   { command: "privacy", description: "What is stored and why" },
   { command: "forget_me", description: "Delete your data" },
   { command: "language", description: "Interface language: en or ru" },
+  { command: "catchup", description: "What's new since last time" },
+  { command: "events", description: "Upcoming events" },
+  { command: "app", description: "Open the Telepathy app" },
   { command: "help", description: "All commands" },
 ];
 
@@ -38,6 +42,7 @@ function bearerOk(req: Request, env: Env): boolean {
 export async function handleFetch(req: Request, env: Env, fetcher?: Fetcher): Promise<Response> {
   const url = new URL(req.url);
   if (req.method === "GET" && url.pathname === "/health") return new Response("ok");
+  if (url.pathname === "/app" || url.pathname.startsWith("/app/api/")) return handleApp(req, env);
 
   if (req.method === "POST" && url.pathname === "/telegram") {
     // Telegram echoes the secret we registered with setWebhook (P11-02).
@@ -77,7 +82,9 @@ export async function handleFetch(req: Request, env: Env, fetcher?: Fetcher): Pr
         max_connections: 10,
       });
       const cmds = await app.tg.call("setMyCommands", { commands: COMMANDS, scope: { type: "all_private_chats" } });
-      return json({ webhook: hook, commands: cmds, url: `${url.origin}/telegram` });
+      // P13-11: Mini App in the chat menu button.
+      const menu = await app.tg.call("setChatMenuButton", { menu_button: { type: "web_app", text: "Telepathy", web_app: { url: `${url.origin}/app` } } });
+      return json({ webhook: hook, commands: cmds, menu, url: `${url.origin}/telegram`, app: `${url.origin}/app` });
     }
     if (req.method === "GET" && url.pathname === "/admin/status") return json(await status(app.db));
     if (req.method === "POST" && url.pathname === "/admin/cron") return json(await runCron(app));

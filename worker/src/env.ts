@@ -13,6 +13,8 @@ export interface Env {
   BOT_USERNAME?: string;
   /** "true" = queue PDF/DOCX/PPTX for the GitHub Actions parser (sends files via GitHub runners). */
   OFFLOAD_DOCUMENTS?: string;
+  /** Public https origin of this Worker, e.g. https://telepathy.you.workers.dev (Mini App links). */
+  PUBLIC_URL?: string;
 }
 
 export function ownerIds(env: Env): Set<number> {

@@ -34,6 +34,15 @@ question with a link to an earlier answer in the same group.
 **Answer feedback.** 👍/👎 and "wrong source" buttons are private. Nobody sees who voted;
 totals only nudge search ranking. `/forget_me` deletes your votes.
 
+**Pings and suggestions.** If an owner turns on routing for a group, opted-in experts may get a
+private link to an unanswered question in a group they already read. After you've answered
+several questions on a topic, the bot may privately suggest adding it to your skills; nothing
+changes unless you accept. `/pings off` stops question pings.
+
+**Events and the app.** Upcoming events are detected from announcements and shown only to people
+who can read those groups. The in-Telegram app uses your Telegram identity, which Telegram signs;
+it shows the same data as the bot and collects nothing new.
+
 **Daily digest.** Off by default. Turn it on with `/digest on`. It summarises only the groups you
 can read, and `/digest off` stops it at any time.
 

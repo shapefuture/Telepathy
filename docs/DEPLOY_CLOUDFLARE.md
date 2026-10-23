@@ -50,6 +50,14 @@ curl -X POST https://telepathy.<you>.workers.dev/admin/setup \
 4. Optional: `/hints on` in a group. When someone asks a question that group already answered,
    the bot replies once with a link to the earlier thread (at most one hint per 10 minutes per
    group). It's off by default because the bot then speaks without being asked.
+5. Optional: `/routing on` in a group. Questions with no reply after 4 hours go privately to at
+   most 2 opted-in experts who can read that group (max 3 pings per expert per day; experts stop
+   them with `/pings off`). Also off by default.
+6. Moderation (owner + chat admin, reply to a message): `/canonical` marks the best answer on a
+   topic, and older canonical answers on it are labelled outdated. `/notevent` hides a wrong event.
+7. Members: `/catchup [12h|3d]`, `/events` (with an .ics file), search filters
+   `in:<group> since:<date|7d> has:file`, and the **Mini App** (chat menu button set by
+   `/admin/setup`; set `PUBLIC_URL` in `wrangler.jsonc` to also enable the `/app` button).
 
 Full history is kept by default. `/retention 365` (in the group) purges older messages daily,
 and `/retention 0` returns to keep-all.

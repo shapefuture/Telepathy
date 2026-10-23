@@ -63,7 +63,7 @@ def forget_member(conn: sqlite3.Connection, member_id: str, now: datetime) -> Fo
             )
         conn.execute(
             "UPDATE members SET discovery_opt_in=0, collection_opt_out=1, available=0, "
-            "profile_visibility='private' WHERE id=?",
+            "digest_opt_in=0, profile_visibility='private' WHERE id=?",
             (member_id,),
         )
         audit(
@@ -84,7 +84,10 @@ def resume_collection(conn: sqlite3.Connection, member_id: str) -> None:
 def apply_retention(conn: sqlite3.Connection, now: datetime, *, batch: int = 500) -> int:
     """Purge messages older than their source's retention_days. Returns count purged."""
     total = 0
-    sources = conn.execute("SELECT id, retention_days FROM sources").fetchall()
+    # retention_days = 0 means keep full history: never purged.
+    sources = conn.execute(
+        "SELECT id, retention_days FROM sources WHERE retention_days > 0"
+    ).fetchall()
     ts = to_iso(now)
     for s in sources:
         cutoff = to_iso(now - timedelta(days=int(s["retention_days"])))

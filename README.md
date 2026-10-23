@@ -23,10 +23,10 @@ called; the egress guard denies them by default.
 - **Introductions:** `/intro <need>` invites the best-matching expert anonymously. Contacts
   are exchanged only after the expert accepts **and** the requester confirms. Weekly caps,
   72 h expiry, one reminder, private feedback.
-- **Daily digest:** admin-only summary of activity, open/answered questions and new
-  documents.
-- **Data rights:** `/forget_me`, `/forget` (reply to a message), per-group retention, nightly
-  purge.
+- **Daily digest:** opt-in summary (`/digest on`) of activity, open/answered questions and new
+  documents in the groups you can read.
+- **Data rights:** full history by default. `/forget_me` and `/forget` (reply to a message)
+  delete your data. Owners can set a per-group retention limit with `/retention N`.
 - **Ops:** verified daily backups, `/status` metrics, crash-safe sends (`/uncertain` to
   reconcile), systemd unit and Dockerfile.
 

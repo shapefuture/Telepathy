@@ -66,13 +66,18 @@ def enable_source(
     title: str | None = None,
     public_username: str | None = None,
     platform: str = "telegram",
+    retention_days: int = 0,
 ) -> str:
-    """Authorize a chat for collection. Caller must have verified the actor is an owner."""
+    """Authorize a chat for collection. Caller must have verified the actor is an owner.
+
+    retention_days=0 keeps full history.
+    """
     now = to_iso(utcnow())
     with transaction(conn):
         conn.execute(
             "INSERT INTO sources(id, community_id, platform, external_ref, title, public_username, "
-            "visibility, enabled, enabled_by, enabled_at) VALUES (?,?,?,?,?,?,?,1,?,?) "
+            "visibility, enabled, enabled_by, enabled_at, retention_days) "
+            "VALUES (?,?,?,?,?,?,?,1,?,?,?) "
             "ON CONFLICT(community_id, platform, external_ref) DO UPDATE SET enabled=1, "
             "visibility=excluded.visibility, enabled_by=excluded.enabled_by, "
             "enabled_at=excluded.enabled_at, title=excluded.title, "
@@ -87,6 +92,7 @@ def enable_source(
                 visibility.value,
                 enabled_by_member_id,
                 now,
+                retention_days,
             ),
         )
         sid = conn.execute(

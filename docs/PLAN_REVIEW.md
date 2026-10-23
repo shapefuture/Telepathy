@@ -52,7 +52,7 @@ reliability gates stay hard, and the provider work moves after launch (K1, K2).
 
 Code-side items are done. The rest needs people:
 
-- [ ] **Owner sign-off (P00-10):** privacy notice (`docs/PRIVACY.md`), retention (90 d), owner
+- [ ] **Owner sign-off (P00-10):** privacy notice (`docs/PRIVACY.md`), retention (full history), owner
       IDs, which groups and visibilities.
 - [ ] **Deploy** on the host per `docs/RUNBOOK.md`. Pin the Docker base image digest.
 - [ ] **Off-host encrypted backup** configured (`TELEPATHY_BACKUP_COMMAND`) and **one restore

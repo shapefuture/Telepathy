@@ -49,13 +49,16 @@ Checkboxes and issue status are unchanged; completion still requires recorded ev
 | K4 | Expert discovery | `/expert` returns **counts only**. Identities are revealed only through a mutually confirmed introduction. Self-claimed skills are confirmed by the member's own statement; auto-detected skills stay private suggestions. |
 | K5 | Admin UI | P11-01/02 (FastAPI/HTMX) deferred to v1.x. v1 admin = owner-only bot commands (`/enable`, `/disable`, `/retention`, `/forget`, `/status`, `/sources`, `/uncertain`, `/digest_now`) + CLI (`migrate`, `import`, `backup`, `verify`, `status`). No HTTP surface, so no CSRF or public-debug risk. |
 | K6 | History import | P00-01 "no user history is imported" conflicts with P03-06. Resolution: import is allowed only for an already-enabled source, run by the operator on the host (no upload endpoint), through the same idempotent ingest path. Retention still applies. |
-| K7 | Digest | Deterministic, extractive digest is the default (no LLM in v1). Recipients are admins/owners only (P10-05), and each digest is built from the recipient's own readable sources. |
+| K7 | Digest | Deterministic, extractive digest is the default (no LLM in v1). Each digest is built from the recipient's own readable sources. **Superseded by K14.** |
 | K8 | Schema authority | `src/telepathy/storage/migrations/*.sql` is authoritative. `architecture/schema.sql` is the historical reference. Added: roles, `source_access`, `edit_version`, outbox `dispatching`, one-live-invite index, collection opt-out, documents/locators, community settings. |
 | K9 | Calendar (P09-07) | Dropped for v1. After mutual confirmation both parties get each other's live contact and arrange time directly. |
 | K10 | OCR/ASR (P07-03/04) | Scanned PDFs are marked `needs_ocr` and reported in `/status`. No OCR or transcription runs in v1. Uploaded `.vtt/.srt` transcripts are supported. |
 | K11 | Quality gates | QG01, QG05, QG06, QG07, QG09 stay **release-blocking**. QG02 (retrieval) is blocking for the canary and needs the P00-04 gold set, which an independent person must create **before** P12. QG03 (classifier) is non-blocking in v1, because the rule classifier only labels digest items and triggers no actions. QG04 needs ≥ 30 approved intents during the pilot. |
-| K12 | Retention | Default 90 days per source, configurable by an owner (`/retention`). Nightly purge also blanks raw events. Backups keep 14 days. |
+| K12 | Retention | **Superseded by K15.** |
 | K13 | Data rights | `/forget_me` deletes a member's messages, documents, skills, consents and live intros, and sets `collection_opt_out`, so future messages are not stored until `/resume_collection`. |
+| K14 | Digest audience (**overrides P10-05**) | The daily digest is visible to **all members**, but it is **opt-in** (`/digest on`, default off). Each digest uses only that member's readable sources (C02). Admin-only and moderation-gated release (P10-05) no longer apply. Decided by the product owner, 2026-10-23. |
+| K15 | Message history (**overrides P00-01 retention**) | **Full history is kept by default** (no retention cap). `retention_days = 0` means keep everything. An owner may set a per-group limit with `/retention N`, and members may delete their own data at any time (`/forget_me`, `/forget`). Decided by the product owner, 2026-10-23. |
+| K16 | Search and hosting | Search options and their trade-offs are in `docs/SEARCH_OPTIONS.md`. Hosting options, including the Cloudflare free-tier limits, are in `docs/HOSTING_CLOUDFLARE.md`. The hosting decision is open. |
 
 ## Phase sequence and dependency gates
 

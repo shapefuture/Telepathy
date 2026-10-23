@@ -27,6 +27,7 @@ COMMANDS = [
     BotCommand(command="expert", description="How many experts match a topic"),
     BotCommand(command="requests", description="Your open introduction requests"),
     BotCommand(command="profile", description="Your profile and settings"),
+    BotCommand(command="digest", description="Turn the daily digest on or off"),
     BotCommand(command="skills", description="Manage your skills"),
     BotCommand(command="privacy", description="What is stored and why"),
     BotCommand(command="forget_me", description="Delete your data"),

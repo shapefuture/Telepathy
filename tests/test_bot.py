@@ -308,3 +308,31 @@ def test_open_database_seeds_owners(tmp_path):
     c.close()
     c = open_database(s)  # idempotent restart
     assert c.execute("SELECT COUNT(*) FROM members").fetchone()[0] == 1
+
+
+def test_digest_command_toggles_opt_in(env):
+    conn, bot, dp, session = env
+    feed(dp, bot, **cmd(OWNER, "/enable"))
+    feed(dp, bot, **group_msg(5, "hello group"))
+    feed(dp, bot, **dm(5, "/digest on"))
+    assert (
+        conn.execute("SELECT digest_opt_in FROM members WHERE telegram_user_id='5'").fetchone()[0]
+        == 1
+    )
+    feed(dp, bot, **dm(5, "/digest"))
+    assert "<b>on</b>" in session.texts(5)[-1]
+    feed(dp, bot, **dm(5, "/digest off"))
+    assert (
+        conn.execute("SELECT digest_opt_in FROM members WHERE telegram_user_id='5'").fetchone()[0]
+        == 0
+    )
+
+
+def test_retention_zero_means_keep_all(env):
+    conn, bot, dp, session = env
+    feed(dp, bot, **cmd(OWNER, "/enable"))
+    feed(dp, bot, **group_msg(5, "x"))
+    reply = cmd(OWNER, "/retention 0")
+    feed(dp, bot, **reply)
+    assert "Full history will be kept" in session.texts(GROUP)[-1]
+    assert conn.execute("SELECT retention_days FROM sources").fetchone()[0] == 0

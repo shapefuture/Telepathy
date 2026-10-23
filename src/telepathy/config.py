@@ -23,7 +23,8 @@ class Settings:
     community_label: str
     timezone: ZoneInfo
     digest_time: time = time(9, 0)
-    retention_days: int = 90
+    # 0 = keep full history (default). Owners may set a per-group limit with /retention.
+    retention_days: int = 0
     backup_dir: Path = Path("./data/backups")
     backup_keep: int = 14
     # Optional command run after each backup, e.g. an encrypted off-host copy.
@@ -50,7 +51,7 @@ class Settings:
             community_label=e.get("TELEPATHY_COMMUNITY_LABEL", "Community"),
             timezone=ZoneInfo(e.get("TELEPATHY_TIMEZONE", "Asia/Jerusalem")),
             digest_time=time(int(hh), int(mm)),
-            retention_days=_int(e, "TELEPATHY_RETENTION_DAYS", 90),
+            retention_days=_int(e, "TELEPATHY_RETENTION_DAYS", 0),
             backup_dir=Path(e.get("TELEPATHY_BACKUP_DIR", "./data/backups")),
             backup_keep=_int(e, "TELEPATHY_BACKUP_KEEP", 14),
             backup_command=e.get("TELEPATHY_BACKUP_COMMAND", ""),

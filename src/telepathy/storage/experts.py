@@ -26,6 +26,7 @@ class Profile:
     reminders: bool
     collection_opt_out: bool
     skills: list[tuple[str, str]]  # (code, state)
+    digest: bool = False
 
 
 def set_discovery(conn: sqlite3.Connection, member_id: str, on: bool, now: datetime) -> None:
@@ -95,8 +96,8 @@ def remove_skill(conn: sqlite3.Connection, member_id: str, code: str, now: datet
 
 def get_profile(conn: sqlite3.Connection, member_id: str) -> Profile:
     m = conn.execute(
-        "SELECT discovery_opt_in, available, reminders_opt_in, collection_opt_out FROM members "
-        "WHERE id=?",
+        "SELECT discovery_opt_in, available, reminders_opt_in, collection_opt_out, "
+        "digest_opt_in FROM members WHERE id=?",
         (member_id,),
     ).fetchone()
     skills = conn.execute(
@@ -111,6 +112,7 @@ def get_profile(conn: sqlite3.Connection, member_id: str) -> Profile:
         bool(m["reminders_opt_in"]),
         bool(m["collection_opt_out"]),
         [(r["skill_code"], r["state"]) for r in skills],
+        bool(m["digest_opt_in"]),
     )
 
 

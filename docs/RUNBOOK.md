@@ -1,5 +1,9 @@
 # Operator runbook
 
+> **Hosting choice:** this runbook covers **Option A** (a Linux VPS). Cloudflare options and their
+> free-tier limits are in [`HOSTING_CLOUDFLARE.md`](HOSTING_CLOUDFLARE.md). Search options are in
+> [`SEARCH_OPTIONS.md`](SEARCH_OPTIONS.md).
+
 Single Linux host, one process (`telepathy run`): Telegram long polling plus a background
 worker for sends, introductions, the digest, retention and backups. State lives in one SQLite
 file (WAL mode).
@@ -33,7 +37,7 @@ file (WAL mode).
    The bot posts a collection notice. Pin it.
 5. **Optional history import**: in Telegram Desktop, choose Export chat history → JSON, copy
    it to the host, then run `telepathy import result.json`. It only works for enabled groups.
-   Re-running is safe. Messages older than the retention period are purged that night.
+   Re-running is safe. History is kept in full (see retention below).
 6. **Off-host backups**: set `TELEPATHY_BACKUP_COMMAND` to a script like
    `deploy/offsite-backup.example.sh` (encrypts with `age`, uploads with `rclone`).
 
@@ -41,13 +45,13 @@ file (WAL mode).
 
 | When | What happens |
 |---|---|
-| 03:30 local | retention purge |
+| 03:30 local | retention purge (only for groups where an owner set a limit with `/retention N`) |
 | 04:00 local | verified online backup (`data/backups`, 14 kept) |
-| 09:00 local | admin-only digest DM to owners/admins |
+| 09:00 local | daily digest DM to members who opted in with `/digest on` |
 | every 5 s | sends, expiries (72 h invites, 14 d requests), 24 h reminders, document parsing |
 
 Owner commands (DM the bot): `/status`, `/sources`, `/uncertain`, `/digest_now`.
-Group commands (owner + chat admin): `/enable`, `/disable`, `/retention <days>`,
+Group commands (owner + chat admin): `/enable`, `/disable`, `/retention <days|0>` (0 = keep full history),
 `/forget` (reply to a message).
 
 ## 3. Incidents

@@ -44,7 +44,7 @@ from telepathy.ingest.service import (
 )
 from telepathy.ops.status import collect_status
 from telepathy.retrieval.answer import answer, render_html
-from telepathy.services import data_rights, intros
+from telepathy.services import data_rights, digest, intros
 from telepathy.storage import acl, experts, jobs, outbox
 from telepathy.storage.db import audit
 
@@ -66,7 +66,8 @@ PRIVACY_NOTICE = (
     "• You are not discoverable as an expert unless you run /optin yourself.\n"
     "• Introductions need both people to agree before any contact is shared.\n"
     "• /forget_me deletes your stored messages and profile and stops collection.\n"
-    "• Messages are deleted automatically after the retention period."
+    "• Full history is kept. Your messages are removed only when you use /forget_me or /forget, "
+    "or when an owner removes them."
 )
 HELP = (
     "<b>Search</b>\n/ask <i>question</i> — cited answers from your groups\n\n"
@@ -75,13 +76,14 @@ HELP = (
     "/expert <i>topic</i> — how many opted-in experts match\n"
     "/requests — your open requests\n\n"
     "<b>Your profile</b>\n/profile — view and change settings\n"
+    "/digest on · /digest off — daily digest of your groups (opt-in)\n"
     "/optin · /optout — expert discoverability\n"
     "/skills — list yours · /skills add <i>skill</i> · /skills remove <i>skill</i>\n"
     "/skills all — the skill list\n\n"
     "<b>Your data</b>\n/privacy · /forget_me · /resume_collection"
 )
 ENABLED_NOTICE = (
-    "Telepathy is now <b>collecting</b> this chat (visibility: {vis}, retention: {days} days). "
+    "Telepathy is now <b>collecting</b> this chat (visibility: {vis}, {history}). "
     "Members can search it privately via /ask in a DM with the bot. "
     "DM the bot /privacy for details or /forget_me to delete your data."
 )
@@ -113,6 +115,10 @@ def _kb(rows: list[list[tuple[str, str]]]) -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text=t, callback_data=d) for t, d in row] for row in rows
         ]
     )
+
+
+def _history_text(days: int) -> str:
+    return "full history kept" if days == 0 else f"messages purged after {days} days"
 
 
 def _is_owner(settings: Settings, user_id: int | None) -> bool:
@@ -187,7 +193,7 @@ async def cmd_enable(
         return
     assert message.from_user is not None
     owner_id = _owner_member_id(conn, settings, message.from_user.id)
-    sid = enable_source(
+    enable_source(
         conn,
         settings.community_id,
         message.chat.id,
@@ -196,9 +202,9 @@ async def cmd_enable(
         title=message.chat.title,
         public_username=message.chat.username,
     )
-    conn.execute("UPDATE sources SET retention_days=? WHERE id=?", (settings.retention_days, sid))
     await message.reply(
-        ENABLED_NOTICE.format(vis=vis.value, days=settings.retention_days), parse_mode=HTML
+        ENABLED_NOTICE.format(vis=vis.value, history=_history_text(settings.retention_days)),
+        parse_mode=HTML,
     )
 
 
@@ -226,8 +232,11 @@ async def cmd_retention(
         days = int((command.args or "").strip())
     except ValueError:
         days = 0
-    if src is None or not 1 <= days <= 3650:
-        await message.reply("Usage: /retention <days 1..3650> in an enabled chat.")
+    if src is None or not 0 <= days <= 3650:
+        await message.reply(
+            "Usage: /retention <days 1..3650> to purge older messages, or /retention 0 to keep "
+            "full history (in an enabled chat)."
+        )
         return
     conn.execute("UPDATE sources SET retention_days=? WHERE id=?", (days, src.id))
     assert message.from_user is not None
@@ -238,7 +247,10 @@ async def cmd_retention(
         subject=src.id,
         detail_json=json.dumps({"days": days}),
     )
-    await message.reply(f"Retention set to {days} days. Older messages are purged nightly.")
+    if days == 0:
+        await message.reply("Full history will be kept. Nothing is purged automatically.")
+    else:
+        await message.reply(f"Retention set to {days} days. Older messages are purged nightly.")
 
 
 @router.message(Command("forget"), IN_GROUP)
@@ -306,7 +318,7 @@ async def cmd_ask(
 
 
 @router.message(
-    Command("ask", "intro", "expert", "profile", "optin", "skills", "forget_me"), IN_GROUP
+    Command("ask", "intro", "expert", "profile", "optin", "skills", "forget_me", "digest"), IN_GROUP
 )
 async def cmd_private_only_in_group(message: Message) -> None:
     # Answering in a group could reveal restricted evidence or profile data.
@@ -328,6 +340,7 @@ def _profile_text(p: experts.Profile) -> tuple[str, InlineKeyboardMarkup]:
     )
     text = (
         "<b>Your profile</b> (only you see this)\n"
+        f"Daily digest: <b>{'on' if p.digest else 'off'}</b>\n"
         f"Discoverable as expert: <b>{'yes' if p.discoverable else 'no'}</b>\n"
         f"Available for introductions: <b>{'yes' if p.available else 'no'}</b>\n"
         f"Reminders: <b>{'on' if p.reminders else 'off'}</b>\n"
@@ -540,6 +553,30 @@ async def cmd_forget_me(message: Message, conn: sqlite3.Connection, settings: Se
         "open introductions, and stops storing your future messages. It cannot be undone.",
         parse_mode=HTML,
         reply_markup=_kb([[("Yes, delete everything", "fm:yes"), ("Cancel", "fm:no")]]),
+    )
+
+
+@router.message(Command("digest"), PRIVATE)
+async def cmd_digest(
+    message: Message, command: CommandObject, conn: sqlite3.Connection, settings: Settings
+) -> None:
+    m = await _member(message, conn, settings)
+    if m is None:
+        return
+    arg = (command.args or "").strip().lower()
+    if arg not in ("on", "off"):
+        state = "on" if experts.get_profile(conn, m.id).digest else "off"
+        await message.answer(
+            f"Daily digest is <b>{state}</b>. Change with <code>/digest on</code> or "
+            "<code>/digest off</code>.",
+            parse_mode=HTML,
+        )
+        return
+    digest.set_opt_in(conn, m.id, arg == "on")
+    await message.answer(
+        "You'll get a daily digest (09:00 local) covering the groups you can read."
+        if arg == "on"
+        else "Daily digest turned off."
     )
 
 

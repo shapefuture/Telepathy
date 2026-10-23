@@ -2,8 +2,8 @@
 
 Deterministic and extractive: counts, open questions and new documents with links. No
 narrative is generated. Each recipient's digest is built from *their own* readable
-sources (C02), and recipients are admins/owners until the public-digest gate passes
-(P10-05). The window checkpoint advances only after every send is accepted (P10-08).
+sources (C02). Members opt in with /digest on (K14). The window checkpoint advances only
+after every send is accepted (P10-08).
 """
 
 from __future__ import annotations
@@ -58,12 +58,17 @@ class Recipient:
 
 
 def recipients(conn: sqlite3.Connection, community_id: str) -> list[Recipient]:
+    """Every active member who opted in with /digest on (K14). Content is ACL-scoped per person."""
     rows = conn.execute(
         "SELECT id, telegram_user_id FROM members WHERE community_id=? AND removed_at IS NULL "
-        "AND role IN ('admin','owner') AND telegram_user_id IS NOT NULL",
+        "AND digest_opt_in=1 AND collection_opt_out=0 AND telegram_user_id IS NOT NULL",
         (community_id,),
     ).fetchall()
     return [Recipient(r["id"], int(r["telegram_user_id"])) for r in rows]
+
+
+def set_opt_in(conn: sqlite3.Connection, member_id: str, on: bool) -> None:
+    conn.execute("UPDATE members SET digest_opt_in=? WHERE id=?", (int(on), member_id))
 
 
 def build(
@@ -148,7 +153,7 @@ def build(
         for d in docs:
             note = "" if d["status"] == "parsed" else f" ({d['status']})"
             lines.append(f"• {link(d['citation_uri'], html.escape(d['title'] or 'file'))}{note}")
-    lines.append("\n<i>Admin-only preview. Quotes are verbatim; follow links for context.</i>")
+    lines.append("\n<i>Quotes are verbatim; follow links for context. Turn off: /digest off</i>")
     return "\n".join(lines)
 
 

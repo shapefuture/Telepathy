@@ -223,6 +223,7 @@ def test_mixed_script_search(conn, owner):
 
 def test_worker_digest_checkpoint_only_after_delivery(tmp_path, conn, owner):
     enable(conn, owner, -1001)
+    conn.execute("UPDATE members SET digest_opt_in=1 WHERE id=?", (owner,))  # K14: opt-in
     now = datetime.now(UTC)
     post(conn, -1001, "Can anyone recommend a plumber?", user_id=1, date=int(now.timestamp()) - 30)
     sent = []
@@ -299,3 +300,55 @@ def test_worker_document_job(tmp_path, conn, owner):
     )
     asyncio.run(w.tick())
     assert answer(conn, ctx_for(conn, 1), "gate code").status is AnswerStatus.ANSWERED
+
+
+def test_full_history_kept_by_default(conn, owner):
+    """K15: no retention cap unless an owner sets one."""
+    from telepathy.config import Settings as S
+
+    assert (
+        S(
+            bot_token="x",
+            db_path=".",
+            owner_telegram_ids=frozenset({1}),
+            community_id="c",
+            community_label="c",
+            timezone=TZ,
+        ).retention_days
+        == 0
+    )
+    sid = enable(conn, owner, -1001)
+    assert conn.execute("SELECT retention_days FROM sources WHERE id=?", (sid,)).fetchone()[0] == 0
+    now = datetime.now(UTC)
+    post(
+        conn,
+        -1001,
+        "message from years ago",
+        user_id=1,
+        date=int((now - timedelta(days=3650)).timestamp()),
+    )
+    assert data_rights.apply_retention(conn, now) == 0
+    assert conn.execute("SELECT COUNT(*) FROM excerpts WHERE valid_to IS NULL").fetchone()[0] == 1
+
+
+def test_digest_goes_only_to_members_who_opted_in(conn, owner):
+    """K14: visible to all members, but optional."""
+    enable(conn, owner, -1001)
+    post(conn, -1001, "anyone know a good dentist?", user_id=1)
+    post(conn, -1001, "yes, try Dr. Levi", user_id=2)
+    ids = {r.member_id for r in digest.recipients(conn, COMMUNITY)}
+    assert ids == set()  # nobody opted in, not even the owner
+    m1 = acl.get_member_by_telegram(conn, COMMUNITY, 1).id
+    digest.set_opt_in(conn, m1, True)
+    assert {r.member_id for r in digest.recipients(conn, COMMUNITY)} == {m1}
+    digest.set_opt_in(conn, m1, False)
+    assert digest.recipients(conn, COMMUNITY) == []
+
+
+def test_forget_clears_digest_opt_in(conn, owner):
+    enable(conn, owner, -1001)
+    post(conn, -1001, "hello there", user_id=7)
+    m = acl.get_member_by_telegram(conn, COMMUNITY, 7).id
+    digest.set_opt_in(conn, m, True)
+    data_rights.forget_member(conn, m, datetime.now(UTC))
+    assert digest.recipients(conn, COMMUNITY) == []

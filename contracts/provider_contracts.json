@@ -1,0 +1,117 @@
+{
+  "schema_version": "1.0",
+  "synthetic_only_by_default": true,
+  "nvidia": {
+    "environment": "development_only_until_production_terms_approved",
+    "method": "POST",
+    "url": "https://integrate.api.nvidia.com/v1/embeddings",
+    "headers": {
+      "Authorization": "Bearer ${NVIDIA_API_KEY}",
+      "Content-Type": "application/json"
+    },
+    "request_index": {
+      "model": "nvidia/nemotron-3.5-embed-1b",
+      "input": [
+        "SYNTHETIC EXAMPLE TEXT ONLY"
+      ],
+      "input_type": "passage",
+      "modality": "text",
+      "encoding_format": "float",
+      "dimensions": 1024,
+      "truncate": "NONE"
+    },
+    "request_query": {
+      "model": "nvidia/nemotron-3.5-embed-1b",
+      "input": [
+        "SYNTHETIC QUERY ONLY"
+      ],
+      "input_type": "query",
+      "modality": "text",
+      "encoding_format": "float",
+      "dimensions": 1024,
+      "truncate": "NONE"
+    },
+    "assertions": [
+      "len(data[0].embedding)==1024",
+      "all(float(x) finite)",
+      "model_id pinned",
+      "do not mix versions in one index"
+    ]
+  },
+  "d3_turbo": {
+    "environment": "development_only_for_synthetic_nonsensitive_text",
+    "method": "POST",
+    "url": "https://decision.vllm-sr.ai/v1/systemone",
+    "headers": {
+      "Authorization": "Bearer ${DECISION_API_KEY}",
+      "Content-Type": "application/json"
+    },
+    "request": {
+      "model": "vllm-sr/d3-turbo",
+      "state": "SYNTHETIC: Can somebody recommend an accountant for a startup?",
+      "questions": {
+        "primary_intent": {
+          "type": "choice",
+          "instructions": "Classify the primary community message intent. Choose the best single label.",
+          "criteria": {
+            "help_request": "Explicitly requests advice, recommendation, assistance or an introduction.",
+            "answer_candidate": "Responds with relevant factual advice or a concrete answer.",
+            "help_offer": "Offers skills, resources, advice or available assistance.",
+            "event": "Announces or coordinates a community event or meeting.",
+            "resource": "Shares a link, tutorial or resource without requesting assistance.",
+            "decision": "Announces a final decision, commitment or outcome.",
+            "social": "Greeting, casual discussion or small talk.",
+            "other": "None of the above."
+          }
+        },
+        "explicit_help_request": {
+          "type": "noul",
+          "instructions": "Does the author explicitly ask for help solving a concrete problem?"
+        },
+        "explicit_help_offer": {
+          "type": "noul",
+          "instructions": "Does the author explicitly offer to help someone?"
+        },
+        "followup_needed": {
+          "type": "noul",
+          "instructions": "Is there an explicit unresolved question or next action?"
+        }
+      }
+    },
+    "response_assertions": [
+      "answers.primary_intent.type==choice",
+      "answers.primary_intent.choice in fixed labels",
+      "all required answers present",
+      "confidence in [0,1]",
+      "never promote competence from class label"
+    ],
+    "thresholds": {
+      "automatic_private_help_candidate": 0.8,
+      "manual_review_lower": 0.5,
+      "manual_review_upper": 0.8
+    },
+    "retry": {
+      "max_attempts": 3,
+      "respect_retry_after": true,
+      "on_unavailable": "deferred_manual"
+    }
+  },
+  "policy": {
+    "reject_classes": [
+      "PRIVATE_UNKNOWN",
+      "INTERNAL_RESTRICTED"
+    ],
+    "accept_classes": [
+      "PUBLIC_APPROVED",
+      "MEMBER_CONSENTED_ONLY_IF_PROVIDER_CONTRACT_AND_PURPOSE_APPROVED"
+    ],
+    "never_send": [
+      "raw_telegram_session",
+      "phone_numbers",
+      "user_email",
+      "secret",
+      "full_private_conversation"
+    ],
+    "nvidia_preview_prod_forbidden": true
+  }
+}

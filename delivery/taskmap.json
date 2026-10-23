@@ -998,3 +998,309 @@
       "title": "State-machine adversarial tests",
       "acceptance": "Exhaustive transition table, duplicate-click/replay, revoke-midflight, forbidden disclosure tests",
       "depends_on_phase": "P08",
+      "owner_role": "FE",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P10-01",
+      "phase": "P10",
+      "title": "Scheduled digest",
+      "acceptance": "Default 09:00 Asia/Jerusalem, saved UTC next_fire_at using zoneinfo; DST simulation across transitions",
+      "depends_on_phase": "P06,P07",
+      "owner_role": "BE",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P10-02",
+      "phase": "P10",
+      "title": "Noisy-chat compression",
+      "acceptance": "Use conversation episodes and distinct needs, not top-message counts or full message dump",
+      "depends_on_phase": "P06,P07",
+      "owner_role": "BE",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P10-03",
+      "phase": "P10",
+      "title": "Digest schema",
+      "acceptance": "Topics, question/answer pairs, unresolved needs, correction notices, event references and cited source IDs",
+      "depends_on_phase": "P06,P07",
+      "owner_role": "BE",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P10-04",
+      "phase": "P10",
+      "title": "Consent and audience",
+      "acceptance": "Member opt-in and per-group scope; no automatic forwarding of restricted-group information",
+      "depends_on_phase": "P06,P07",
+      "owner_role": "BE",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P10-05",
+      "phase": "P10",
+      "title": "Review before broadcast",
+      "acceptance": "First pilot digests admin-only; public digest requires moderation approval until acceptance gate",
+      "depends_on_phase": "P06,P07",
+      "owner_role": "BE",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P10-06",
+      "phase": "P10",
+      "title": "Event intelligence",
+      "acceptance": "D3-classified signals become draft moderator items, not automatic cold DMs",
+      "depends_on_phase": "P06,P07",
+      "owner_role": "BE",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P10-07",
+      "phase": "P10",
+      "title": "Change detection",
+      "acceptance": "Compute added/updated/resolved needs and superseded claims since last successful digest",
+      "depends_on_phase": "P06,P07",
+      "owner_role": "BE",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P10-08",
+      "phase": "P10",
+      "title": "Reliability",
+      "acceptance": "Job ledger ensures successful-day checkpoint only after delivery accepted or explicit reconciliation",
+      "depends_on_phase": "P06,P07",
+      "owner_role": "BE",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P10-09",
+      "phase": "P10",
+      "title": "Fallback digest",
+      "acceptance": "If LLM unavailable, send deterministic source-link digest; no invented narrative",
+      "depends_on_phase": "P06,P07",
+      "owner_role": "BE",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P10-10",
+      "phase": "P10",
+      "title": "Digest evaluation",
+      "acceptance": ">=95% valid citations, 0 restricted leaks, >=90% scheduled sends within 10 min over test schedule",
+      "depends_on_phase": "P06,P07",
+      "owner_role": "BE",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P11-01",
+      "phase": "P11",
+      "title": "Admin UI",
+      "acceptance": "Jinja2+HTMX local/private UI: sources, pending profiles, evidence, jobs, audits, deletion requests",
+      "depends_on_phase": "P03,P06,P09,P10",
+      "owner_role": "FE",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P11-02",
+      "phase": "P11",
+      "title": "Access enforcement",
+      "acceptance": "Telegram signed identity for member UI; admin session with CSRF defense and no public debug API",
+      "depends_on_phase": "P03,P06,P09,P10",
+      "owner_role": "FE",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P11-03",
+      "phase": "P11",
+      "title": "Operational metrics",
+      "acceptance": "Ingest lag, classified rate, queued jobs, 429/5xx provider failures, citation errors, storage use, model cost",
+      "depends_on_phase": "P03,P06,P09,P10",
+      "owner_role": "FE",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P11-04",
+      "phase": "P11",
+      "title": "Secrets and data",
+      "acceptance": "Environment/OS key store, never logs or tracker; locally encrypt backups and sessions",
+      "depends_on_phase": "P03,P06,P09,P10",
+      "owner_role": "FE",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P11-05",
+      "phase": "P11",
+      "title": "Service startup",
+      "acceptance": "systemd unit with Restart=on-failure and explicit SQLite WAL shutdown/backup process",
+      "depends_on_phase": "P03,P06,P09,P10",
+      "owner_role": "FE",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P11-06",
+      "phase": "P11",
+      "title": "Backups",
+      "acceptance": "Nightly SQLite online backup plus file hashes, off-host encrypted copy; monthly restore test",
+      "depends_on_phase": "P03,P06,P09,P10",
+      "owner_role": "FE",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P11-07",
+      "phase": "P11",
+      "title": "Data rights",
+      "acceptance": "Member consent withdrawal triggers complete per-person derived data invalidation within policy deadline",
+      "depends_on_phase": "P03,P06,P09,P10",
+      "owner_role": "FE",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P11-08",
+      "phase": "P11",
+      "title": "Performance",
+      "acceptance": "Record single-node RSS, disk and p95 Q&A under representative corpus; storage cost forecast",
+      "depends_on_phase": "P03,P06,P09,P10",
+      "owner_role": "FE",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P11-09",
+      "phase": "P11",
+      "title": "Documentation",
+      "acceptance": "Write operator runbook, setup, privacy notice, deployment rollback and on-call page",
+      "depends_on_phase": "P03,P06,P09,P10",
+      "owner_role": "FE",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P11-10",
+      "phase": "P11",
+      "title": "Independent security review",
+      "acceptance": "Separate reviewer tests ACL, egress guard, token leakage, intro state and recovery before production",
+      "depends_on_phase": "P03,P06,P09,P10",
+      "owner_role": "FE",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P12-01",
+      "phase": "P12",
+      "title": "Baseline freeze",
+      "acceptance": "Capture immutable generation hash, database schema and fixture/evaluator hashes",
+      "depends_on_phase": "P00..P11",
+      "owner_role": "QA",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P12-02",
+      "phase": "P12",
+      "title": "Shadow pilot",
+      "acceptance": "Run with synthetic or lawfully authorized pilot data, no automated publication or unsolicited matching",
+      "depends_on_phase": "P00..P11",
+      "owner_role": "QA",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P12-03",
+      "phase": "P12",
+      "title": "Provider contract gate",
+      "acceptance": "NVIDIA production rights / privacy agreement and d3 processing permission documented, or local substitute engaged",
+      "depends_on_phase": "P00..P11",
+      "owner_role": "QA",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P12-04",
+      "phase": "P12",
+      "title": "Failure campaign",
+      "acceptance": "Inject provider 429/503, restart, duplicate updates, disk-full, interrupted send and deletion during reindex",
+      "depends_on_phase": "P00..P11",
+      "owner_role": "QA",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P12-05",
+      "phase": "P12",
+      "title": "Golden QA",
+      "acceptance": "Re-run locked 200-case gold suite; independent verifier owns labels and immutable harness",
+      "depends_on_phase": "P00..P11",
+      "owner_role": "QA",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P12-06",
+      "phase": "P12",
+      "title": "User validation",
+      "acceptance": "At least 10 authorized pilot members try /ask, /expert and /intro; record task outcomes",
+      "depends_on_phase": "P00..P11",
+      "owner_role": "QA",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P12-07",
+      "phase": "P12",
+      "title": "Canary",
+      "acceptance": "Enable 1 group and opt-in subset, shadow comparisons daily, rollback trigger on hard invariant",
+      "depends_on_phase": "P00..P11",
+      "owner_role": "QA",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P12-08",
+      "phase": "P12",
+      "title": "SLO dashboard",
+      "acceptance": "Track acceptance, citation precision, p95 ingest and Q&A, delivery, member correction requests",
+      "depends_on_phase": "P00..P11",
+      "owner_role": "QA",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P12-09",
+      "phase": "P12",
+      "title": "Release decision",
+      "acceptance": "Independent reviewer and community owner sign evidence bundle and approve release generation",
+      "depends_on_phase": "P00..P11",
+      "owner_role": "QA",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "P12-10",
+      "phase": "P12",
+      "title": "Handoff",
+      "acceptance": "Publish outstanding risks, owner, exact deployed commit, recovery procedure, and next revision backlog",
+      "depends_on_phase": "P00..P11",
+      "owner_role": "QA",
+      "status": "open",
+      "evidence": []
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+name: Plan integrity
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate-plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate delivery task map, links and counts
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, re
+          root = pathlib.Path(".")
+          data = json.loads((root / "delivery/taskmap.json").read_text())
+          tasks = data["tasks"]
+          assert len(tasks) == 130, f"Expected 130 tasks, got {len(tasks)}"
+          ids = [t["id"] for t in tasks]
+          assert len(ids) == len(set(ids)), "Duplicate task IDs"
+          phases = {t["phase"] for t in tasks}
+          assert phases == {f"P{i:02d}" for i in range(13)}
+          for t in tasks:
+              assert re.fullmatch(r"P\d{2}-\d{2}", t["id"])
+              assert t["id"].startswith(t["phase"] + "-")
+              assert t["status"] == "open", "Planning artifact must not claim code completion"
+              assert t.get("acceptance"), t["id"]
+          assert (root / "MASTER_PLAN.md").exists()
+          assert (root / "AGENTS.md").exists()
+          c = json.loads((root / "contracts/provider_contracts.json").read_text())
+          assert c["synthetic_only_by_default"] is True
+          print("OK: 130 tasks / 13 phases / prototype-only providers")
+          PY

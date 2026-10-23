@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+# Local data must never be committed (C11)
+*.db
+*.db-wal
+*.db-shm
+*.sqlite*
+.env
+data/

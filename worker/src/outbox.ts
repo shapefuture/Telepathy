@@ -11,6 +11,8 @@ export interface Payload {
   buttons?: InlineButton[][];
   /** Append a live contact link for this Telegram user, resolved at send time, never stored. */
   reveal_tg_id?: number;
+  /** Reply under this message (group hints). */
+  reply_to?: number;
 }
 
 export function effectStatement(db: D1Database, key: string, chatId: number, payload: Payload): D1PreparedStatement {
@@ -51,7 +53,7 @@ export async function dispatch(db: D1Database, tg: Telegram, id: string): Promis
   try {
     let text = p.text;
     if (p.reveal_tg_id) text += `\n${await contactLine(tg, p.reveal_tg_id)}`;
-    const msg = await tg.sendMessage(row.chat_id, text, { buttons: p.buttons });
+    const msg = await tg.sendMessage(row.chat_id, text, { buttons: p.buttons, replyTo: p.reply_to });
     await setState(db, id, "dispatching", "sent", { ref: String(msg.message_id) });
     return "sent";
   } catch (e) {

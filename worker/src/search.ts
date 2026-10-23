@@ -7,7 +7,9 @@
 // Authorization is inside the candidate SQL (source_id IN readable set), so hidden evidence
 // is never scored, ranked or snippeted. Message text is evidence only; nothing in it is obeyed.
 
+import { T, type Lang } from "./i18n";
 import { citation } from "./ingest";
+import type { InlineButton } from "./telegram";
 import { contentTerms, editDistance, escapeHtml, ftsQuery, normalize, snippet, stemKey, termPresent, tokens, variants } from "./text";
 
 export const TOP_K = 40;
@@ -18,6 +20,7 @@ const VOCAB_SCAN_LIMIT = 400;
 
 export interface Hit {
   id: number;
+  msg_id: number;
   source_id: string;
   body: string;
   label: string | null;
@@ -89,6 +92,25 @@ export async function corrections(db: D1Database, terms: string[]): Promise<Map<
   return out;
 }
 
+/**
+ * Small ranking nudge from private answer feedback (P13-05). One RRF rank step at k=60 is about
+ * 0.0003, so ±0.004 can lift a well-rated passage a few places but never invents relevance.
+ */
+export const VOTE_WEIGHT = 0.004;
+export async function voteBoost(db: D1Database, ids: number[]): Promise<Map<number, number>> {
+  const out = new Map<number, number>();
+  if (!ids.length) return out;
+  const { results } = await db
+    .prepare("SELECT passage_id, up, down, bad FROM passage_votes WHERE passage_id IN (SELECT value FROM json_each(?))")
+    .bind(JSON.stringify(ids))
+    .all<{ passage_id: number; up: number; down: number; bad: number }>();
+  for (const r of results) {
+    const net = r.up - r.down - 2 * r.bad;
+    out.set(r.passage_id, VOTE_WEIGHT * Math.max(-1, Math.min(1, net / 3)));
+  }
+  return out;
+}
+
 export async function search(db: D1Database, readable: Set<string>, query: string): Promise<{ hits: Hit[]; terms: string[]; fixes: Map<string, string> }> {
   const terms = contentTerms(query);
   const base = terms.length ? terms : tokens(query).filter((t) => t.length > 1);
@@ -107,10 +129,16 @@ export async function search(db: D1Database, readable: Set<string>, query: strin
       return row.id;
     }),
   );
-  const hits = rrf(lists).map(([id, score]) => {
+  const fused = rrf(lists);
+  const boost = await voteBoost(db, fused.map(([id]) => id));
+  const hits = fused
+    .map(([id, score]) => [id, score + (boost.get(id) ?? 0)] as [number, number])
+    .sort((a, b) => b[1] - a[1] || a[0] - b[0])
+    .map(([id, score]) => {
     const r = rows.get(id)!;
     return {
       id,
+      msg_id: r.msg_id,
       source_id: r.source_id,
       body: r.body,
       label: r.label,
@@ -126,6 +154,7 @@ export async function search(db: D1Database, readable: Set<string>, query: strin
 export type AnswerStatus = "answered" | "insufficient" | "no_access" | "empty";
 
 export interface Quote {
+  id: number;
   text: string;
   label: string | null;
   event_at: string;
@@ -133,7 +162,7 @@ export interface Quote {
   coverage: number;
 }
 
-export async function answer(db: D1Database, readable: Set<string>, query: string): Promise<{ status: AnswerStatus; quotes: Quote[]; fixes: Map<string, string> }> {
+export async function answer(db: D1Database, readable: Set<string>, query: string): Promise<Answer> {
   const terms = contentTerms(query);
   if (!terms.length) return { status: "empty", quotes: [], fixes: new Map() };
   if (!readable.size) return { status: "no_access", quotes: [], fixes: new Map() };
@@ -145,31 +174,46 @@ export async function answer(db: D1Database, readable: Set<string>, query: strin
     const coverage = present / terms.length;
     if (coverage >= MIN_COVERAGE) {
       const keys = terms.flatMap((t) => [t, ...(fixes.has(t) ? [fixes.get(t)!] : [])]);
-      quotes.push({ text: snippet(h.body, keys), label: h.label, event_at: h.event_at, url: h.url, coverage });
+      quotes.push({ id: h.id, text: snippet(h.body, keys), label: h.label, event_at: h.event_at, url: h.url, coverage });
     }
   }
   quotes.sort((a, b) => b.coverage - a.coverage); // stable: keeps RRF order among ties
   return { status: quotes.length ? "answered" : "insufficient", quotes: quotes.slice(0, MAX_QUOTES), fixes };
 }
 
-export function renderAnswer(a: { status: AnswerStatus; quotes: Quote[]; fixes: Map<string, string> }, tz: string): string {
-  if (a.status === "empty") return "Usage: <code>/ask your question</code>";
-  if (a.status === "no_access") {
-    return "I don't have any community sources you're allowed to read yet. Post in an enabled group first, or ask an admin.";
-  }
-  if (a.status === "insufficient") {
-    return "<b>No reliable answer found</b> in sources you can access.\nTry different wording, or ask the community directly.";
-  }
+export type Answer = { status: AnswerStatus; quotes: Quote[]; fixes: Map<string, string> };
+
+/**
+ * Telegram HTML for an answer. `answerId` adds private feedback buttons (P13-05);
+ * scope "group" words the reply for an in-group answer (P13-01).
+ */
+export function renderAnswer(
+  a: Answer,
+  tz: string,
+  lang: Lang = "en",
+  opts: { scope?: "dm" | "group"; answerId?: string } = {},
+): { text: string; buttons?: InlineButton[][] } {
+  const m = T(lang);
+  if (a.status === "empty") return { text: m.askUsage };
+  if (a.status === "no_access") return { text: m.noAccess };
+  if (a.status === "insufficient") return { text: opts.scope === "group" ? m.insufficientGroup : m.insufficient };
   const date = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });
-  const lines = [`<b>Found ${a.quotes.length} relevant message(s)</b> — quoted verbatim, please check the source:`];
-  if (a.fixes.size) {
-    lines.push(`<i>Also searched: ${escapeHtml([...a.fixes].map(([k, v]) => `${k} → ${v}`).join(", "))}</i>`);
-  }
+  const lines = [opts.scope === "group" ? m.foundGroup(a.quotes.length) : m.found(a.quotes.length)];
+  if (a.fixes.size) lines.push(m.alsoSearched(escapeHtml([...a.fixes].map(([k, v]) => `${k} → ${v}`).join(", "))));
   a.quotes.forEach((q, i) => {
     const when = date.format(new Date(q.event_at));
-    const src = q.url ? `<a href="${escapeHtml(q.url)}">source</a>` : "source link unavailable";
+    const src = q.url ? `<a href="${escapeHtml(q.url)}">${m.source}</a>` : m.sourceUnavailable;
     const label = q.label ? ` · ${escapeHtml(q.label)}` : "";
     lines.push(`\n${i + 1}. <blockquote>${escapeHtml(q.text)}</blockquote>\n${when}${label} · ${src}`);
   });
-  return lines.join("\n");
+  if (!opts.answerId) return { text: lines.join("\n") };
+  const id = opts.answerId;
+  const buttons: InlineButton[][] = [
+    [
+      { text: m.fbHelpful, callback_data: `f:${id}:up` },
+      { text: m.fbNotHelpful, callback_data: `f:${id}:down` },
+    ],
+    a.quotes.map((_, i) => ({ text: m.fbWrong(i + 1), callback_data: `f:${id}:bad${i}` })),
+  ];
+  return { text: lines.join("\n"), buttons };
 }

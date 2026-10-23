@@ -27,6 +27,13 @@ back to Telepathy.
 (`/forget_me`, or `/forget` on one message) or when a group owner sets a retention limit for that
 group. Backups roll over after 14 days.
 
+**Asking in a group.** `/ask` in a group answers only from that group's own messages,
+which everyone there can already read. If the owner turned on hints, the bot may reply to a
+question with a link to an earlier answer in the same group.
+
+**Answer feedback.** 👍/👎 and "wrong source" buttons are private. Nobody sees who voted;
+totals only nudge search ranking. `/forget_me` deletes your votes.
+
 **Daily digest.** Off by default. Turn it on with `/digest on`. It summarises only the groups you
 can read, and `/digest off` stops it at any time.
 

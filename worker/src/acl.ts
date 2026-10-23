@@ -4,6 +4,7 @@
 //   MEMBER_CONSENTED    -> members with an active grant for that source
 //   INTERNAL_RESTRICTED -> active grant AND role >= moderator
 
+import { langFromCode, type Lang } from "./i18n";
 import { newId, nowIso } from "./util";
 
 export type Role = "member" | "moderator" | "admin" | "owner";
@@ -20,7 +21,12 @@ export interface Member {
   digest: number;
   collection_opt_out: number;
   removed_at: string | null;
+  lang: Lang | null;
+  lang_explicit: number;
 }
+
+/** Interface language for a member (stored choice, else English). */
+export const langOf = (m: Pick<Member, "lang"> | null | undefined): Lang => m?.lang ?? "en";
 
 export const isStaff = (role: Role): boolean => role !== "member";
 
@@ -32,8 +38,11 @@ export async function memberById(db: D1Database, id: string): Promise<Member | n
   return db.prepare("SELECT * FROM members WHERE id=?").bind(id).first<Member>();
 }
 
-/** Return the member, creating a private, non-discoverable row if new. */
-export async function ensureMember(db: D1Database, tgId: number, role?: Role): Promise<Member> {
+/**
+ * Return the member, creating a private, non-discoverable row if new. When Telegram tells us
+ * the user's language and they haven't picked one with /language, remember it (one write, once).
+ */
+export async function ensureMember(db: D1Database, tgId: number, role?: Role, languageCode?: string): Promise<Member> {
   let m = await memberByTg(db, tgId);
   if (!m) {
     await db
@@ -41,6 +50,13 @@ export async function ensureMember(db: D1Database, tgId: number, role?: Role): P
       .bind(newId(), tgId, nowIso())
       .run();
     m = (await memberByTg(db, tgId))!;
+  }
+  if (languageCode && !m.lang_explicit) {
+    const lang = langFromCode(languageCode);
+    if (m.lang !== lang) {
+      await db.prepare("UPDATE members SET lang=? WHERE id=?").bind(lang, m.id).run();
+      m = { ...m, lang };
+    }
   }
   if (role && m.role !== role) {
     await db.prepare("UPDATE members SET role=? WHERE id=?").bind(role, m.id).run();

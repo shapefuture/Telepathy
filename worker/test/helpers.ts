@@ -87,13 +87,13 @@ export function groupCmd(user: number, text: string, extra: Record<string, unkno
   return u;
 }
 
-export function dm(user: number, text: string) {
+export function dm(user: number, text: string, languageCode?: string) {
   return {
     message: {
       message_id: nextMsg(),
       date: nowUnix(),
       chat: { id: user, type: "private" },
-      from: { id: user, is_bot: false },
+      from: { id: user, is_bot: false, ...(languageCode ? { language_code: languageCode } : {}) },
       text,
       entities: text.startsWith("/") ? [{ type: "bot_command", offset: 0, length: text.split(/\s/)[0]!.length }] : [],
     },

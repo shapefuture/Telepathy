@@ -29,6 +29,24 @@ use by at least one open-source MCP server ([gnosis-mcp](https://glama.ai/mcp/se
 | PostgreSQL + pgvector + pg_trgm | yes (trigram similarity) | yes | yes | free self-hosted | Strong all-in-one, but the plan locks **SQLite, no PostgreSQL**. Needs your approval to change. |
 | Cloudflare Vectorize + Workers AI embeddings | depends on layer | yes | yes | free tier exists (limits not verified here) | **Blocked for community text**: embedding sends content to Cloudflare, which the constitution forbids without approval (C03/C14). Acceptable only for public, approved sources. |
 
+## Also evaluated: nanograph (2026-10-23)
+
+[nanograph](https://github.com/nanograph/nanograph) is an embedded, on-device property-graph
+database ("DuckDB for graphs") written in Rust on Lance/Arrow/DataFusion. Its README lists
+full-text, BM25, fuzzy, semantic and hybrid search, graph-constrained reranking, a change ledger,
+and an MIT license. It has a TypeScript/Node SDK.
+
+**Not adopted for now:**
+- **It can't run in the Worker.** It needs a local filesystem and native Rust binaries; the
+  README mentions no WASM or edge build, and Workers have no disk and 10 ms of CPU.
+- **The plan rules out a graph DB** until a benchmark shows a gain: SQLite relational links +
+  CTEs are the locked choice (TRIZ table, "lightweight storage vs graph reasoning").
+- **It's early:** about 158 stars, no published releases, and no benchmarks in the README.
+
+**Where it could fit later:** as an offline analysis job on GitHub Actions or a VPS, for example
+an expert/relationship graph built from D1 exports, or if the bot ever moves off Workers.
+Re-evaluate once it has releases and the gold set exists to measure it.
+
 ## Embedding models (for the semantic layer, after the gold set exists)
 
 - **multilingual-e5-large-instruct** (560M parameters): the source I found calls it the best

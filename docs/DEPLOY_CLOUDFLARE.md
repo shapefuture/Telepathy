@@ -31,7 +31,8 @@ npx wrangler secret put ADMIN_TOKEN      # at least 16 characters
 npx wrangler secret put OWNER_IDS        # e.g. 123456789 or 123,456
 
 # Optional: edit "vars" in wrangler.jsonc: TIMEZONE, DIGEST_HOUR, COMMUNITY_LABEL,
-# and BOT_USERNAME (without @) so commands addressed to other bots are ignored.
+# and BOT_USERNAME (without @). It lets members ask by @mention in groups and makes the
+# bot ignore commands addressed to other bots.
 
 npm run deploy                           # prints https://telepathy.<you>.workers.dev
 curl -X POST https://telepathy.<you>.workers.dev/admin/setup \
@@ -44,7 +45,11 @@ curl -X POST https://telepathy.<you>.workers.dev/admin/setup \
 1. Add the bot to each group **as admin** (needed for join/leave events and admin checks).
 2. As an owner (listed in `OWNER_IDS`) who is also a chat admin, send `/enable` in the group.
    Optional visibility: `/enable PUBLIC_APPROVED` or `/enable INTERNAL_RESTRICTED`.
-3. Pin the bot's collection notice. Members DM the bot: `/start`, `/ask …`, `/digest on`.
+3. Pin the bot's collection notice. Members can `/ask …` right in the group (answers come only
+   from that group) or DM the bot for everything else: `/start`, `/ask`, `/digest on`, `/language ru`.
+4. Optional: `/hints on` in a group. When someone asks a question that group already answered,
+   the bot replies once with a link to the earlier thread (at most one hint per 10 minutes per
+   group). It's off by default because the bot then speaks without being asked.
 
 Full history is kept by default. `/retention 365` (in the group) purges older messages daily,
 and `/retention 0` returns to keep-all.

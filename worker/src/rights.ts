@@ -4,10 +4,12 @@ import { audit, DAY, nowIso } from "./util";
 
 export async function forgetMember(db: D1Database, memberId: string, tgId: number): Promise<{ passages: number; skills: number; intros: number }> {
   const now = nowIso();
-  const [p, s, i] = await db.batch([
+  const [p, s, , , i] = await db.batch([
     // RETURNING gives exact counts (D1's meta.changes also counts FTS trigger writes).
     db.prepare("UPDATE passages SET body=NULL, removed_at=? WHERE author_id=? AND removed_at IS NULL RETURNING id").bind(now, memberId),
     db.prepare("DELETE FROM skills WHERE member_id=? RETURNING code").bind(memberId),
+    db.prepare("DELETE FROM answer_votes WHERE member_id=?").bind(memberId),
+    db.prepare("DELETE FROM answers WHERE member_id=?").bind(memberId),
     db
       .prepare(
         "UPDATE intros SET status='cancelled', updated_at=? WHERE (requester_id=? OR candidate_id=?) " +

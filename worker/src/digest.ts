@@ -2,7 +2,8 @@
 // Deterministic and extractive. Built per distinct readable-source set, so members who can
 // read the same groups share one build (keeps CPU and queries inside free-plan limits).
 
-import { readableSets, type Member } from "./acl";
+import { langOf, readableSets, type Member } from "./acl";
+import { T, type Lang } from "./i18n";
 import { citation } from "./ingest";
 import { effectStatement } from "./outbox";
 import { escapeHtml, snippet } from "./text";
@@ -29,7 +30,8 @@ interface Row {
   label?: string | null;
 }
 
-export async function build(db: D1Database, readable: Set<string>, start: string, end: string, day: string): Promise<string | null> {
+export async function build(db: D1Database, readable: Set<string>, start: string, end: string, day: string, lang: Lang = "en"): Promise<string | null> {
+  const m = T(lang);
   if (!readable.size) return null;
   const src = JSON.stringify([...readable].sort());
   const [perSource, questions, docs] = await db.batch([
@@ -64,27 +66,27 @@ export async function build(db: D1Database, readable: Set<string>, start: string
     return url ? `<a href="${escapeHtml(url)}">${text}</a>` : text;
   };
   const total = groups.reduce((a, g) => a + (g.n ?? 0), 0);
-  const lines = [`<b>Daily digest · ${day}</b>`, `${total} new message(s):`];
-  for (const g of groups) lines.push(`• ${escapeHtml(g.title ?? "Untitled group")}: ${g.n}`);
+  const lines = [m.dTitle(day), m.dNew(total)];
+  for (const g of groups) lines.push(`• ${escapeHtml(g.title ?? m.dUntitled)}: ${g.n}`);
   const qs = questions!.results as unknown as Row[];
   const open = qs.filter((q) => !q.replies);
   const answered = qs.filter((q) => (q.replies ?? 0) > 0);
   if (open.length) {
-    lines.push(`\n<b>Open questions (${open.length})</b>`);
-    for (const q of open.slice(0, MAX_ITEMS)) lines.push(`• ${escapeHtml(snippet(q.body ?? "", [], 160))} (${link(q, "open")})`);
+    lines.push(`\n${m.dOpen(open.length)}`);
+    for (const q of open.slice(0, MAX_ITEMS)) lines.push(`• ${escapeHtml(snippet(q.body ?? "", [], 160))} (${link(q, m.dOpenLink)})`);
   }
   if (answered.length) {
-    lines.push(`\n<b>Answered questions (${answered.length})</b>`);
+    lines.push(`\n${m.dAnswered(answered.length)}`);
     for (const q of answered.slice(0, MAX_ITEMS)) {
-      lines.push(`• ${escapeHtml(snippet(q.body ?? "", [], 120))} — ${q.replies} repl${q.replies === 1 ? "y" : "ies"} (${link(q, "thread")})`);
+      lines.push(`• ${escapeHtml(snippet(q.body ?? "", [], 120))} — ${m.dReplies(q.replies ?? 0)} (${link(q, m.dThread)})`);
     }
   }
   const ds = docs!.results as unknown as Row[];
   if (ds.length) {
-    lines.push("\n<b>New documents</b>");
+    lines.push(`\n${m.dDocs}`);
     for (const d of ds) lines.push(`• ${link(d, escapeHtml((d.label ?? "file").split(" · ")[0]!))}`);
   }
-  const footer = "\n<i>Quotes are verbatim; follow links for context. Turn off: /digest off</i>";
+  const footer = `\n${m.dFooter}`;
   // Telegram rejects messages over 4096 characters: drop whole lines from the end if needed.
   while (lines.join("\n").length + footer.length > MAX_CHARS && lines.length > 2) lines.pop();
   return lines.join("\n") + footer;
@@ -123,8 +125,9 @@ export async function digestStep(db: D1Database, now: Date, tz: string, hour: nu
   const keys: string[] = [];
   for (const m of pending.results) {
     const set = sets.get(m.id)!;
-    const sig = [...set].sort().join(",");
-    if (!cache.has(sig)) cache.set(sig, await build(db, set, start, end, day));
+    const lang = langOf(m);
+    const sig = `${lang}|${[...set].sort().join(",")}`;
+    if (!cache.has(sig)) cache.set(sig, await build(db, set, start, end, day, lang));
     const text = cache.get(sig);
     const key = `digest:${day}:${m.id}`;
     if (text) {

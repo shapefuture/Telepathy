@@ -8,6 +8,7 @@ import { nowIso } from "./util";
 export interface TgUser {
   id: number;
   is_bot?: boolean;
+  language_code?: string;
 }
 export interface TgDocument {
   file_id: string;
@@ -38,6 +39,7 @@ export interface Source {
   visibility: Visibility;
   enabled: number;
   retention_days: number;
+  hints: number;
 }
 
 export type IngestOutcome = "not_authorized" | "opted_out" | "stored" | "unchanged";
@@ -62,7 +64,7 @@ export async function ingestMessage(db: D1Database, msg: TgMessage): Promise<{ o
   let authorId: string | null = null;
   const stmts: D1PreparedStatement[] = [];
   if (msg.from && !msg.from.is_bot) {
-    const m = await ensureMember(db, msg.from.id);
+    const m = await ensureMember(db, msg.from.id, undefined, msg.from.language_code);
     if (m.collection_opt_out) return { outcome: "opted_out", source };
     authorId = m.id;
     stmts.push(grantStatement(db, source.id, m.id));

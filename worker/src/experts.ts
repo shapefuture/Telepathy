@@ -1,6 +1,7 @@
 // Skill taxonomy, consent and ranking (P08). Ranking happens only after hard eligibility.
 // No personality, health or inferred private traits; a classifier label is never evidence (C08).
 
+import type { Lang } from "./i18n";
 import skillsData from "./skills.json";
 import { normalize, stemKey, tokens } from "./text";
 import { DAY, nowIso } from "./util";
@@ -15,7 +16,11 @@ export interface Skill {
 export const TAXONOMY: Map<string, Skill> = new Map(
   (skillsData as { skills: Skill[] }).skills.map((s) => [s.code, s]),
 );
+/** Full bilingual label (used in /skills all). */
 export const label = (s: Skill): string => (s.en === s.ru ? s.en : `${s.en} / ${s.ru}`);
+/** Label in one language. */
+export const labelIn = (s: Skill, lang: Lang): string => (lang === "ru" ? s.ru : s.en);
+export const labelsFor = (codes: string[], lang: Lang): string => codes.map((c) => (TAXONOMY.get(c) ? labelIn(TAXONOMY.get(c)!, lang) : c)).join(", ");
 
 export const WEIGHTS = { domain: 0.4, helpfulness: 0.25, evidence: 0.15, context: 0.1, fairness: 0.1 } as const;
 const EVIDENCE: Record<string, number> = {

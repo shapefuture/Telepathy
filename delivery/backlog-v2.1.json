@@ -11,7 +11,8 @@
       "relates_to": "new",
       "estimate": "0.5d",
       "status": "open",
-      "evidence": []
+      "evidence": [],
+      "github_issue": 146
     },
     {
       "id": "P13-02",
@@ -21,7 +22,8 @@
       "relates_to": "new",
       "estimate": "1d",
       "status": "open",
-      "evidence": []
+      "evidence": [],
+      "github_issue": 147
     },
     {
       "id": "P13-03",
@@ -31,7 +33,8 @@
       "relates_to": "new",
       "estimate": "1d",
       "status": "open",
-      "evidence": []
+      "evidence": [],
+      "github_issue": 148
     },
     {
       "id": "P13-04",
@@ -41,7 +44,8 @@
       "relates_to": "new",
       "estimate": "0.5d",
       "status": "open",
-      "evidence": []
+      "evidence": [],
+      "github_issue": 149
     },
     {
       "id": "P13-05",
@@ -51,7 +55,8 @@
       "relates_to": "extends P06-07",
       "estimate": "0.5d",
       "status": "open",
-      "evidence": []
+      "evidence": [],
+      "github_issue": 150
     },
     {
       "id": "P13-06",
@@ -61,7 +66,8 @@
       "relates_to": "new",
       "estimate": "0.25d",
       "status": "open",
-      "evidence": []
+      "evidence": [],
+      "github_issue": 151
     },
     {
       "id": "P13-07",
@@ -71,7 +77,8 @@
       "relates_to": "extends P07-06/P07-07",
       "estimate": "1d",
       "status": "open",
-      "evidence": []
+      "evidence": [],
+      "github_issue": 152
     },
     {
       "id": "P13-08",
@@ -81,7 +88,8 @@
       "relates_to": "new",
       "estimate": "0.25d",
       "status": "open",
-      "evidence": []
+      "evidence": [],
+      "github_issue": 153
     },
     {
       "id": "P13-09",
@@ -91,7 +99,8 @@
       "relates_to": "extends P08-04",
       "estimate": "1d",
       "status": "open",
-      "evidence": []
+      "evidence": [],
+      "github_issue": 154
     },
     {
       "id": "P13-10",
@@ -101,7 +110,8 @@
       "relates_to": "extends P10-06",
       "estimate": "1d",
       "status": "open",
-      "evidence": []
+      "evidence": [],
+      "github_issue": 155
     },
     {
       "id": "P13-11",
@@ -111,7 +121,8 @@
       "relates_to": "extends P11-01/P11-02",
       "estimate": "2-3d",
       "status": "open",
-      "evidence": []
+      "evidence": [],
+      "github_issue": 156
     }
   ]
 }

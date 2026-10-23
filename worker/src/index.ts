@@ -20,6 +20,7 @@ export const COMMANDS = [
   { command: "skills", description: "Manage your skills" },
   { command: "privacy", description: "What is stored and why" },
   { command: "forget_me", description: "Delete your data" },
+  { command: "language", description: "Interface language: en or ru" },
   { command: "help", description: "All commands" },
 ];
 

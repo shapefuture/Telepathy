@@ -3,7 +3,8 @@
 // requester confirms -> only then both receive each other's contact. Decline or expiry moves
 // on to the next candidate (max 3). Every send goes through the effect ledger.
 
-import { matchSkills, TAXONOMY, eligibleCandidates } from "./experts";
+import { eligibleCandidates, labelsFor, matchSkills } from "./experts";
+import { T, type Lang } from "./i18n";
 import { effectStatement } from "./outbox";
 import { escapeHtml } from "./text";
 import { DAY, HOUR, addMs, audit, newId, nowIso } from "./util";
@@ -51,10 +52,11 @@ interface IntroRow {
   invite_expires_at: string;
 }
 
-async function tgId(db: D1Database, memberId: string): Promise<number> {
-  const r = await db.prepare("SELECT tg_id FROM members WHERE id=?").bind(memberId).first<{ tg_id: number }>();
+/** Telegram id and interface language of a member, so each person gets messages in their language. */
+async function contact(db: D1Database, memberId: string): Promise<{ tg: number; lang: Lang }> {
+  const r = await db.prepare("SELECT tg_id, lang FROM members WHERE id=?").bind(memberId).first<{ tg_id: number; lang: Lang | null }>();
   if (!r) throw new IntroError("member not found");
-  return r.tg_id;
+  return { tg: r.tg_id, lang: r.lang ?? "en" };
 }
 
 const btn = (text: string, data: string) => ({ text, callback_data: data });
@@ -64,20 +66,19 @@ export async function requestIntro(
   requesterId: string,
   rawText: string,
   now = nowIso(),
+  lang: Lang = "en",
 ): Promise<{ needId: string; introId: string | null; skills: string[]; keys: string[] }> {
   const text = rawText.split(/\s+/).join(" ").trim().slice(0, 500);
   const skills = matchSkills(text);
   if (!skills.length) {
-    throw new IntroError(
-      "I couldn't match that to a skill. Try naming the area, e.g. <code>/intro accountant for a small startup</code>, or see /skills all.",
-    );
+    throw new IntroError(T(lang).introNoSkill);
   }
   const open = await db
     .prepare("SELECT COUNT(*) AS n FROM needs WHERE member_id=? AND created_at>=? AND status IN ('open','matching')")
     .bind(requesterId, addMs(now, -7 * DAY))
     .first<{ n: number }>();
   if ((open?.n ?? 0) >= REQUESTER_WEEKLY_CAP) {
-    throw new IntroError(`You already have ${open!.n} open requests this week (limit ${REQUESTER_WEEKLY_CAP}). Cancel one with /requests or wait.`);
+    throw new IntroError(T(lang).introCap(open!.n, REQUESTER_WEEKLY_CAP));
   }
   const needId = newId();
   await db
@@ -98,15 +99,13 @@ async function nextCandidate(db: D1Database, needId: string, now: string, notify
   const codes = JSON.parse(need.skills_json) as string[];
   const candidates =
     tried.size >= MAX_CANDIDATES || need.expires_at <= now ? [] : await eligibleCandidates(db, need.member_id, codes, now, tried);
-  const requesterTg = await tgId(db, need.member_id);
+  const requester = await contact(db, need.member_id);
   if (!candidates.length) {
     const key = `need:${needId}:no_match`;
     const stmts = [db.prepare("UPDATE needs SET status='no_match' WHERE id=?").bind(needId)];
     if (notifyNone) {
       stmts.push(
-        effectStatement(db, key, requesterTg, {
-          text: "No available expert accepted your request this time, so it is closed. You can try again later or ask in the community.",
-        }),
+        effectStatement(db, key, requester.tg, { text: T(requester.lang).introClosedNoMatch }),
       );
     }
     await db.batch(stmts);
@@ -115,7 +114,8 @@ async function nextCandidate(db: D1Database, needId: string, now: string, notify
   const c = candidates[0]!;
   const id = newId();
   const key = `intro:${id}:invite`;
-  const labels = codes.map((x) => TAXONOMY.get(x)?.en ?? x).join(", ");
+  const cand = await contact(db, c.member_id);
+  const cm = T(cand.lang);
   await db.batch([
     db
       .prepare(
@@ -127,12 +127,9 @@ async function nextCandidate(db: D1Database, needId: string, now: string, notify
     db
       .prepare("INSERT INTO audit(at, actor, action, subject, detail) VALUES (?,?,?,?,?)")
       .bind(now, "system", "intro.invite", id, JSON.stringify({ total: c.total, components: c.components })),
-    effectStatement(db, key, await tgId(db, c.member_id), {
-      text:
-        `<b>Introduction request</b>\nA community member is looking for help with: <i>${escapeHtml(labels)}</i>\n\n` +
-        `<blockquote>${escapeHtml(need.text)}</blockquote>\n` +
-        "Your identity stays private unless you accept <b>and</b> they confirm. This invitation expires in 72 hours.",
-      buttons: [[btn("Accept", `i:${id}:accept`), btn("Decline", `i:${id}:decline`)]],
+    effectStatement(db, key, cand.tg, {
+      text: cm.introInvite(escapeHtml(labelsFor(codes, cand.lang)), escapeHtml(need.text)),
+      buttons: [[btn(cm.bAccept, `i:${id}:accept`), btn(cm.bDecline, `i:${id}:decline`)]],
     }),
   ]);
   return { introId: id, keys: [key] };
@@ -141,68 +138,71 @@ async function nextCandidate(db: D1Database, needId: string, now: string, notify
 /** Apply a button press. Returns a short reply and the effect keys to dispatch. */
 export async function act(db: D1Database, introId: string, memberId: string, action: string, now = nowIso()): Promise<{ reply: string; keys: string[] }> {
   const event = (["accept", "decline", "confirm", "cancel", "helpful", "noresp"].includes(action) ? (action === "helpful" || action === "noresp" ? "complete" : action) : null) as Event | null;
-  if (!event) return { reply: "Unknown action.", keys: [] };
+  const me = T((await db.prepare("SELECT lang FROM members WHERE id=?").bind(memberId).first<{ lang: Lang | null }>())?.lang ?? "en");
+  if (!event) return { reply: me.unknownAction, keys: [] };
   const intro = await db.prepare("SELECT * FROM intros WHERE id=?").bind(introId).first<IntroRow>();
-  if (!intro) return { reply: "This introduction no longer exists.", keys: [] };
+  if (!intro) return { reply: me.introGone, keys: [] };
   const actor: Actor | null = memberId === intro.requester_id ? "requester" : memberId === intro.candidate_id ? "candidate" : null;
-  if (!actor) return { reply: "This introduction is not yours.", keys: [] };
-  if (event === "accept" && now >= intro.invite_expires_at) return { reply: "This invitation has expired.", keys: [] };
+  if (!actor) return { reply: me.notYours, keys: [] };
+  if (event === "accept" && now >= intro.invite_expires_at) return { reply: me.inviteExpired, keys: [] };
   const to = next(intro.status, event, actor);
-  if (!to) return { reply: "Already handled, or no longer available.", keys: [] };
+  if (!to) return { reply: me.alreadyHandledOrNA, keys: [] };
   const outcome = event === "complete" ? (action === "helpful" ? "helpful" : "no_response") : null;
   // Optimistic write: a double click or a concurrent expiry loses the race harmlessly.
   const r = await db
     .prepare("UPDATE intros SET status=?, updated_at=?, outcome=COALESCE(?, outcome) WHERE id=? AND status=?")
     .bind(to, now, outcome, introId, intro.status)
     .run();
-  if (!r.meta.changes) return { reply: "Already handled.", keys: [] };
+  if (!r.meta.changes) return { reply: me.alreadyHandled, keys: [] };
   await audit(db, `intro.${event}`, memberId, introId);
   return after(db, intro, to, actor, now);
 }
 
 async function after(db: D1Database, intro: IntroRow, to: Status, actor: Actor, now: string): Promise<{ reply: string; keys: string[] }> {
-  const reqTg = await tgId(db, intro.requester_id);
-  const candTg = await tgId(db, intro.candidate_id);
+  const req = await contact(db, intro.requester_id);
+  const cand = await contact(db, intro.candidate_id);
+  const rm = T(req.lang);
+  const cm = T(cand.lang);
+  const me = actor === "requester" ? rm : cm;
   const need = await db.prepare("SELECT text FROM needs WHERE id=?").bind(intro.need_id).first<{ text: string }>();
   const quote = `<blockquote>${escapeHtml(need?.text ?? "")}</blockquote>`;
   const id = intro.id;
   if (to === "accepted") {
     const key = `intro:${id}:accepted`;
-    await effectStatement(db, key, reqTg, {
-      text: `<b>Good news:</b> an expert accepted your introduction request.\n${quote}\nConfirm to exchange contacts with them.`,
-      buttons: [[btn("Confirm & exchange contacts", `i:${id}:confirm`), btn("Cancel", `i:${id}:cancel`)]],
+    await effectStatement(db, key, req.tg, {
+      text: rm.introAcceptedToRequester(quote),
+      buttons: [[btn(rm.bConfirm, `i:${id}:confirm`), btn(rm.bCancel, `i:${id}:cancel`)]],
     }).run();
-    return { reply: "Thanks! The requester will now be asked to confirm. Nothing is shared yet.", keys: [key] };
+    return { reply: me.introAcceptedReply, keys: [key] };
   }
   if (to === "declined") {
     const { keys } = await nextCandidate(db, intro.need_id, now);
-    return { reply: "Declined. Nobody is told who you are.", keys };
+    return { reply: me.introDeclinedReply, keys };
   }
   if (to === "mutually_confirmed") {
-    const buttons = [[btn("It helped", `i:${id}:helpful`), btn("Didn't happen", `i:${id}:noresp`)]];
     const k1 = `intro:${id}:reveal:req`;
     const k2 = `intro:${id}:reveal:cand`;
+    const fb = (m: typeof rm) => [[btn(m.bHelped, `i:${id}:helpful`), btn(m.bDidntHappen, `i:${id}:noresp`)]];
     await db.batch([
-      effectStatement(db, k1, reqTg, { text: "<b>You're connected.</b> Here is the expert's contact:", buttons, reveal_tg_id: candTg }),
-      effectStatement(db, k2, candTg, { text: `<b>You're connected.</b> The requester confirmed.\n${quote}\nTheir contact:`, buttons, reveal_tg_id: reqTg }),
+      effectStatement(db, k1, req.tg, { text: rm.introConnectedReq, buttons: fb(rm), reveal_tg_id: cand.tg }),
+      effectStatement(db, k2, cand.tg, { text: cm.introConnectedCand(quote), buttons: fb(cm), reveal_tg_id: req.tg }),
     ]);
-    return { reply: "Confirmed. Contacts have been shared with both of you.", keys: [k1, k2] };
+    return { reply: me.introConfirmedReply, keys: [k1, k2] };
   }
   if (to === "cancelled") {
     const key = `intro:${id}:cancelled`;
+    const other = actor === "requester" ? cand : req;
     await db.batch([
       db.prepare("UPDATE needs SET status='cancelled' WHERE id=? AND status IN ('open','matching')").bind(intro.need_id),
-      effectStatement(db, key, actor === "requester" ? candTg : reqTg, {
-        text: "An introduction you were part of was cancelled. Nothing was shared.",
-      }),
+      effectStatement(db, key, other.tg, { text: T(other.lang).introCancelledNotice }),
     ]);
-    return { reply: "Cancelled.", keys: [key] };
+    return { reply: me.introCancelledReply, keys: [key] };
   }
   if (to === "completed") {
     await db.prepare("UPDATE needs SET status='closed' WHERE id=?").bind(intro.need_id).run();
-    return { reply: "Thanks for the feedback! It is private and only improves future matching.", keys: [] };
+    return { reply: me.introCompletedReply, keys: [] };
   }
-  return { reply: "Done.", keys: [] };
+  return { reply: me.done, keys: [] };
 }
 
 export async function cancelNeed(db: D1Database, requesterId: string, needId: string, now = nowIso()): Promise<{ ok: boolean; keys: string[] }> {
@@ -243,19 +243,19 @@ export async function expireDue(db: D1Database, now = nowIso()): Promise<string[
 export async function sendReminders(db: D1Database, now = nowIso()): Promise<string[]> {
   const rows = await db
     .prepare(
-      "SELECT i.id, m.tg_id FROM intros i JOIN members m ON m.id = i.candidate_id WHERE i.status='invited' " +
+      "SELECT i.id, m.tg_id, m.lang FROM intros i JOIN members m ON m.id = i.candidate_id WHERE i.status='invited' " +
         "AND i.reminder_sent_at IS NULL AND i.created_at <= ? AND i.invite_expires_at > ? AND m.reminders=1 AND m.removed_at IS NULL LIMIT 50",
     )
     .bind(addMs(now, -REMINDER_AFTER), now)
-    .all<{ id: string; tg_id: number }>();
+    .all<{ id: string; tg_id: number; lang: Lang | null }>();
   const keys: string[] = [];
   for (const r of rows.results) {
     const key = `intro:${r.id}:reminder`;
     const [upd] = await db.batch([
       db.prepare("UPDATE intros SET reminder_sent_at=? WHERE id=? AND reminder_sent_at IS NULL AND status='invited'").bind(now, r.id),
       effectStatement(db, key, r.tg_id, {
-        text: "Reminder: an introduction request is waiting for your answer. Ignore this if you're not interested; it expires automatically.",
-        buttons: [[btn("Accept", `i:${r.id}:accept`), btn("Decline", `i:${r.id}:decline`)]],
+        text: T(r.lang ?? "en").introReminder,
+        buttons: [[btn(T(r.lang ?? "en").bAccept, `i:${r.id}:accept`), btn(T(r.lang ?? "en").bDecline, `i:${r.id}:decline`)]],
       }),
     ]);
     if (upd!.meta.changes) keys.push(key);

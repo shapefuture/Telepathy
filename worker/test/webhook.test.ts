@@ -53,7 +53,7 @@ describe("bot behaviour", () => {
   it("private commands in a group are redirected", async () => {
     const { app, texts } = testApp();
     await enableGroup(app);
-    await feed(app, groupCmd(5, "/ask venue?"));
+    await feed(app, groupCmd(5, "/intro need an accountant"));
     expect(texts(GROUP).at(-1)).toContain("private chat");
   });
 

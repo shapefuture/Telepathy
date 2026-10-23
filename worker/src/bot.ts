@@ -1,11 +1,15 @@
-// Telegram update router (P03, P06, P08, P09, P11-07).
+// Telegram update router (P03, P06, P08, P09, P11-07, P13-01/02/04/05).
 //   * group messages are stored only for chats an owner explicitly enabled
-//   * member features answer only in private chat, using the verified Telegram user id
-//   * the bot never speaks in groups except to owner commands and redirects
+//   * in a group, /ask (or @mention) answers only from that same group (P13-01)
+//   * everything personal (profile, intros, digest, data rights) happens in private chat
+//   * texts follow the member's language: Telegram setting or /language (P13-04)
 
-import { ensureMember, memberByTg, readable, revoke, grantStatement, VISIBILITIES, type Member, type Visibility } from "./acl";
+import { ensureMember, grantStatement, langOf, memberByTg, readable, revoke, VISIBILITIES, type Member, type Visibility } from "./acl";
 import { digestHour, ownerIds, timezone, type Env } from "./env";
-import { eligibleCandidates, label, matchSkills, resolveSkill, TAXONOMY } from "./experts";
+import { eligibleCandidates, label, labelIn, labelsFor, matchSkills, resolveSkill, TAXONOMY } from "./experts";
+import { recordAnswer, vote } from "./feedback";
+import { maybeHint } from "./hints";
+import { langFromCode, T, type Lang, type Messages } from "./i18n";
 import { docOffloadable, docSupported, EDGE_DOC_MAX_BYTES, enabledSource, ingestMessage, removeMessage, storeDocument, type TgMessage, type TgUser } from "./ingest";
 import { act, cancelNeed, IntroError, requestIntro } from "./intros";
 import { reconcile } from "./outbox";
@@ -25,7 +29,7 @@ interface CallbackQuery {
   id: string;
   from: TgUser;
   data?: string;
-  message?: { message_id: number; chat: { id: number } };
+  message?: { message_id: number; chat: { id: number; type?: string } };
 }
 interface ChatMemberUpdated {
   chat: { id: number; type: string };
@@ -41,27 +45,10 @@ export interface Update {
   chat_member?: ChatMemberUpdated;
 }
 
-export const PRIVACY_NOTICE =
-  "<b>Telepathy privacy notice</b>\n" +
-  "• Only groups an owner explicitly enabled are stored. Each group shows a notice.\n" +
-  "• Your name, username and phone number are not stored; you get a random internal ID.\n" +
-  "• Answers quote messages verbatim with a link, only from groups you can read.\n" +
-  "• Data is stored in Cloudflare D1. Nothing is sent to AI services. PDF, Word and PowerPoint files " +
-  "are converted to text on GitHub's servers and not kept there.\n" +
-  "• You are not discoverable as an expert unless you run /optin yourself.\n" +
-  "• Introductions need both people to agree before any contact is shared.\n" +
-  "• Full history is kept. /forget_me deletes your messages and profile and stops collection; " +
-  "reply /forget to one of your messages in the group to delete it.";
+/** Kept for tests and docs: the English privacy notice. */
+export const PRIVACY_NOTICE = T("en").privacy;
 
-const HELP =
-  "<b>Search</b>\n/ask <i>question</i> — cited answers from your groups (typos and RU/EN spelling tolerated)\n\n" +
-  "<b>Experts &amp; introductions</b>\n/intro <i>what you need</i> — consent-based introduction\n" +
-  "/expert <i>topic</i> — how many opted-in experts match\n/requests — your open requests\n\n" +
-  "<b>Your profile</b>\n/profile — view and change settings\n/digest on · /digest off — daily digest (opt-in)\n" +
-  "/optin · /optout — expert discoverability\n/skills · /skills add <i>skill</i> · /skills remove <i>skill</i> · /skills all\n\n" +
-  "<b>Your data</b>\n/privacy · /forget_me · /resume_collection";
-
-const PRIVATE_ONLY = new Set(["ask", "intro", "expert", "profile", "optin", "optout", "skills", "forget_me", "digest", "requests"]);
+const PRIVATE_ONLY = new Set(["intro", "expert", "profile", "optin", "optout", "skills", "forget_me", "digest", "requests", "language"]);
 const GROUP_TYPES = new Set(["group", "supergroup"]);
 const btn = (text: string, data: string): InlineButton => ({ text, callback_data: data });
 
@@ -74,6 +61,16 @@ export function parseCommand(msg: TgMessage, botUsername?: string): { cmd: strin
   const [name, at] = text.slice(1, e.length).toLowerCase().split("@");
   if (at && botUsername && at !== botUsername.toLowerCase()) return null; // addressed to another bot
   return { cmd: name ?? "", args: text.slice(e.length).trim() };
+}
+
+/** "@telepathy_bot where is the venue?" -> "where is the venue?" (only when BOT_USERNAME is set). */
+export function mentionQuestion(msg: TgMessage, botUsername?: string): string | null {
+  if (!botUsername || !msg.text) return null;
+  const handle = `@${botUsername.toLowerCase()}`;
+  const hit = msg.entities?.find((e) => e.type === "mention" && msg.text!.slice(e.offset, e.offset + e.length).toLowerCase() === handle);
+  if (!hit) return null;
+  const q = (msg.text.slice(0, hit.offset) + msg.text.slice(hit.offset + hit.length)).trim();
+  return q || null;
 }
 
 const hits = new Map<number, number[]>();
@@ -91,6 +88,7 @@ export function rateOk(userId: number, perMinute: number, now = Date.now()): boo
 export const resetRateLimits = () => hits.clear();
 
 const isOwner = (app: App, userId?: number) => userId !== undefined && ownerIds(app.env).has(userId);
+const rateLimit = (app: App) => Number(app.env.ASK_RATE_PER_MINUTE ?? "10") || 10;
 
 async function isChatAdmin(app: App, chatId: number, userId: number): Promise<boolean> {
   try {
@@ -109,15 +107,23 @@ async function ownerInGroup(app: App, msg: TgMessage): Promise<boolean> {
 const reply = (app: App, chatId: number, text: string, buttons?: InlineButton[][], replyTo?: number) =>
   app.tg.sendMessage(chatId, text, { buttons, replyTo });
 
+/** Language for someone we may not know yet: stored choice, else their Telegram setting. */
+async function langForUser(app: App, user?: TgUser): Promise<Lang> {
+  if (!user) return "en";
+  const m = await memberByTg(app.db, user.id);
+  return m?.lang_explicit ? langOf(m) : langFromCode(user.language_code);
+}
+
 async function knownMember(app: App, msg: TgMessage): Promise<Member | null> {
   if (!msg.from) return null;
   let m = await memberByTg(app.db, msg.from.id);
   if (!m && isOwner(app, msg.from.id)) m = await ensureMember(app.db, msg.from.id, "owner");
   if (!m || m.removed_at) {
-    await reply(app, msg.chat.id, "I don't know you yet. Post a message in an enabled community group first, then try again.");
+    await reply(app, msg.chat.id, T(langFromCode(msg.from.language_code)).dontKnowYou);
     return null;
   }
-  return m;
+  // Existing member: keep their language in sync with Telegram unless they chose one.
+  return ensureMember(app.db, msg.from.id, undefined, msg.from.language_code);
 }
 
 // ---- entry point ----------------------------------------------------------------------
@@ -143,24 +149,36 @@ async function onMessage(app: App, msg: TgMessage, edited: boolean): Promise<str
     }
     if (command) {
       if (PRIVATE_ONLY.has(command.cmd)) {
-        await reply(app, msg.chat.id, "Please send that command to me in a private chat.", undefined, msg.message_id);
+        await reply(app, msg.chat.id, T(await langForUser(app, msg.from)).privateOnly, undefined, msg.message_id);
         return [];
       }
+      if (command.cmd === "ask") return groupAsk(app, msg, command.args);
       if (command.cmd === "enable") return cmdEnable(app, msg, command.args);
       if (command.cmd === "disable") return cmdDisable(app, msg);
       if (command.cmd === "retention") return cmdRetention(app, msg, command.args);
+      if (command.cmd === "hints") return cmdHints(app, msg, command.args);
       if (command.cmd === "forget") return cmdForgetMessage(app, msg);
     }
-    await ingest(app, msg);
-    return [];
+    const keys: string[] = [];
+    const mentioned = edited ? null : mentionQuestion(msg, app.env.BOT_USERNAME);
+    // Answer before storing, so the question can't match itself.
+    if (mentioned) keys.push(...(await groupAsk(app, msg, mentioned)));
+    keys.push(...(await ingest(app, msg, edited)));
+    return keys;
   }
   if (msg.chat.type !== "private" || !command || !msg.from) return [];
   return privateCommand(app, msg, command.cmd, command.args);
 }
 
-async function ingest(app: App, msg: TgMessage): Promise<void> {
+async function ingest(app: App, msg: TgMessage, edited: boolean): Promise<string[]> {
   const { outcome, source } = await ingestMessage(app.db, msg);
-  if (outcome !== "stored" || !source || msg.edit_date || !msg.document) return;
+  if (outcome !== "stored" || !source || edited || msg.edit_date) return [];
+  const keys: string[] = [];
+  if (!msg.document) {
+    const hint = await maybeHint(app.db, source, msg, await langForUser(app, msg.from));
+    if (hint) keys.push(hint);
+    return keys;
+  }
   if (app.env.OFFLOAD_DOCUMENTS === "true" && docOffloadable(msg.document)) {
     const now = nowIso();
     await app.db
@@ -169,24 +187,44 @@ async function ingest(app: App, msg: TgMessage): Promise<void> {
       )
       .bind(source.id, msg.message_id, msg.document.file_id, msg.document.file_name ?? "file", msg.document.file_size ?? null, now, now)
       .run();
-    return;
+    return keys;
   }
-  if (!docSupported(msg.document)) return;
+  if (!docSupported(msg.document)) return keys;
   try {
-    const text = await app.tg.fileText(msg.document!.file_id, EDGE_DOC_MAX_BYTES);
-    await storeDocument(app.db, source, msg, msg.document!.file_name ?? "file.txt", text);
+    const text = await app.tg.fileText(msg.document.file_id, EDGE_DOC_MAX_BYTES);
+    await storeDocument(app.db, source, msg, msg.document.file_name ?? "file.txt", text);
   } catch (e) {
     console.warn("document ingest failed", msg.chat.id, msg.message_id, String(e));
   }
+  return keys;
+}
+
+/** P13-01: answer in the group, from that group only. Everyone there can already read it. */
+async function groupAsk(app: App, msg: TgMessage, question: string): Promise<string[]> {
+  const source = await enabledSource(app.db, msg.chat.id);
+  if (!source || !msg.from || msg.from.is_bot) return [];
+  const lang = await langForUser(app, msg.from);
+  if (!rateOk(msg.from.id, rateLimit(app))) {
+    await reply(app, msg.chat.id, T(lang).tooMany, undefined, msg.message_id);
+    return [];
+  }
+  const asker = await ensureMember(app.db, msg.from.id, undefined, msg.from.language_code);
+  if (asker.collection_opt_out || asker.removed_at) return [];
+  const a = await answer(app.db, new Set([source.id]), question);
+  const answerId = a.status === "answered" ? await recordAnswer(app.db, asker.id, a.quotes.map((q) => q.id)) : undefined;
+  const r = renderAnswer(a, timezone(app.env), lang, { scope: "group", answerId });
+  await reply(app, msg.chat.id, r.text, r.buttons, msg.message_id);
+  return [];
 }
 
 // ---- owner commands in groups -----------------------------------------------------------
 
 async function cmdEnable(app: App, msg: TgMessage, args: string): Promise<string[]> {
   if (!(await ownerInGroup(app, msg))) return []; // silent: don't advertise admin commands
+  const m = T(await langForUser(app, msg.from));
   const vis = (args.trim().toUpperCase() || "MEMBER_CONSENTED") as Visibility;
   if (!VISIBILITIES.includes(vis)) {
-    await reply(app, msg.chat.id, `Visibility must be one of: ${VISIBILITIES.join(", ")}`);
+    await reply(app, msg.chat.id, m.visibilityMust(VISIBILITIES.join(", ")));
     return [];
   }
   const owner = await ensureMember(app.db, msg.from!.id, "owner");
@@ -203,12 +241,7 @@ async function cmdEnable(app: App, msg: TgMessage, args: string): Promise<string
     grantStatement(app.db, id, owner.id),
   ]);
   await audit(app.db, "source.enable", owner.id, id, { visibility: vis });
-  await reply(
-    app,
-    msg.chat.id,
-    `Telepathy is now <b>collecting</b> this chat (visibility: ${vis}, full history kept). ` +
-      "Members can search it privately via /ask in a DM with the bot. DM the bot /privacy for details or /forget_me to delete your data.",
-  );
+  await reply(app, msg.chat.id, m.enabled(vis));
   return [];
 }
 
@@ -217,22 +250,39 @@ async function cmdDisable(app: App, msg: TgMessage): Promise<string[]> {
   const r = await app.db.prepare("UPDATE sources SET enabled=0 WHERE chat_id=? AND enabled=1").bind(msg.chat.id).run();
   if (r.meta.changes) {
     await audit(app.db, "source.disable", String(msg.from!.id), String(msg.chat.id));
-    await reply(app, msg.chat.id, "Telepathy stopped collecting this chat. Existing messages are excluded from all answers.");
+    await reply(app, msg.chat.id, T(await langForUser(app, msg.from)).disabled);
   }
   return [];
 }
 
 async function cmdRetention(app: App, msg: TgMessage, args: string): Promise<string[]> {
   if (!(await ownerInGroup(app, msg))) return [];
+  const m = T(await langForUser(app, msg.from));
   const src = await enabledSource(app.db, msg.chat.id);
   const days = Number(args.trim());
-  if (!src || !Number.isInteger(days) || days < 0 || days > 3650) {
-    await reply(app, msg.chat.id, "Usage: /retention <days 1..3650> to purge older messages, or /retention 0 to keep full history.");
+  if (!src || !args.trim() || !Number.isInteger(days) || days < 0 || days > 3650) {
+    await reply(app, msg.chat.id, m.retentionUsage);
     return [];
   }
   await app.db.prepare("UPDATE sources SET retention_days=? WHERE id=?").bind(days, src.id).run();
   await audit(app.db, "source.retention", String(msg.from!.id), src.id, { days });
-  await reply(app, msg.chat.id, days === 0 ? "Full history will be kept. Nothing is purged automatically." : `Retention set to ${days} days. Older messages are purged daily.`);
+  await reply(app, msg.chat.id, days === 0 ? m.retentionKeepAll : m.retentionSet(days));
+  return [];
+}
+
+/** P13-02: per-group opt-in for "already answered" hints. Turning it on is the owner's sign-off. */
+async function cmdHints(app: App, msg: TgMessage, args: string): Promise<string[]> {
+  if (!(await ownerInGroup(app, msg))) return [];
+  const m = T(await langForUser(app, msg.from));
+  const src = await enabledSource(app.db, msg.chat.id);
+  const arg = args.trim().toLowerCase();
+  if (!src || (arg !== "on" && arg !== "off")) {
+    await reply(app, msg.chat.id, m.hintsUsage);
+    return [];
+  }
+  await app.db.prepare("UPDATE sources SET hints=? WHERE id=?").bind(arg === "on" ? 1 : 0, src.id).run();
+  await audit(app.db, "source.hints", String(msg.from!.id), src.id, { on: arg === "on" });
+  await reply(app, msg.chat.id, arg === "on" ? m.hintsOn : m.hintsOff);
   return [];
 }
 
@@ -243,33 +293,41 @@ async function cmdForgetMessage(app: App, msg: TgMessage): Promise<string[]> {
   if (!target || !src || !msg.from) return [];
   const isAuthor = target.from?.id === msg.from.id;
   if (!isAuthor && !(await ownerInGroup(app, msg))) return [];
+  const m = T(await langForUser(app, msg.from));
   const ok = await removeMessage(app.db, src.id, target.message_id);
   await audit(app.db, "message.remove", String(msg.from.id), `${src.id}:${target.message_id}`, { reason: isAuthor ? "author" : "owner" });
-  await reply(app, msg.chat.id, ok ? "Removed from Telepathy." : "Nothing stored for that message.", undefined, msg.message_id);
+  await reply(app, msg.chat.id, ok ? m.removed : m.nothingStored, undefined, msg.message_id);
   return [];
 }
 
 // ---- private commands -------------------------------------------------------------------
 
-function profileView(m: Member, skills: { code: string; state: string }[]): { text: string; buttons: InlineButton[][] } {
-  const list = skills.map((s) => `${TAXONOMY.get(s.code)?.en ?? s.code}${s.state === "confirmed" ? "" : " (suggested)"}`).join(", ") || "none yet";
-  const yes = (v: number) => (v ? "yes" : "no");
+function profileView(mem: Member, skills: { code: string; state: string }[]): { text: string; buttons: InlineButton[][] } {
+  const lang = langOf(mem);
+  const m = T(lang);
+  const list =
+    skills.map((s) => `${TAXONOMY.get(s.code) ? labelIn(TAXONOMY.get(s.code)!, lang) : s.code}${s.state === "confirmed" ? "" : ` (${m.suggested})`}`).join(", ") ||
+    m.noneYet;
+  const yn = (v: number) => (v ? m.yes : m.no);
+  const oo = (v: number) => (v ? m.on : m.off);
   return {
     text:
-      "<b>Your profile</b> (only you see this)\n" +
-      `Daily digest: <b>${m.digest ? "on" : "off"}</b>\n` +
-      `Discoverable as expert: <b>${yes(m.discoverable)}</b>\n` +
-      `Available for introductions: <b>${yes(m.available)}</b>\n` +
-      `Reminders: <b>${m.reminders ? "on" : "off"}</b>\n` +
-      `Message collection: <b>${m.collection_opt_out ? "stopped" : "on"}</b>\n` +
-      `Skills: ${escapeHtml(list)}\n\nAdd skills with <code>/skills add accounting</code>.`,
+      `${m.profileTitle}\n` +
+      `${m.pDigest}: <b>${oo(mem.digest)}</b>\n` +
+      `${m.pDiscoverable}: <b>${yn(mem.discoverable)}</b>\n` +
+      `${m.pAvailable}: <b>${yn(mem.available)}</b>\n` +
+      `${m.pReminders}: <b>${oo(mem.reminders)}</b>\n` +
+      `${m.pCollection}: <b>${mem.collection_opt_out ? m.pStopped : m.on}</b>\n` +
+      `${m.pLanguage}: <b>${lang === "ru" ? "русский" : "English"}</b>\n` +
+      `${m.pSkills}: ${escapeHtml(list)}\n\n${m.addSkillHint}`,
     buttons: [
-      [btn(m.digest ? "Digest off" : "Digest on", `p:digest:${m.digest ? 0 : 1}`)],
-      [btn(m.discoverable ? "Stop being discoverable" : "Become discoverable", `p:discoverable:${m.discoverable ? 0 : 1}`)],
+      [btn(mem.digest ? m.bDigestOff : m.bDigestOn, `p:digest:${mem.digest ? 0 : 1}`)],
+      [btn(mem.discoverable ? m.bDiscoverOff : m.bDiscoverOn, `p:discoverable:${mem.discoverable ? 0 : 1}`)],
       [
-        btn(m.available ? "Pause introductions" : "Resume introductions", `p:available:${m.available ? 0 : 1}`),
-        btn(m.reminders ? "Reminders off" : "Reminders on", `p:reminders:${m.reminders ? 0 : 1}`),
+        btn(mem.available ? m.bPause : m.bResume, `p:available:${mem.available ? 0 : 1}`),
+        btn(mem.reminders ? m.bRemindersOff : m.bRemindersOn, `p:reminders:${mem.reminders ? 0 : 1}`),
       ],
+      [btn(lang === "ru" ? "English" : "Русский", `p:lang:${lang === "ru" ? "en" : "ru"}`)],
     ],
   };
 }
@@ -278,104 +336,109 @@ async function mySkills(app: App, memberId: string) {
   return (await app.db.prepare("SELECT code, state FROM skills WHERE member_id=? ORDER BY code").bind(memberId).all<{ code: string; state: string }>()).results;
 }
 
+async function setLanguage(app: App, memberId: string, lang: Lang): Promise<void> {
+  await app.db.prepare("UPDATE members SET lang=?, lang_explicit=1 WHERE id=?").bind(lang, memberId).run();
+}
+
 async function privateCommand(app: App, msg: TgMessage, cmd: string, args: string): Promise<string[]> {
   const chat = msg.chat.id;
   const from = msg.from!;
-  const rate = Number(app.env.ASK_RATE_PER_MINUTE ?? "10") || 10;
+  const pre = T(await langForUser(app, from));
   switch (cmd) {
     case "start":
-      await reply(app, chat, "Hi! I search your community's enabled groups and answer with cited quotes, and I can introduce you to opted-in experts.\n\n" + HELP);
+      await reply(app, chat, pre.start + pre.help);
       return [];
     case "help":
-      await reply(app, chat, HELP);
+      await reply(app, chat, pre.help);
       return [];
     case "privacy":
-      await reply(app, chat, PRIVACY_NOTICE);
+      await reply(app, chat, pre.privacy);
       return [];
     case "status":
     case "sources":
     case "uncertain":
       if (!isOwner(app, from.id)) return [];
-      return ownerCommand(app, chat, cmd);
+      return ownerCommand(app, chat, cmd, pre);
   }
-  const m = await knownMember(app, msg);
-  if (!m) return [];
+  const mem = await knownMember(app, msg);
+  if (!mem) return [];
+  if (cmd === "language") {
+    const want = args.trim().toLowerCase();
+    if (want !== "en" && want !== "ru") {
+      await reply(app, chat, pre.languageUsage);
+      return [];
+    }
+    await setLanguage(app, mem.id, want);
+    await reply(app, chat, T(want).languageSet);
+    return [];
+  }
+  const lang = langOf(mem);
+  const m = T(lang);
   switch (cmd) {
     case "ask": {
-      if (!rateOk(from.id, rate)) {
-        await reply(app, chat, "Too many requests. Please wait a minute.");
+      if (!rateOk(from.id, rateLimit(app))) {
+        await reply(app, chat, m.tooMany);
         return [];
       }
-      const a = await answer(app.db, await readable(app.db, m), args);
-      await reply(app, chat, renderAnswer(a, timezone(app.env)));
+      const a = await answer(app.db, await readable(app.db, mem), args);
+      const answerId = a.status === "answered" ? await recordAnswer(app.db, mem.id, a.quotes.map((q) => q.id)) : undefined;
+      const r = renderAnswer(a, timezone(app.env), lang, { answerId });
+      await reply(app, chat, r.text, r.buttons);
       return [];
     }
     case "profile": {
-      const v = profileView(m, await mySkills(app, m.id));
+      const v = profileView(mem, await mySkills(app, mem.id));
       await reply(app, chat, v.text, v.buttons);
       return [];
     }
     case "digest": {
       const arg = args.toLowerCase();
       if (arg !== "on" && arg !== "off") {
-        await reply(app, chat, `Daily digest is <b>${m.digest ? "on" : "off"}</b>. Change with <code>/digest on</code> or <code>/digest off</code>.`);
+        await reply(app, chat, m.digestState(!!mem.digest));
         return [];
       }
-      await app.db.prepare("UPDATE members SET digest=? WHERE id=?").bind(arg === "on" ? 1 : 0, m.id).run();
-      await reply(app, chat, arg === "on" ? `You'll get a daily digest (${digestHour(app.env)}:00 local) covering the groups you can read.` : "Daily digest turned off.");
+      await app.db.prepare("UPDATE members SET digest=? WHERE id=?").bind(arg === "on" ? 1 : 0, mem.id).run();
+      await reply(app, chat, arg === "on" ? m.digestOn(digestHour(app.env)) : m.digestOff);
       return [];
     }
     case "optin":
     case "optout": {
       const on = cmd === "optin";
-      await app.db.prepare("UPDATE members SET discoverable=? WHERE id=?").bind(on ? 1 : 0, m.id).run();
-      await audit(app.db, "consent.discovery", m.id, m.id, { granted: on });
-      await reply(
-        app,
-        chat,
-        on
-          ? "You're now discoverable for introductions <b>in the skills you list</b>. Nobody sees your identity unless you accept a specific request and the requester confirms.\nAdd skills: <code>/skills add python</code> · undo anytime: /optout"
-          : "You're no longer discoverable. Pending invitations stay answerable.",
-      );
+      await app.db.prepare("UPDATE members SET discoverable=? WHERE id=?").bind(on ? 1 : 0, mem.id).run();
+      await audit(app.db, "consent.discovery", mem.id, mem.id, { granted: on });
+      await reply(app, chat, on ? m.optin : m.optout);
       return [];
     }
     case "skills":
-      return cmdSkills(app, chat, m, args);
+      return cmdSkills(app, chat, mem, args, m);
     case "expert": {
-      if (!rateOk(from.id, rate)) {
-        await reply(app, chat, "Too many requests. Please wait a minute.");
+      if (!rateOk(from.id, rateLimit(app))) {
+        await reply(app, chat, m.tooMany);
         return [];
       }
       const codes = matchSkills(args);
       if (!codes.length) {
-        await reply(app, chat, "Tell me a topic, e.g. <code>/expert tax advice</code> (see /skills all).");
+        await reply(app, chat, m.expertUsage);
         return [];
       }
-      const n = (await eligibleCandidates(app.db, m.id, codes, nowIso())).length;
-      const labels = codes.map((c) => TAXONOMY.get(c)!.en).join(", ");
+      const n = (await eligibleCandidates(app.db, mem.id, codes, nowIso())).length;
       // Identities are never listed: discovery happens only through consented intros (K4).
-      await reply(app, chat, `<b>${n}</b> opted-in, available member(s) match <i>${escapeHtml(labels)}</i>.\n` + (n ? "Use <code>/intro …</code> to request an introduction." : "Try a broader topic, or ask in the community."));
+      await reply(app, chat, m.expertCount(n, escapeHtml(labelsFor(codes, lang))));
       return [];
     }
     case "intro": {
-      if (!rateOk(from.id, rate)) {
-        await reply(app, chat, "Too many requests. Please wait a minute.");
+      if (!rateOk(from.id, rateLimit(app))) {
+        await reply(app, chat, m.tooMany);
         return [];
       }
       if (args.length < 10) {
-        await reply(app, chat, "Describe what you need in a sentence, e.g.\n<code>/intro need an accountant for a 3-person startup</code>\n\nYour text is shown to matching experts <b>without your name</b>.");
+        await reply(app, chat, m.introUsage);
         return [];
       }
       try {
-        const r = await requestIntro(app.db, m.id, args);
-        const labels = r.skills.map((c) => TAXONOMY.get(c)!.en).join(", ");
-        await reply(
-          app,
-          chat,
-          r.introId
-            ? `Request created (<i>${escapeHtml(labels)}</i>). I've invited the best-matching available expert anonymously. You'll be asked to confirm before any contact is shared. Invitations expire after 72h; I'll try up to 3 experts.`
-            : `No opted-in, available expert matches <i>${escapeHtml(labels)}</i> right now. Try again later or ask in the community.`,
-        );
+        const r = await requestIntro(app.db, mem.id, args, nowIso(), lang);
+        const labels = escapeHtml(labelsFor(r.skills, lang));
+        await reply(app, chat, r.introId ? m.introCreated(labels) : m.introNoMatch(labels));
         return r.keys;
       } catch (e) {
         if (e instanceof IntroError) {
@@ -386,73 +449,71 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
       }
     }
     case "requests": {
-      const rows = (await app.db.prepare("SELECT id, text, status FROM needs WHERE member_id=? AND status IN ('open','matching') ORDER BY created_at DESC").bind(m.id).all<{ id: string; text: string; status: string }>()).results;
-      if (!rows.length) await reply(app, chat, "You have no open requests.");
-      for (const r of rows) await reply(app, chat, `<blockquote>${escapeHtml(r.text)}</blockquote>Status: ${r.status}`, [[btn("Cancel request", `n:${r.id}:cancel`)]]);
+      const rows = (await app.db.prepare("SELECT id, text, status FROM needs WHERE member_id=? AND status IN ('open','matching') ORDER BY created_at DESC").bind(mem.id).all<{ id: string; text: string; status: string }>()).results;
+      if (!rows.length) await reply(app, chat, m.noRequests);
+      for (const r of rows) await reply(app, chat, m.requestStatus(escapeHtml(r.text), r.status), [[btn(m.bCancelRequest, `n:${r.id}:cancel`)]]);
       return [];
     }
     case "forget_me":
-      await reply(
-        app,
-        chat,
-        "<b>Delete my data?</b>\nThis removes all your stored messages, skills and open introductions, and stops storing your future messages. It cannot be undone.",
-        [[btn("Yes, delete everything", "fm:yes"), btn("Cancel", "fm:no")]],
-      );
+      await reply(app, chat, m.forgetConfirm, [[btn(m.bForgetYes, "fm:yes"), btn(m.bCancel, "fm:no")]]);
       return [];
     case "resume_collection":
-      await app.db.prepare("UPDATE members SET collection_opt_out=0 WHERE id=?").bind(m.id).run();
-      await audit(app.db, "member.resume_collection", m.id, m.id);
-      await reply(app, chat, "Your new messages in enabled groups will be stored again.");
+      await app.db.prepare("UPDATE members SET collection_opt_out=0 WHERE id=?").bind(mem.id).run();
+      await audit(app.db, "member.resume_collection", mem.id, mem.id);
+      await reply(app, chat, m.resumeOk);
       return [];
   }
   return [];
 }
 
-async function cmdSkills(app: App, chat: number, m: Member, args: string): Promise<string[]> {
+async function cmdSkills(app: App, chat: number, mem: Member, args: string, m: Messages): Promise<string[]> {
   const [verb = "", ...rest] = args.split(/\s+/);
   const what = rest.join(" ");
   if (verb === "all") {
     const lines = [...TAXONOMY.values()].map((s) => `<code>${s.code}</code> ${escapeHtml(label(s))}`);
-    for (let i = 0; i < lines.length; i += 35) await reply(app, chat, (i ? "" : "<b>Skills</b>\n") + lines.slice(i, i + 35).join("\n"));
+    for (let i = 0; i < lines.length; i += 35) await reply(app, chat, (i ? "" : `${m.skillsTitle}\n`) + lines.slice(i, i + 35).join("\n"));
     return [];
   }
   if ((verb === "add" || verb === "remove") && what) {
     const code = resolveSkill(what);
     if (!code) {
-      await reply(app, chat, "Unknown skill. See /skills all.");
+      await reply(app, chat, m.unknownSkill);
       return [];
     }
     if (verb === "add") {
       await app.db
         .prepare("INSERT INTO skills(member_id, code, state, kind) VALUES (?,?,'confirmed','self_claim') ON CONFLICT(member_id, code) DO UPDATE SET state='confirmed'")
-        .bind(m.id, code)
+        .bind(mem.id, code)
         .run();
-      const note = m.discoverable ? "" : " You're not discoverable yet — run /optin when ready.";
-      await reply(app, chat, `Added <b>${escapeHtml(label(TAXONOMY.get(code)!))}</b>.${note}`);
+      await reply(app, chat, m.skillAdded(escapeHtml(labelIn(TAXONOMY.get(code)!, langOf(mem))), !!mem.discoverable));
     } else {
-      const r = await app.db.prepare("DELETE FROM skills WHERE member_id=? AND code=?").bind(m.id, code).run();
-      await reply(app, chat, r.meta.changes ? "Removed." : "That skill wasn't on your profile.");
+      const r = await app.db.prepare("DELETE FROM skills WHERE member_id=? AND code=?").bind(mem.id, code).run();
+      await reply(app, chat, r.meta.changes ? m.skillRemoved : m.skillNotOnProfile);
     }
     return [];
   }
-  const listed = (await mySkills(app, m.id)).filter((s) => s.state === "confirmed").map((s) => `• ${escapeHtml(label(TAXONOMY.get(s.code)!))}`).join("\n") || "none yet";
-  await reply(app, chat, `<b>Your skills</b>\n${listed}\n\n<code>/skills add …</code> · <code>/skills remove …</code> · /skills all`);
+  const listed =
+    (await mySkills(app, mem.id))
+      .filter((s) => s.state === "confirmed")
+      .map((s) => `• ${escapeHtml(labelIn(TAXONOMY.get(s.code)!, langOf(mem)))}`)
+      .join("\n") || m.noneYet;
+  await reply(app, chat, m.yourSkills(listed));
   return [];
 }
 
-async function ownerCommand(app: App, chat: number, cmd: string): Promise<string[]> {
+async function ownerCommand(app: App, chat: number, cmd: string, m: Messages): Promise<string[]> {
   if (cmd === "status") {
     const st = await status(app.db);
-    await reply(app, chat, "<b>Status</b>\n" + Object.entries(st).map(([k, v]) => `${escapeHtml(k)}: <b>${escapeHtml(String(v))}</b>`).join("\n"));
+    await reply(app, chat, `${m.statusTitle}\n` + Object.entries(st).map(([k, v]) => `${escapeHtml(k)}: <b>${escapeHtml(String(v))}</b>`).join("\n"));
   } else if (cmd === "sources") {
-    const rows = (await app.db.prepare("SELECT s.*, (SELECT COUNT(*) FROM passages p WHERE p.source_id=s.id AND p.part=0 AND p.removed_at IS NULL) AS n FROM sources s ORDER BY enabled DESC, title").all<{ title: string | null; chat_id: number; visibility: string; enabled: number; retention_days: number; n: number }>()).results;
-    const lines = rows.map((r) => `${r.enabled ? "✅" : "⏸"} ${escapeHtml(r.title ?? String(r.chat_id))} · ${r.visibility} · ${r.retention_days ? `${r.retention_days}d` : "full history"} · ${r.n} msgs`);
-    await reply(app, chat, "<b>Sources</b>\n" + (lines.join("\n") || "none"));
+    const rows = (await app.db.prepare("SELECT s.*, (SELECT COUNT(*) FROM passages p WHERE p.source_id=s.id AND p.part=0 AND p.removed_at IS NULL) AS n FROM sources s ORDER BY enabled DESC, title").all<{ title: string | null; chat_id: number; visibility: string; enabled: number; retention_days: number; hints: number; n: number }>()).results;
+    const lines = rows.map((r) => `${r.enabled ? "✅" : "⏸"} ${escapeHtml(r.title ?? String(r.chat_id))} · ${r.visibility} · ${r.retention_days ? `${r.retention_days}d` : m.fullHistory} · ${r.n} msgs${r.hints ? " · 💡" : ""}`);
+    await reply(app, chat, `${m.sourcesTitle}\n` + (lines.join("\n") || "—"));
   } else {
     const rows = (await app.db.prepare("SELECT id, key, chat_id, updated_at FROM effects WHERE state='uncertain' ORDER BY updated_at LIMIT 10").all<{ id: string; key: string; chat_id: number; updated_at: string }>()).results;
-    if (!rows.length) await reply(app, chat, "No uncertain sends.");
+    if (!rows.length) await reply(app, chat, m.noUncertain);
     for (const r of rows) {
-      await reply(app, chat, `<code>${escapeHtml(r.key)}</code> → ${r.chat_id} (${r.updated_at})\nDid it arrive?`, [[btn("Delivered", `u:${r.id}:1`), btn("Not delivered", `u:${r.id}:0`)]]);
+      await reply(app, chat, `<code>${escapeHtml(r.key)}</code> → ${r.chat_id} (${r.updated_at})\n${m.didArrive}`, [[btn(m.bDelivered, `u:${r.id}:1`), btn(m.bNotDelivered, `u:${r.id}:0`)]]);
     }
   }
   return [];
@@ -472,6 +533,8 @@ export async function status(db: D1Database): Promise<Record<string, string | nu
     q("SELECT COUNT(*) AS n FROM effects WHERE state='failed'"),
     q("SELECT COUNT(*) AS n FROM needs WHERE status IN ('open','matching')"),
     q("SELECT COUNT(*) AS n FROM intros WHERE status IN ('mutually_confirmed','completed')"),
+    q("SELECT COUNT(*) AS n FROM doc_queue WHERE status='pending'"),
+    q("SELECT COALESCE(SUM(up),0) || ' / ' || COALESCE(SUM(down),0) || ' / ' || COALESCE(SUM(bad),0) AS n FROM passage_votes"),
   ]);
   const v = (i: number) => ((rows[i]!.results[0] as { n: number | string | null } | undefined)?.n ?? 0) as string | number;
   return {
@@ -486,6 +549,8 @@ export async function status(db: D1Database): Promise<Record<string, string | nu
     "sends failed": v(8),
     "open intro requests": v(9),
     "intros connected": v(10),
+    "documents queued": v(11),
+    "feedback up / down / wrong": v(12),
   };
 }
 
@@ -500,48 +565,58 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
       await app.tg.call("editMessageReplyMarkup", { chat_id: cb.message.chat.id, message_id: cb.message.message_id, reply_markup: { inline_keyboard: [] } }).catch(() => undefined);
     }
   };
+  const pre = T(await langForUser(app, cb.from));
   if (kind === "u") {
     if (!isOwner(app, cb.from.id)) {
       await answerCb();
       return [];
     }
     const ok = await reconcile(app.db, a, b === "1", `operator ${cb.from.id}`);
-    await answerCb(ok ? "Recorded." : "Already resolved.");
+    await answerCb(ok ? pre.recorded : pre.alreadyResolved);
     await clearButtons();
     return [];
   }
-  const m = await memberByTg(app.db, cb.from.id);
-  if (!m) {
-    await answerCb("Not available.");
+  const mem = await memberByTg(app.db, cb.from.id);
+  if (!mem) {
+    await answerCb(pre.notAvailable);
     return [];
   }
+  const m = T(langOf(mem));
   let keys: string[] = [];
-  if (kind === "i") {
-    const r = await act(app.db, a, m.id, b);
+  if (kind === "f") {
+    // Feedback stays on the message (others in a group may vote too); only a toast confirms it.
+    const r = await vote(app.db, a, mem.id, b);
+    await answerCb(r === "recorded" ? m.fbThanks : r === "already" ? m.fbAlready : m.notAvailable);
+  } else if (kind === "i") {
+    const r = await act(app.db, a, mem.id, b);
     keys = r.keys;
     await answerCb(r.reply, r.reply.length > 60);
     await clearButtons();
   } else if (kind === "n") {
-    const r = await cancelNeed(app.db, m.id, a);
+    const r = await cancelNeed(app.db, mem.id, a);
     keys = r.keys;
-    await answerCb(r.ok ? "Request cancelled." : "Already closed.");
+    await answerCb(r.ok ? m.requestCancelled : m.alreadyClosed);
     await clearButtons();
-  } else if (kind === "p" && ["digest", "discoverable", "available", "reminders"].includes(a)) {
-    await app.db.prepare(`UPDATE members SET ${a}=? WHERE id=?`).bind(b === "1" ? 1 : 0, m.id).run();
-    if (a === "discoverable") await audit(app.db, "consent.discovery", m.id, m.id, { granted: b === "1" });
+  } else if (kind === "p" && ["digest", "discoverable", "available", "reminders", "lang"].includes(a)) {
+    if (a === "lang") {
+      if (b === "en" || b === "ru") await setLanguage(app, mem.id, b);
+    } else {
+      await app.db.prepare(`UPDATE members SET ${a}=? WHERE id=?`).bind(b === "1" ? 1 : 0, mem.id).run();
+      if (a === "discoverable") await audit(app.db, "consent.discovery", mem.id, mem.id, { granted: b === "1" });
+    }
     const fresh = (await memberByTg(app.db, cb.from.id))!;
-    const v = profileView(fresh, await mySkills(app, m.id));
-    await answerCb("Saved.");
+    const v = profileView(fresh, await mySkills(app, mem.id));
+    await answerCb(T(langOf(fresh)).saved);
     if (cb.message) {
       await app.tg.call("editMessageText", { chat_id: cb.message.chat.id, message_id: cb.message.message_id, text: v.text, parse_mode: "HTML", reply_markup: { inline_keyboard: v.buttons } });
     }
   } else if (kind === "fm") {
     if (a === "yes") {
-      const r = await forgetMember(app.db, m.id, m.tg_id);
-      await answerCb("Deleted.");
-      await reply(app, cb.from.id, `Done: ${r.passages} message(s), ${r.skills} skill(s) and ${r.intros} introduction(s) removed. Your future messages won't be stored. /resume_collection undoes the collection stop.`);
+      const r = await forgetMember(app.db, mem.id, mem.tg_id);
+      await answerCb(m.deleted);
+      await reply(app, cb.from.id, m.forgetDone(r.passages, r.skills, r.intros));
     } else {
-      await answerCb("Nothing deleted.");
+      await answerCb(m.nothingDeleted);
     }
     await clearButtons();
   } else {

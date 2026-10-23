@@ -17,7 +17,7 @@ called; the egress guard denies them by default.
 ## Features
 
 - **Cited search:** `/ask` in a DM returns verbatim quotes with links, only from groups the
-  asker can read, including attached documents (PDF, Word, PowerPoint, text, subtitles with
+  asker can read (or, in a group, only from that group), with private 👍/👎 feedback, including attached documents (PDF, Word, PowerPoint, text, subtitles with
   timestamps). It handles Russian/English and transliterated spellings, and says "no
   reliable answer" instead of guessing.
 - **Experts:** members `/optin` and list skills from a 100-skill RU/EN taxonomy. `/expert`

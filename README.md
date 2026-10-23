@@ -4,9 +4,11 @@ Telepathy is a privacy-first **Community Intelligence OS** for Telegram communit
 source-cited knowledge retrieval, approved meeting/document search, verified opt-in
 expert discovery, and consent-based introductions.
 
-**Status:** v1 code complete for a single community. It is not deployed yet: the launch
+**Status:** v2 runs on **Cloudflare Workers (free plan)** from [`worker/`](worker/). Deploy with
+[`docs/DEPLOY_CLOUDFLARE.md`](docs/DEPLOY_CLOUDFLARE.md). It isn't deployed yet: the launch
 checklist in [`docs/PLAN_REVIEW.md`](docs/PLAN_REVIEW.md) still needs owner sign-off, an
-independent review and a pilot. Operators: see [`docs/RUNBOOK.md`](docs/RUNBOOK.md).
+independent review and a pilot. The Python v1 in `src/telepathy/` remains as a self-hosted
+alternative ([`docs/RUNBOOK.md`](docs/RUNBOOK.md)).
 
 **Important:** Do not upload Telegram chat transcripts, credentials, private member
 details, or identifiable data to this public repository. External AI providers are not
@@ -30,7 +32,27 @@ called; the egress guard denies them by default.
 - **Ops:** verified daily backups, `/status` metrics, crash-safe sends (`/uncertain` to
   reconcile), systemd unit and Dockerfile.
 
-## Layout
+## Cloudflare Worker (v2, primary)
+
+```
+worker/
+  src/index.ts     webhook (secret-checked), /admin endpoints, cron entry
+  src/bot.ts       update router: commands, buttons, group ingestion, membership events
+  src/search.ts    hybrid fuzzy search: FTS5 prefix + translit + vocabulary typo correction, RRF
+  src/acl.ts       who can read which group (deny by default)
+  src/intros.ts    consent-based introduction state machine and workflow
+  src/digest.ts    opt-in daily digest, ACL-scoped, batched per cron run
+  src/outbox.ts    at-most-once send ledger with uncertain-state reconciliation
+  migrations/      D1 schema
+  scripts/         Telegram Desktop history importer (generates D1 SQL)
+  test/            76 tests in the real Workers runtime with a local D1
+```
+
+```bash
+cd worker && npm ci && npm run typecheck && npm test
+```
+
+## Python v1 layout (self-hosted alternative)
 
 ```
 src/telepathy/

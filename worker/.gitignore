@@ -1,0 +1,6 @@
+node_modules/
+.wrangler/
+dist/
+import/
+*.sql.age
+.dev.vars

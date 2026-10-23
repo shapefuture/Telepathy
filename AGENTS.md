@@ -11,7 +11,8 @@ Build the privacy-first Community Intelligence OS described in `MASTER_PLAN.md`.
 - Parallel agents operate in separate worktrees with disjoint write scopes; one integrator owns schema migrations, CI, lockfiles and common contracts.
 
 ## Locked design
-- Python 3.12 + uv; aiogram 3; SQLite WAL/FTS5 (sqlite-vec optional later). Admin via owner bot commands in v1; FastAPI/Jinja2/HTMX deferred (K5).
+- **Primary (K17):** `worker/` — TypeScript on Cloudflare Workers, D1 + FTS5, Telegram webhook, cron trigger. Commands: `cd worker && npm ci && npm run typecheck && npm test`.
+- Self-hosted alternative: Python 3.12 + uv; aiogram 3; SQLite WAL/FTS5 in `src/telepathy/`. Admin via owner bot commands; FastAPI/Jinja2/HTMX deferred (K5).
 - Implement domain ports for Telegram, embedding, classification, search, persistence and notification. Keep vendor SDKs out of domain logic.
 - NVIDIA NIM `nvidia/nemotron-3.5-embed-1b` and d3-turbo integrations are **synthetic/approved non-sensitive prototype only** unless a documented legal/data-protection approval explicitly enables real inputs.
 - **Never transmit real private community data, Telegram session tokens, API keys, full chat dumps, profile dossiers or personal identifiers to trial providers or public GitHub.**

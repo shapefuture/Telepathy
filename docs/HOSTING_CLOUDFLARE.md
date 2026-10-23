@@ -1,5 +1,10 @@
 # Hosting: can this run on Cloudflare for free?
 
+> **Decision (2026-10-23): Option C.** Built in `worker/`. Deploy with
+> [`DEPLOY_CLOUDFLARE.md`](DEPLOY_CLOUDFLARE.md). The v2 schema stores text once, so measured
+> usage is about 5 D1 writes per message, better than the estimates below, which assumed the
+> Python schema.
+
 **Short answer:** partly. The free Cloudflare tier can run the bot's always-on edge and a small
 community's recent history. It cannot run the current Python bot, cannot hold full history for a
 large group, and cannot run local semantic search. Two working setups are below.

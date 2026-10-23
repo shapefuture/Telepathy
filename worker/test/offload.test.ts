@@ -13,8 +13,8 @@ const admin = (path: string, init: RequestInit = {}, e = ON) => handleFetch(new 
 const queued = async () => (await env.DB.prepare("SELECT COUNT(*) AS n FROM doc_queue").first<{ n: number }>())!.n;
 
 describe("document offload to GitHub Actions", () => {
-  it("is off by default: heavy documents are not queued", async () => {
-    const app = makeApp(env, fakeTelegram().fetcher);
+  it("is off when OFFLOAD_DOCUMENTS isn't \"true\": heavy documents are not queued", async () => {
+    const app = makeApp({ ...env, OFFLOAD_DOCUMENTS: "false" } as any, fakeTelegram().fetcher);
     await enableGroup(app);
     await feed(app, groupMsg(5, "the plan", pdf("F1")));
     expect(await queued()).toBe(0);

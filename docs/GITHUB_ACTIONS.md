@@ -19,7 +19,7 @@ data is either encrypted before upload or never written out.
 | **Deploy** (test → migrate D1 → deploy) | needs your Cloudflare token; repeatable releases | no | off (`CLOUDFLARE_DEPLOY`) | `deploy-worker.yml` |
 | **Encrypted D1 backup**, weekly, kept off Cloudflare | Workers can't export their own database | yes, but **encrypted with your age key first**; plaintext never leaves the runner | off (`D1_BACKUP`) | `d1-backup.yml` |
 | **Queue drain**: calls `/admin/cron` 5× per hour | one 5-min cron run sends ~30 digests; big communities need more passes | no (responses are counts) | on once `WORKER_URL` is set | `worker-jobs.yml` → `maintenance` |
-| **PDF / DOCX / PPTX parsing** | parsing a PDF can take seconds of CPU; the Worker only parses text files ≤ 512 KB | **yes: files pass through GitHub runners** (not logged, not stored) | **off** (`OFFLOAD_DOCUMENTS`, needs owner approval) | `worker-jobs.yml` → `documents` |
+| **PDF / DOCX / PPTX parsing** | parsing a PDF can take seconds of CPU; the Worker only parses text files ≤ 512 KB | **yes: files pass through GitHub runners** (not logged, not stored) | **on**: owner approved 2026-10-23 (`OFFLOAD_DOCUMENTS`) | `worker-jobs.yml` → `documents` |
 
 ## What Actions can't fix
 
@@ -58,7 +58,7 @@ Repository → Settings → Secrets and variables → Actions:
 | `CLOUDFLARE_DEPLOY` | variable | deploy | `true` to deploy on merge |
 | `D1_BACKUP` | variable | backup | `true` |
 | `AGE_RECIPIENT` | variable | backup | your age **public** key (`age-keygen` → `age1…`) |
-| `OFFLOAD_DOCUMENTS` | variable | documents | `true` **only after the owner approves**; also set it to `"true"` in `wrangler.jsonc` vars |
+| `OFFLOAD_DOCUMENTS` | variable | documents | `true` (owner approved 2026-10-23). The Worker side is already `"true"` in `wrangler.jsonc`; set it to `"false"` there to stop queueing |
 
 Create an environment named `production` (Settings → Environments). Add yourself as a required
 reviewer there if you want to approve each deploy.

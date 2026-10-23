@@ -46,7 +46,8 @@ export const PRIVACY_NOTICE =
   "• Only groups an owner explicitly enabled are stored. Each group shows a notice.\n" +
   "• Your name, username and phone number are not stored; you get a random internal ID.\n" +
   "• Answers quote messages verbatim with a link, only from groups you can read.\n" +
-  "• Data is stored in Cloudflare D1. Nothing is sent to AI services.\n" +
+  "• Data is stored in Cloudflare D1. Nothing is sent to AI services. PDF, Word and PowerPoint files " +
+  "are converted to text on GitHub's servers and not kept there.\n" +
   "• You are not discoverable as an expert unless you run /optin yourself.\n" +
   "• Introductions need both people to agree before any contact is shared.\n" +
   "• Full history is kept. /forget_me deletes your messages and profile and stops collection; " +

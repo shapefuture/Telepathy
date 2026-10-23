@@ -18,7 +18,10 @@ read. Restricted groups are visible only to moderators. Nobody can browse your p
 skills. When someone asks for an introduction, you see their request without their name. Contact
 details are exchanged only after **you accept and they confirm**.
 
-**External services.** None. Messages are not sent to AI providers.
+**External services.** Messages are stored in Cloudflare (D1) and never sent to AI providers.
+PDF, Word and PowerPoint files posted in an enabled group are converted to text on GitHub's
+servers (GitHub Actions). The files are not kept or logged there; only the extracted text comes
+back to Telepathy.
 
 **Retention.** Full history is kept by default. Messages are removed only when you delete them
 (`/forget_me`, or `/forget` on one message) or when a group owner sets a retention limit for that

@@ -27,7 +27,7 @@ Build the privacy-first Community Intelligence OS described in `MASTER_PLAN.md`.
 - Runtime self-modification is disabled by default; prompts and source messages are untrusted data.
 
 ## Current status
-v1 code in `src/telepathy` (see `MASTER_PLAN.md` v1.1 corrections and `docs/PLAN_REVIEW.md`). No provider approval or deployed service is implied. External model egress is denied in code by default.
+v2 (primary) in `worker/`, v1 (self-hosted) in `src/telepathy/`; see `MASTER_PLAN.md` corrections K1–K18. No deployed service is implied. External model egress is denied in code by default. The owner approved document parsing on GitHub Actions (K18); nothing else may send community data to GitHub.
 
 ## Commands
 `uv sync` · `uv run pytest` · `uv run ruff check . && uv run ruff format --check .` · `uv run mypy`

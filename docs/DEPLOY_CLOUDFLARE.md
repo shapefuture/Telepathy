@@ -135,14 +135,20 @@ to be undone, use Time Travel to restore the database to just before it.
 | Group upgraded to a supergroup | Handled automatically: the bot follows Telegram's migration notice to the new chat id. Check `/sources`. |
 | A member asks for deletion | They use `/forget_me` themselves, or reply `/forget` to one message. |
 
-## 9. What's different from the Python version
+## 9. GitHub Actions (optional)
+
+Automatic deploys, weekly encrypted backups, faster digest delivery, and PDF/DOCX/PPTX parsing
+run on GitHub's runners. Each is off until you set its variable. See
+[`GITHUB_ACTIONS.md`](GITHUB_ACTIONS.md).
+
+## 10. What's different from the Python version
 
 | Python v1 (Linux host) | Worker v2 (this runbook) |
 |---|---|
 | long polling | webhook with secret token |
 | SQLite file on disk | Cloudflare D1 (SQLite) |
-| PDF/DOCX/PPTX parsing | text formats only (txt, md, html, csv, vtt, srt ≤ 512 KB); other files are just referenced |
-| nightly backup file | D1 Time Travel + `wrangler d1 export` |
+| PDF/DOCX/PPTX parsing | text formats in the Worker (≤ 512 KB); PDF/DOCX/PPTX via the opt-in GitHub Actions job |
+| nightly backup file | D1 Time Travel + weekly age-encrypted export (GitHub Actions or by hand) |
 | in-process worker loop | cron trigger every 5 minutes |
 
 The Python implementation in `src/telepathy/` stays in the repo as the self-hosted alternative.

@@ -11,6 +11,8 @@ export interface Env {
   DIGEST_HOUR?: string;
   ASK_RATE_PER_MINUTE?: string;
   BOT_USERNAME?: string;
+  /** "true" = queue PDF/DOCX/PPTX for the GitHub Actions parser (sends files via GitHub runners). */
+  OFFLOAD_DOCUMENTS?: string;
 }
 
 export function ownerIds(env: Env): Set<number> {

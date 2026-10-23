@@ -3,9 +3,10 @@
 import { handleUpdate, status, type App, type Update } from "./bot";
 import { runCron } from "./cron";
 import type { Env } from "./env";
+import { MAX_CHUNKS, storeChunks } from "./ingest";
 import { dispatchPending } from "./outbox";
 import { createTelegram, DefiniteFailure, type Fetcher } from "./telegram";
-import { safeEqual } from "./util";
+import { nowIso, safeEqual } from "./util";
 
 export const ALLOWED_UPDATES = ["message", "edited_message", "callback_query", "my_chat_member", "chat_member"];
 
@@ -79,8 +80,60 @@ export async function handleFetch(req: Request, env: Env, fetcher?: Fetcher): Pr
     }
     if (req.method === "GET" && url.pathname === "/admin/status") return json(await status(app.db));
     if (req.method === "POST" && url.pathname === "/admin/cron") return json(await runCron(app));
+    if (req.method === "GET" && url.pathname === "/admin/docs/pending") return json(await pendingDocs(env.DB, Number(url.searchParams.get("limit") ?? "10")));
+    if (req.method === "POST" && url.pathname === "/admin/docs/result") return json(await docResult(env.DB, await req.json()));
   }
   return new Response("not found", { status: 404 });
+}
+
+// ---- document offload (GitHub Actions parses PDF/DOCX/PPTX; see docs/GITHUB_ACTIONS.md) ----
+
+const MAX_DOC_ATTEMPTS = 3;
+
+async function pendingDocs(db: D1Database, limit: number) {
+  const n = Math.min(Math.max(1, Number.isFinite(limit) ? limit : 10), 50);
+  // Only documents whose message is still live and whose group is still enabled.
+  const { results } = await db
+    .prepare(
+      "SELECT q.source_id, q.msg_id, q.file_id, q.file_name, q.file_size FROM doc_queue q " +
+        "JOIN passages p ON p.source_id = q.source_id AND p.msg_id = q.msg_id AND p.part = 0 AND p.removed_at IS NULL " +
+        "JOIN sources s ON s.id = q.source_id AND s.enabled = 1 " +
+        "WHERE q.status = 'pending' AND q.attempts < ? ORDER BY q.created_at LIMIT ?",
+    )
+    .bind(MAX_DOC_ATTEMPTS, n)
+    .all();
+  return { documents: results };
+}
+
+interface DocResult {
+  source_id: string;
+  msg_id: number;
+  status: "done" | "failed" | "skipped";
+  error?: string;
+  chunks?: { locator: string | null; text: string }[];
+}
+
+async function docResult(db: D1Database, body: DocResult) {
+  const row = await db
+    .prepare("SELECT file_name, status FROM doc_queue WHERE source_id=? AND msg_id=?")
+    .bind(body.source_id, body.msg_id)
+    .first<{ file_name: string; status: string }>();
+  if (!row) return { ok: false, reason: "unknown document" };
+  if (row.status !== "pending") return { ok: true, stored: 0, note: "already handled" };
+  let stored = 0;
+  let status = body.status;
+  if (status === "done") {
+    const chunks = (body.chunks ?? []).slice(0, MAX_CHUNKS).map((c) => ({ locator: c.locator ?? null, text: String(c.text ?? "").slice(0, 20_000) }));
+    stored = await storeChunks(db, body.source_id, body.msg_id, row.file_name, chunks);
+    if (!stored) status = "skipped"; // message removed meanwhile, or empty document
+  }
+  await db
+    .prepare(
+      "UPDATE doc_queue SET status=CASE WHEN ?='failed' AND attempts+1 < ? THEN 'pending' ELSE ? END, attempts=attempts+1, error=?, updated_at=? WHERE source_id=? AND msg_id=?",
+    )
+    .bind(status, MAX_DOC_ATTEMPTS, status, body.error?.slice(0, 300) ?? null, nowIso(), body.source_id, body.msg_id)
+    .run();
+  return { ok: true, stored, status };
 }
 
 export default {

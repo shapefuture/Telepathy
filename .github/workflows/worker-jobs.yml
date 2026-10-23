@@ -1,0 +1,58 @@
+# Work the free Worker can't do (or does slowly), run on GitHub's runners.
+#
+# 1. maintenance (no community data): calls the Worker's /admin/cron a few times each hour so
+#    large digests and send backlogs drain faster than one 5-minute cron batch at a time.
+#    Enable: variable WORKER_URL; secret ADMIN_TOKEN.
+#
+# 2. documents (COMMUNITY DATA passes through GitHub runners): downloads queued PDF/DOCX/PPTX
+#    files from Telegram, parses them with the Python v1 parsers and posts text chunks back.
+#    Off unless the owner approves: variable OFFLOAD_DOCUMENTS=true here AND in the Worker's
+#    wrangler.jsonc vars. Logs contain counts only (this repo is public).
+#    Needs secret BOT_TOKEN as well.
+name: Worker jobs
+
+on:
+  schedule:
+    - cron: "23 * * * *" # hourly
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: worker-jobs
+  cancel-in-progress: false
+
+jobs:
+  maintenance:
+    if: vars.WORKER_URL != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Drain digest and send queues
+        env:
+          WORKER_URL: ${{ vars.WORKER_URL }}
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+        run: |
+          for i in 1 2 3 4 5; do
+            curl -fsS -X POST "$WORKER_URL/admin/cron" -H "authorization: Bearer $ADMIN_TOKEN" | tr -d '\n '; echo
+            sleep 15
+          done
+
+  documents:
+    if: vars.OFFLOAD_DOCUMENTS == 'true' && vars.WORKER_URL != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --locked --no-dev
+      - name: Parse queued documents (prints counts only)
+        env:
+          WORKER_URL: ${{ vars.WORKER_URL }}
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          OFFLOAD_BATCH: "25"
+        run: uv run --no-dev python -m telepathy.ops.offload

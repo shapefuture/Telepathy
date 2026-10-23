@@ -116,6 +116,15 @@ const MAX_WORDS = 450;
 const OVERLAP_WORDS = 50;
 const WINDOW_SECONDS = 90;
 
+export const OFFLOAD_EXT = [".pdf", ".docx", ".pptx"];
+export const OFFLOAD_MAX_BYTES = 20 * 1024 * 1024; // Bot API download limit
+
+/** Heavy formats parsed off-Worker by the GitHub Actions job (when enabled). */
+export function docOffloadable(doc?: TgDocument): boolean {
+  const name = (doc?.file_name ?? "").toLowerCase();
+  return !!doc && OFFLOAD_EXT.some((e) => name.endsWith(e)) && (doc.file_size ?? 0) <= OFFLOAD_MAX_BYTES;
+}
+
 export function docSupported(doc?: TgDocument): boolean {
   const name = (doc?.file_name ?? "").toLowerCase();
   return !!doc && TEXT_EXT.some((e) => name.endsWith(e)) && (doc.file_size ?? 0) <= EDGE_DOC_MAX_BYTES;
@@ -207,27 +216,32 @@ export async function storeDocument(
   fileName: string,
   data: string,
 ): Promise<number> {
+  return storeChunks(db, source.id, msg.message_id, fileName, chunk(parseDocument(fileName, data)));
+}
+
+export const MAX_CHUNKS = 200;
+
+/** Insert pre-chunked text. Stores nothing if the posting message was removed meanwhile (C06). */
+export async function storeChunks(
+  db: D1Database,
+  sourceId: string,
+  msgId: number,
+  fileName: string,
+  segments: { locator: string | null; text: string }[],
+): Promise<number> {
   const live = await db
-    .prepare("SELECT author_id FROM passages WHERE source_id=? AND msg_id=? AND part=0 AND removed_at IS NULL")
-    .bind(source.id, msg.message_id)
-    .first<{ author_id: string | null }>();
+    .prepare("SELECT author_id, event_at FROM passages WHERE source_id=? AND msg_id=? AND part=0 AND removed_at IS NULL")
+    .bind(sourceId, msgId)
+    .first<{ author_id: string | null; event_at: string }>();
   if (!live) return 0;
-  const chunks = chunk(parseDocument(fileName, data)).slice(0, 200);
+  const chunks = segments.filter((c) => c.text.trim()).slice(0, MAX_CHUNKS);
   const stmts = chunks.map((c, i) =>
     db
       .prepare(
         "INSERT OR IGNORE INTO passages(source_id, msg_id, part, author_id, body, label, event_at) " +
           "VALUES (?,?,?,?,?,?,?)",
       )
-      .bind(
-        source.id,
-        msg.message_id,
-        i + 1,
-        live.author_id,
-        c.text,
-        c.locator ? `${fileName} · ${c.locator}` : fileName,
-        iso(msg.date),
-      ),
+      .bind(sourceId, msgId, i + 1, live.author_id, c.text, c.locator ? `${fileName} · ${c.locator}` : fileName, live.event_at),
   );
   if (stmts.length) await db.batch(stmts);
   return stmts.length;

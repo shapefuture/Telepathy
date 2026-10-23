@@ -45,8 +45,11 @@ worker/
   src/outbox.ts    at-most-once send ledger with uncertain-state reconciliation
   migrations/      D1 schema
   scripts/         Telegram Desktop history importer (generates D1 SQL)
-  test/            76 tests in the real Workers runtime with a local D1
+  test/            79 tests in the real Workers runtime with a local D1
 ```
+
+Heavy or scheduled work (deploys, encrypted backups, queue drain, PDF/DOCX/PPTX parsing) runs on
+GitHub Actions. See [`docs/GITHUB_ACTIONS.md`](docs/GITHUB_ACTIONS.md).
 
 ```bash
 cd worker && npm ci && npm run typecheck && npm test

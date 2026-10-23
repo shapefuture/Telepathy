@@ -6,7 +6,7 @@
 import { ensureMember, memberByTg, readable, revoke, grantStatement, VISIBILITIES, type Member, type Visibility } from "./acl";
 import { digestHour, ownerIds, timezone, type Env } from "./env";
 import { eligibleCandidates, label, matchSkills, resolveSkill, TAXONOMY } from "./experts";
-import { docSupported, EDGE_DOC_MAX_BYTES, enabledSource, ingestMessage, removeMessage, storeDocument, type TgMessage, type TgUser } from "./ingest";
+import { docOffloadable, docSupported, EDGE_DOC_MAX_BYTES, enabledSource, ingestMessage, removeMessage, storeDocument, type TgMessage, type TgUser } from "./ingest";
 import { act, cancelNeed, IntroError, requestIntro } from "./intros";
 import { reconcile } from "./outbox";
 import { forgetMember } from "./rights";
@@ -159,7 +159,18 @@ async function onMessage(app: App, msg: TgMessage, edited: boolean): Promise<str
 
 async function ingest(app: App, msg: TgMessage): Promise<void> {
   const { outcome, source } = await ingestMessage(app.db, msg);
-  if (outcome !== "stored" || !source || msg.edit_date || !docSupported(msg.document)) return;
+  if (outcome !== "stored" || !source || msg.edit_date || !msg.document) return;
+  if (app.env.OFFLOAD_DOCUMENTS === "true" && docOffloadable(msg.document)) {
+    const now = nowIso();
+    await app.db
+      .prepare(
+        "INSERT OR IGNORE INTO doc_queue(source_id, msg_id, file_id, file_name, file_size, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
+      )
+      .bind(source.id, msg.message_id, msg.document.file_id, msg.document.file_name ?? "file", msg.document.file_size ?? null, now, now)
+      .run();
+    return;
+  }
+  if (!docSupported(msg.document)) return;
   try {
     const text = await app.tg.fileText(msg.document!.file_id, EDGE_DOC_MAX_BYTES);
     await storeDocument(app.db, source, msg, msg.document!.file_name ?? "file.txt", text);

@@ -1,0 +1,37 @@
+# Telepathy minimal AAA-inspired constitution v1
+project: Telepathy
+runtime_profile: AG1_BOUNDED_MODELS
+agent_self_modification: false
+active_generation_mutable: false
+external_model_egress_default: deny
+production_trial_model_egress: deny
+invariants:
+  - {id: C01, hard: true, description: "No ingestion outside authorized community scope"}
+  - {id: C02, hard: true, description: "Every answer excerpt requires source authorization"}
+  - {id: C03, hard: true, description: "External model egress requires lawful-data and contract approval"}
+  - {id: C04, hard: true, description: "Expert discovery requires member opt-in"}
+  - {id: C05, hard: true, description: "Contact release requires mutual agreement"}
+  - {id: C06, hard: true, description: "Revoked/deleted evidence is ineligible"}
+  - {id: C07, hard: true, description: "All derived claims retain resolvable evidence IDs"}
+  - {id: C08, hard: true, description: "Classifier score is not competence evidence"}
+  - {id: C09, hard: true, description: "External effects have ledger IDs and recovery paths"}
+  - {id: C10, hard: true, description: "Builders cannot edit live evaluator or hidden fixtures"}
+  - {id: C11, hard: true, description: "No secrets or participant data in GitHub"}
+  - {id: C12, hard: true, description: "Active release has identity and rollback ancestor"}
+  - {id: C13, hard: true, description: "Consent withdrawal invalidates derived projections"}
+  - {id: C14, hard: true, description: "No free NVIDIA trial production processing"}
+authority:
+  builder: [repo_read, isolated_workcell_write, test_run, candidate_publish]
+  independent_reviewer: [repo_read, hidden_eval_run, evidence_sign]
+  integration_owner: [contract_merge, migration_merge, release_candidate_build]
+  community_owner: [source_approve, deployment_approve, external_egress_approve]
+  runtime_bot: [approved_source_ingest, authorized_member_reply, consent_request]
+  classifier_adapter: [approved_nonsensitive_inference_only]
+  embedding_adapter: [approved_nonsensitive_inference_only]
+forbidden:
+  - classifier_adapter.grant_source_access
+  - embedding_adapter.publish_member_profile
+  - runtime_bot.auto_intro_without_consent
+  - builder.modify_hidden_test_data
+  - builder.deploy_production
+  - any_provider.send_unapproved_private_content

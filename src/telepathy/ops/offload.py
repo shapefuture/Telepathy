@@ -96,8 +96,9 @@ def main() -> int:
         print(f"missing environment: {', '.join(missing)}", file=sys.stderr)
         return 2
     batch = int(os.environ.get("OFFLOAD_BATCH", "25"))
-    counts = run(os.environ["WORKER_URL"], os.environ["ADMIN_TOKEN"], os.environ["BOT_TOKEN"],
-                 limit=batch)
+    counts = run(
+        os.environ["WORKER_URL"], os.environ["ADMIN_TOKEN"], os.environ["BOT_TOKEN"], limit=batch
+    )
     print(json.dumps(counts))  # counts only: safe for public logs
     return 0
 

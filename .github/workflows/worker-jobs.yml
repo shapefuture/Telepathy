@@ -1,8 +1,8 @@
 # Work the free Worker can't do (or does slowly), run on GitHub's runners.
 #
-# 1. maintenance (no community data): calls the Worker's /admin/cron a few times each hour so
-#    large digests and send backlogs drain faster than one 5-minute cron batch at a time.
-#    Enable: variable WORKER_URL; secret ADMIN_TOKEN.
+# 1. maintenance (no community data): manual only. The Worker's own cron now runs every minute
+#    on Cloudflare for free, so this costs Actions minutes for nothing unless you need a burst.
+#    Enable: variable WORKER_URL; secret ADMIN_TOKEN. Run it from the Actions tab.
 #
 # 2. documents (COMMUNITY DATA passes through GitHub runners): downloads queued PDF/DOCX/PPTX
 #    files from Telegram, parses them with the Python v1 parsers and posts text chunks back.
@@ -13,7 +13,7 @@ name: Worker jobs
 
 on:
   schedule:
-    - cron: "23 * * * *" # hourly
+    - cron: "23 */4 * * *" # every 4 hours (documents only; ~180 runner-minutes/month at most)
   workflow_dispatch:
 
 permissions:
@@ -25,7 +25,7 @@ concurrency:
 
 jobs:
   maintenance:
-    if: vars.WORKER_URL != ''
+    if: github.event_name == 'workflow_dispatch' && vars.WORKER_URL != ''
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

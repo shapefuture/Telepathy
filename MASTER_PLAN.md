@@ -59,9 +59,11 @@ Checkboxes and issue status are unchanged; completion still requires recorded ev
 | K14 | Digest audience (**overrides P10-05**) | The daily digest is visible to **all members**, but it is **opt-in** (`/digest on`, default off). Each digest uses only that member's readable sources (C02). Admin-only and moderation-gated release (P10-05) no longer apply. Decided by the product owner, 2026-10-23. |
 | K15 | Message history (**overrides P00-01 retention**) | **Full history is kept by default** (no retention cap). `retention_days = 0` means keep everything. An owner may set a per-group limit with `/retention N`, and members may delete their own data at any time (`/forget_me`, `/forget`). Decided by the product owner, 2026-10-23. |
 | K16 | Search and hosting | Search options and their trade-offs are in `docs/SEARCH_OPTIONS.md`. Hosting options, including the Cloudflare free-tier limits, are in `docs/HOSTING_CLOUDFLARE.md`. |
-| K17 | **Runtime: Cloudflare Workers (overrides the locked Python/aiogram/SQLite-file/long-polling/single-host decisions)** | Product owner chose Option C on 2026-10-23. v2 lives in `worker/`: TypeScript, no bot SDK, Telegram **webhook** with secret token, **D1** (SQLite) with external-content FTS5, **cron trigger** every 5 min. Search = hybrid fuzzy lexical: FTS5 prefix + RU↔Latin transliteration + typo correction from the index vocabulary (`fts5vocab`), fused with RRF k=60. Semantic search is out of scope on the free plan (CPU limit; hosted embeddings would breach C03). Documents: text formats ≤ 512 KB only. Backups: D1 Time Travel + `wrangler d1 export`. Python v1 (`src/telepathy/`) stays as the self-hosted alternative. Runbook: `docs/DEPLOY_CLOUDFLARE.md`. |
+| K17 | **Runtime: Cloudflare Workers (overrides the locked Python/aiogram/SQLite-file/long-polling/single-host decisions)** | Product owner chose Option C on 2026-10-23. v2 lives in `worker/`: TypeScript, no bot SDK, Telegram **webhook** with secret token, **D1** (SQLite) with external-content FTS5, **cron trigger** every minute (K20). Search = hybrid fuzzy lexical: FTS5 prefix + RU↔Latin transliteration + typo correction from the index vocabulary (`fts5vocab`), fused with RRF k=60. Semantic search is out of scope on the free plan (CPU limit; hosted embeddings would breach C03). Documents: text formats ≤ 512 KB only. Backups: D1 Time Travel + `wrangler d1 export`. Python v1 (`src/telepathy/`) stays as the self-hosted alternative. Runbook: `docs/DEPLOY_CLOUDFLARE.md`. |
 | K18 | GitHub Actions as the heavy-work tier | Actions do what the free Worker can't: deploy (test → migrate → deploy), weekly **age-encrypted** D1 backup off Cloudflare, hourly queue drain via `/admin/cron`, and **opt-in** PDF/DOCX/PPTX parsing with the v1 Python parsers (`OFFLOAD_DOCUMENTS`; files pass through GitHub runners; **approved by the community owner 2026-10-23**, now on by default and disclosed in the privacy notice). The repo is public, so workflows log counts only. Live semantic search is still out of scope: query-time embedding can't run in a scheduled job. See `docs/GITHUB_ACTIONS.md`. |
 | K19 | v2.1 member features | Backlog phase **P13** (below) holds 11 member-facing features proposed 2026-10-23. Five extend existing items (P06-07, P07-06/07, P08-04, P10-06, P11-01/02). P13 is tracked in `delivery/backlog-v2.1.json`, kept out of `taskmap.json` so the 130-task P00–P12 map and its CI check stay intact. Recommended order: P13-01, 02, 04, 05 first; then 03. |
+| K20 | GitHub Actions minutes | Cron moves to **every minute on Cloudflare** (free), replacing the hourly Actions queue drain (now manual only). Document parsing runs every 4 h. CI is split by path and cancels superseded runs. Every job has a no-Actions path: `scripts/check.sh`, Cloudflare Workers Builds, `scripts/backup-local.sh`, `scripts/offload-local.sh` (files then skip GitHub entirely). Public repos don't use quota on standard runners. See `docs/GITHUB_ACTIONS.md`. |
+| K21 | Opportunity Internet (owner request 2026-10-24) | Telepathy stays the local kernel; adds the **Assistance OS** (missions, desk, offers, receipts) and a **partner gateway** (`nexus.v1` signed envelopes, E0 manual + E2 HTTP). One Worker per organization (ADR-001); disclosure stages and consent records (ADR-002); trust model (ADR-003). Phase **P14** below, tracked in `delivery/backlog-v3.json`. Source plan: `docs/OPPORTUNITY_INTERNET_PLAN.md`. Federation is off by default; real cross-community use waits for gates G0–G3. |
 
 ## Phase sequence and dependency gates
 
@@ -265,6 +267,23 @@ Each item below is deliberately specific. Checkbox markers start empty, do not m
 - [ ] **P13-11 Telegram Mini App.** Web app served by the Worker (static assets) for search, profile, requests and settings; identity from Telegram's signed initData, verified server-side; no new data collection. _Priority 4 · extends P11-01/P11-02 · est. 2-3d. Evidence: issue/PR, tests, independent review, commit SHA._
 
 **Phase gate P13:** each item has tests, including ACL negatives for P13-01/02/03/08 and a no-leak test for P13-11, plus an independent review. P13-02 and P13-03 need owner sign-off before they're enabled per group, because they send messages members didn't ask for.
+
+
+### P14 — Opportunity Internet: assistance desk and partner gateway (K21)
+**Depends on:** P12 local launch gates. **Integration owner:** BE. **Risk:** R3 (external disclosure). Issues #157–#168.
+
+- [ ] **P14-01 Organization boundary (one node per org).** _built · issue #157. Evidence: tests, independent review, commit SHA._
+- [ ] **P14-02 Missions: /help, /requests, /cancel, /desk.** _built · issue #158. Evidence: tests, independent review, commit SHA._
+- [ ] **P14-03 Capability offers + atomic capacity.** _built · issue #159. Evidence: tests, independent review, commit SHA._
+- [ ] **P14-04 Consent grants + disclosure preview.** _built · issue #160. Evidence: tests, independent review, commit SHA._
+- [ ] **P14-05 Manual partner gateway E0.** _built · issue #161. Evidence: tests, independent review, commit SHA._
+- [ ] **P14-06 Signed federation transport.** _built · issue #162. Evidence: tests, independent review, commit SHA._
+- [ ] **P14-07 Outcome receipts + operator report.** _built · issue #163. Evidence: tests, independent review, commit SHA._
+- [ ] **P14-08 Protocol contract + conformance.** _partial · issue #164. Evidence: tests, independent review, commit SHA._
+- [ ] **P14-09 Clearing ledger + paid programs.** _not started · issue #165. Evidence: tests, independent review, commit SHA._
+- [ ] **P14-10 Gap signals -> new capacity.** _not started · issue #166. Evidence: tests, independent review, commit SHA._
+- [ ] **P14-11 Owner: job research, partner commitment, first exchange.** _owner task · issue #167. Evidence: tests, independent review, commit SHA._
+- [ ] **P14-12 Federation maturity: key rotation, A2A, trust registry.** _not started · issue #168. Evidence: tests, independent review, commit SHA._
 
 ## Hard quality gates (release-blocking)
 

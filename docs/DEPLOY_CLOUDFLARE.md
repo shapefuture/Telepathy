@@ -1,8 +1,8 @@
 # Deploy runbook: Cloudflare Workers (free plan)
 
 Telepathy v2 runs as one Cloudflare Worker (`worker/`) with a D1 database. Telegram sends updates
-to the Worker by webhook; a cron trigger every 5 minutes handles sends, expiries, reminders, the
-daily digest and optional retention. There is no server to run.
+to the Worker by webhook; a cron trigger every minute handles sends, partner messages, expiries,
+reminders, the daily digest and optional retention. There is no server to run.
 
 ## 0. What you need
 
@@ -85,9 +85,9 @@ Bots only see messages sent after they joined. To add older history:
 | D1 writes | 100,000 rows/day | **≈5 per message** (live or imported) | ≈20,000 new messages/day; imports at 15,000/day |
 | D1 reads | 5,000,000 rows/day | ≈4 per matching message per search | thousands of searches/day for a typical community |
 | D1 size | 500 MB per database | text stored once + search index | my estimate: on the order of 1 million average messages; check with `npx wrangler d1 info telepathy` |
-| Worker requests | 100,000/day | 1 per Telegram update + 288 cron runs | ≈99,000 updates/day |
+| Worker requests | 100,000/day | 1 per Telegram update + 1,440 cron runs | ≈98,500 updates/day |
 | Worker CPU | 10 ms per request | short handlers, no SDK, D1 waits don't count | watch `wrangler tail` for "exceeded CPU" |
-| Bundle | 3 MB | **114 KiB** | fine |
+| Bundle | 3 MB | **≈300 KiB (71 KiB gzip)** | fine |
 
 Limits come from Cloudflare's [Workers limits](https://developers.cloudflare.com/workers/platform/limits)
 and [D1 limits](https://developers.cloudflare.com/d1/platform/limits) pages (checked 2026-10-23;
@@ -99,7 +99,7 @@ database. No code changes are needed.
 | When | What happens |
 |---|---|
 | every webhook | message stored (enabled groups only); replies to commands; intro messages sent at once |
-| every 5 min (cron) | stuck sends → uncertain; intro expiry (72 h invite, 14 d request); 24 h reminders; next batch of digests; leftover sends |
+| every minute (cron) | stuck sends → uncertain; intro and mission expiry; 24 h reminders; next batch of digests; partner messages (≤5); leftover sends (≤36) |
 | from `DIGEST_HOUR` local | digest to members who ran `/digest on`, about 30 per run, built only from groups each person can read |
 | once a day | retention purge, only for groups with `/retention N` |
 
@@ -148,13 +148,27 @@ to be undone, use Time Travel to restore the database to just before it.
 | Group upgraded to a supergroup | Handled automatically: the bot follows Telegram's migration notice to the new chat id. Check `/sources`. |
 | A member asks for deletion | They use `/forget_me` themselves, or reply `/forget` to one message. |
 
-## 9. GitHub Actions (optional)
+## 9. GitHub Actions (optional) and running without it
 
-Automatic deploys, weekly encrypted backups, faster digest delivery, and PDF/DOCX/PPTX parsing
-run on GitHub's runners. Each is off until you set its variable. See
-[`GITHUB_ACTIONS.md`](GITHUB_ACTIONS.md).
+Automatic deploys, weekly encrypted backups and PDF/DOCX/PPTX parsing can run on GitHub's
+runners. Each is off until you set its variable. Every one of them also has a no-Actions path
+(Cloudflare Workers Builds, `scripts/backup-local.sh`, `scripts/offload-local.sh`,
+`scripts/check.sh`). See [`GITHUB_ACTIONS.md`](GITHUB_ACTIONS.md#if-your-actions-minutes-run-out).
 
-## 10. What's different from the Python version
+## 10. Assistance desk and partner gateway
+
+Members ask with `/help <need>`; owners work the desk with `/desk`, publish capacity with
+`/offer`, and connect partner communities with `/partner`. All of it works locally with
+federation off. To connect partners, see [`OPERATOR_GUIDE.md`](OPERATOR_GUIDE.md):
+
+```bash
+npm run fed:keys                                   # prints a key pair to your terminal
+npx wrangler secret put FEDERATION_PRIVATE_KEY     # paste the private key
+# wrangler.jsonc vars: FEDERATION_ENABLED "true", PUBLIC_URL, FEDERATION_PUBLIC_KEY
+npm run db:migrate:remote && npm run deploy
+```
+
+## 11. What's different from the Python version
 
 | Python v1 (Linux host) | Worker v2 (this runbook) |
 |---|---|
@@ -162,6 +176,6 @@ run on GitHub's runners. Each is off until you set its variable. See
 | SQLite file on disk | Cloudflare D1 (SQLite) |
 | PDF/DOCX/PPTX parsing | text formats in the Worker (≤ 512 KB); PDF/DOCX/PPTX via the opt-in GitHub Actions job |
 | nightly backup file | D1 Time Travel + weekly age-encrypted export (GitHub Actions or by hand) |
-| in-process worker loop | cron trigger every 5 minutes |
+| in-process worker loop | cron trigger every minute |
 
 The Python implementation in `src/telepathy/` stays in the repo as the self-hosted alternative.

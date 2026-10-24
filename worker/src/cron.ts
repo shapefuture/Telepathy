@@ -8,9 +8,12 @@ import { digestHour, timezone } from "./env";
 import { expireDue, sendReminders } from "./intros";
 import { dispatchPending, recoverStuck } from "./outbox";
 import { applyRetention } from "./rights";
+import { liveCommitment, release } from "./assist/capacity";
+import { expireMissions, revokeGrants } from "./assist/missions";
+import { dispatchFed, expireExchanges, withdrawMission } from "./federation/gateway";
 import { localParts, nowIso } from "./util";
 
-export const SEND_BUDGET = 40; // Telegram calls per run (free plan allows 50 subrequests)
+export const SEND_BUDGET = 36; // Telegram calls per run; with FED_BUDGET (5) stays under the 50-subrequest free limit
 
 export async function runCron(app: App, now = new Date()): Promise<Record<string, number>> {
   const out: Record<string, number> = {};
@@ -43,6 +46,18 @@ export async function runCron(app: App, now = new Date()): Promise<Record<string
     await app.db.prepare("INSERT INTO settings(key, value) VALUES ('suggest.day', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(today).run();
     return n;
   });
+  await step("missions_expired", async () => {
+    const ids = await expireMissions(app.db, nowIso(now));
+    for (const id of ids) {
+      await revokeGrants(app.db, id);
+      const c = await liveCommitment(app.db, { missionId: id });
+      if (c) await release(app.db, c.id, "cancelled");
+      await withdrawMission(app, id);
+    }
+    return ids.length;
+  });
+  await step("exchanges_expired", () => expireExchanges(app.db, nowIso(now)));
+  await step("fed_sent", () => dispatchFed(app));
   await step("sent", () => dispatchPending(app.db, app.tg, SEND_BUDGET));
   return out;
 }

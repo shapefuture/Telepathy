@@ -29,6 +29,7 @@ const EN = {
     "/optin · /optout — expert discoverability\n/skills · /skills add <i>skill</i> · /skills remove <i>skill</i> · /skills all\n" +
     "/language en · /language ru — interface language\n/catchup — what's new since last time · /events — upcoming events · /pings on|off\n" +
     "Search filters: <code>in:group since:2026-01-01 has:file</code>\n\n" +
+    "<b>Get help</b>\n/help <i>what you need</i> — a request the operator desk follows through; nothing leaves the community without your permission\n/requests · /cancel — your open requests\n\n" +
     "<b>Your data</b>\n/privacy · /forget_me · /resume_collection",
   privacy:
     "<b>Telepathy privacy notice</b>\n" +
@@ -240,6 +241,7 @@ const RU: Messages = {
     "/optin · /optout — видимость как эксперта\n/skills · /skills add <i>навык</i> · /skills remove <i>навык</i> · /skills all\n" +
     "/language ru · /language en — язык интерфейса\n/catchup — что нового · /events — ближайшие события · /pings on|off\n" +
     "Фильтры поиска: <code>in:группа since:2026-01-01 has:file</code>\n\n" +
+    "<b>Помощь</b>\n/help <i>что нужно</i> — запрос, который ведёт оператор; без вашего разрешения ничего не уходит за пределы сообщества\n/requests · /cancel — открытые запросы\n\n" +
     "<b>Ваши данные</b>\n/privacy · /forget_me · /resume_collection",
   privacy:
     "<b>Telepathy: конфиденциальность</b>\n" +

@@ -2,8 +2,15 @@ name: Plan integrity
 
 on:
   pull_request:
+    paths: ["delivery/**", "MASTER_PLAN.md", "AGENTS.md", ".github/workflows/plan-integrity.yml"]
   push:
     branches: [main]
+    paths: ["delivery/**", "MASTER_PLAN.md", "AGENTS.md", ".github/workflows/plan-integrity.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: plan-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

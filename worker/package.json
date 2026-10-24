@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "db:migrate:local": "wrangler d1 migrations apply telepathy --local",
     "db:migrate:remote": "wrangler d1 migrations apply telepathy --remote",
-    "import": "node scripts/import-export.mjs"
+    "import": "node scripts/import-export.mjs",
+    "fed:keys": "node scripts/fed-keys.mjs"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "1.3.7",

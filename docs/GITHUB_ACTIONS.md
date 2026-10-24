@@ -18,8 +18,8 @@ data is either encrypted before upload or never written out.
 |---|---|---|---|---|
 | **Deploy** (test → migrate D1 → deploy) | needs your Cloudflare token; repeatable releases | no | off (`CLOUDFLARE_DEPLOY`) | `deploy-worker.yml` |
 | **Encrypted D1 backup**, weekly, kept off Cloudflare | Workers can't export their own database | yes, but **encrypted with your age key first**; plaintext never leaves the runner | off (`D1_BACKUP`) | `d1-backup.yml` |
-| **Queue drain**: calls `/admin/cron` 5× per hour | one 5-min cron run sends ~30 digests; big communities need more passes | no (responses are counts) | on once `WORKER_URL` is set | `worker-jobs.yml` → `maintenance` |
-| **PDF / DOCX / PPTX parsing** | parsing a PDF can take seconds of CPU; the Worker only parses text files ≤ 512 KB | **yes: files pass through GitHub runners** (not logged, not stored) | **on**: owner approved 2026-10-23 (`OFFLOAD_DOCUMENTS`) | `worker-jobs.yml` → `documents` |
+| **Queue drain** burst: calls `/admin/cron` 5× | rarely needed now: the Worker's own cron runs **every minute** | no (responses are counts) | **manual only** (Actions tab) | `worker-jobs.yml` → `maintenance` |
+| **PDF / DOCX / PPTX parsing**, every 4 hours | parsing a PDF can take seconds of CPU; the Worker only parses text files ≤ 512 KB | **yes: files pass through GitHub runners** (not logged, not stored) | **on**: owner approved 2026-10-23 (`OFFLOAD_DOCUMENTS`) | `worker-jobs.yml` → `documents` |
 
 ## What Actions can't fix
 
@@ -69,3 +69,30 @@ Restore a backup: download the artifact, then
 
 Scheduled workflows in a public repository may be paused by GitHub after a long period without
 repository activity. Check the Actions tab occasionally, or re-enable the workflow there.
+
+## If your Actions minutes run out
+
+First check whether they can: on a **public** repository, standard GitHub-hosted runners don't
+count against any quota. A "spending limit" or "minutes exhausted" banner usually means the repo
+was made private, or the account bills a private repo elsewhere (Settings → Billing → Usage).
+
+Changes in this repo that keep usage low:
+
+| Was | Now |
+|---|---|
+| Hourly `maintenance` job (~1,400 runner-minutes/month) | Worker cron every **minute** on Cloudflare (free); the job is manual-only |
+| Hourly `documents` job | every 4 hours (≤ 180 runner-minutes/month) |
+| Python + Worker CI on every push | split by path (`ci.yml`, `ci-worker.yml`, `plan-integrity.yml`); superseded runs are cancelled |
+
+Every job has a path that uses no Actions at all:
+
+| Job | No-Actions replacement | Community data on GitHub? |
+|---|---|---|
+| CI | `scripts/check.sh` locally (or as a git pre-push hook) | no |
+| Deploy | Cloudflare **Workers Builds**: dashboard → Workers → telepathy → Settings → Builds → connect this repo, root `worker`, build `npm ci && npm test`, deploy `npx wrangler deploy`. It has its own free build allowance. Or `npm run deploy` by hand | no |
+| Encrypted backup | `AGE_RECIPIENT=age1… scripts/backup-local.sh` (weekly crontab on any machine); D1 Time Travel covers point-in-time restore meanwhile | no |
+| Document parsing | `scripts/offload-local.sh` from any machine you control (crontab line in the script). Files then **don't** pass through GitHub at all, which is also the more private option | no |
+| Queue drain | not needed: per-minute cron | no |
+
+If none of these suit, set `OFFLOAD_DOCUMENTS` to `"false"` in `wrangler.jsonc`: PDFs/DOCX/PPTX
+are then skipped (text files are still parsed in the Worker) and nothing needs a runner.

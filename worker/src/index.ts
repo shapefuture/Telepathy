@@ -2,6 +2,7 @@
 
 import { handleUpdate, status, type App, type Update } from "./bot";
 import { handleApp } from "./app";
+import { handleFederation } from "./federation/gateway";
 import { runCron } from "./cron";
 import type { Env } from "./env";
 import { MAX_CHUNKS, storeChunks } from "./ingest";
@@ -15,7 +16,7 @@ export const COMMANDS = [
   { command: "ask", description: "Search your groups with cited answers" },
   { command: "intro", description: "Request a consent-based introduction" },
   { command: "expert", description: "How many experts match a topic" },
-  { command: "requests", description: "Your open introduction requests" },
+  { command: "requests", description: "Your open requests" },
   { command: "profile", description: "Your profile and settings" },
   { command: "digest", description: "Turn the daily digest on or off" },
   { command: "skills", description: "Manage your skills" },
@@ -25,11 +26,11 @@ export const COMMANDS = [
   { command: "catchup", description: "What's new since last time" },
   { command: "events", description: "Upcoming events" },
   { command: "app", description: "Open the Telepathy app" },
-  { command: "help", description: "All commands" },
+  { command: "help", description: "All commands, or /help <need> to ask for help" },
 ];
 
-export function makeApp(env: Env, fetcher?: Fetcher): App {
-  return { env, db: env.DB, tg: createTelegram(env.BOT_TOKEN, fetcher) };
+export function makeApp(env: Env, fetcher?: Fetcher, net?: Fetcher): App {
+  return { env, db: env.DB, tg: createTelegram(env.BOT_TOKEN, fetcher), net };
 }
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data, null, 2), { status, headers: { "content-type": "application/json" } });
@@ -39,9 +40,18 @@ function bearerOk(req: Request, env: Env): boolean {
   return !!env.ADMIN_TOKEN && env.ADMIN_TOKEN.length >= 16 && safeEqual(h, `Bearer ${env.ADMIN_TOKEN}`);
 }
 
-export async function handleFetch(req: Request, env: Env, fetcher?: Fetcher): Promise<Response> {
+export async function handleFetch(req: Request, env: Env, fetcher?: Fetcher, net?: Fetcher): Promise<Response> {
   const url = new URL(req.url);
   if (req.method === "GET" && url.pathname === "/health") return new Response("ok");
+  if (url.pathname.startsWith("/v1/") || url.pathname === "/.well-known/nexus-node.json") {
+    // Partner gateway (off unless FEDERATION_ENABLED=true). Signed messages only.
+    const app = makeApp(env, fetcher, net);
+    const r = await handleFederation(req, app);
+    if (r) {
+      if (r.keys.length) await dispatchPending(app.db, app.tg, 10, r.keys).catch((e) => console.warn("fed notify", String(e)));
+      return r.response;
+    }
+  }
   if (url.pathname === "/app" || url.pathname.startsWith("/app/api/")) return handleApp(req, env);
 
   if (req.method === "POST" && url.pathname === "/telegram") {

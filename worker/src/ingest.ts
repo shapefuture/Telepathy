@@ -9,6 +9,7 @@ export interface TgUser {
   id: number;
   is_bot?: boolean;
   language_code?: string;
+  username?: string;
 }
 export interface TgDocument {
   file_id: string;

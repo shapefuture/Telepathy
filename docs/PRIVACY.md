@@ -46,10 +46,20 @@ it shows the same data as the bot and collects nothing new.
 **Daily digest.** Off by default. Turn it on with `/digest on`. It summarises only the groups you
 can read, and `/digest off` stops it at any time.
 
+**Requests for help (`/help`).** When you confirm a request, its summary is stored and the
+community operators can see it, so they can help. It stays inside this community unless you
+press **Allow sharing**, after a preview of exactly what partner communities would get: the type
+of help and your summary, without your name, Telegram account, groups or messages. If you then
+choose a partner's offer, your Telegram contact goes to that one partner, so their helper can
+reach you. Cancelling a request (or `/forget_me`) tells partners to delete what they received;
+we can't make a person forget what they already read. Requests expire after 30 days and
+permissions after 14.
+
 **Your controls.**
 - `/profile`: see and change everything stored about your discoverability and your digest.
 - `/optout`: stop being discoverable.
 - Reply `/forget` to one of your messages in the group: delete that message.
+- `/requests`: see and cancel your open requests.
 - `/forget_me`: delete all your stored messages, skills and requests, and stop storing your
   future messages. `/resume_collection` undoes the stop.
 

@@ -16,8 +16,9 @@ import { citation, docOffloadable, docSupported, EDGE_DOC_MAX_BYTES, enabledSour
 import { act, cancelNeed, IntroError, requestIntro } from "./intros";
 import { reconcile } from "./outbox";
 import { forgetMember } from "./rights";
+import { assistCallback, cmdHelpNeed, forgetMissions, listMissions, ownerAssistCommand, OWNER_COMMANDS } from "./assist/bot";
 import { answer, parseFilters, renderAnswer } from "./search";
-import type { InlineButton, Telegram } from "./telegram";
+import type { Fetcher, InlineButton, Telegram } from "./telegram";
 import { escapeHtml } from "./text";
 import { audit, DAY, HOUR, localParts, newId, nowIso, tzOffsetMinutes } from "./util";
 
@@ -25,6 +26,8 @@ export interface App {
   env: Env;
   db: D1Database;
   tg: Telegram;
+  /** Outbound HTTP for partner gateways (tests inject a fake). */
+  net?: Fetcher;
 }
 
 interface CallbackQuery {
@@ -50,7 +53,7 @@ export interface Update {
 /** Kept for tests and docs: the English privacy notice. */
 export const PRIVACY_NOTICE = T("en").privacy;
 
-const PRIVATE_ONLY = new Set(["intro", "expert", "profile", "optin", "optout", "skills", "forget_me", "digest", "requests", "language", "catchup", "events", "pings", "app"]);
+const PRIVATE_ONLY = new Set(["intro", "expert", "profile", "optin", "optout", "skills", "forget_me", "digest", "requests", "language", "catchup", "events", "pings", "app", "cancel", "desk", "offer", "partner", "fed"]);
 const GROUP_TYPES = new Set(["group", "supergroup"]);
 const btn = (text: string, data: string): InlineButton => ({ text, callback_data: data });
 
@@ -386,6 +389,7 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
       await reply(app, chat, pre.start + pre.help);
       return [];
     case "help":
+      if (args.trim()) break; // "/help <need>" opens a mission below
       await reply(app, chat, pre.help);
       return [];
     case "privacy":
@@ -396,6 +400,11 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
     case "uncertain":
       if (!isOwner(app, from.id)) return [];
       return ownerCommand(app, chat, cmd, pre);
+  }
+  if (OWNER_COMMANDS.has(cmd)) {
+    if (!isOwner(app, from.id)) return [];
+    const owner = await ensureMember(app.db, from.id, "owner", from.language_code);
+    return ownerAssistCommand(app, chat, cmd, args, langOf(owner), owner.id);
   }
   const mem = await knownMember(app, msg);
   if (!mem) return [];
@@ -411,6 +420,7 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
   }
   const lang = langOf(mem);
   const m = T(lang);
+  if (cmd === "help") return cmdHelpNeed(app, chat, mem, args);
   switch (cmd) {
     case "ask": {
       if (!rateOk(from.id, rateLimit(app))) {
@@ -486,9 +496,11 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
         throw e;
       }
     }
+    case "cancel":
     case "requests": {
+      const listed = await listMissions(app, chat, mem);
       const rows = (await app.db.prepare("SELECT id, text, status FROM needs WHERE member_id=? AND status IN ('open','matching') ORDER BY created_at DESC").bind(mem.id).all<{ id: string; text: string; status: string }>()).results;
-      if (!rows.length) await reply(app, chat, m.noRequests);
+      if (!rows.length && !listed) await reply(app, chat, m.noRequests);
       for (const r of rows) await reply(app, chat, m.requestStatus(escapeHtml(r.text), r.status), [[btn(m.bCancelRequest, `n:${r.id}:cancel`)]]);
       return [];
     }
@@ -622,6 +634,9 @@ export async function status(db: D1Database): Promise<Record<string, string | nu
     q("SELECT COUNT(*) AS n FROM intros WHERE status IN ('mutually_confirmed','completed')"),
     q("SELECT COUNT(*) AS n FROM doc_queue WHERE status='pending'"),
     q("SELECT COALESCE(SUM(up),0) || ' / ' || COALESCE(SUM(down),0) || ' / ' || COALESCE(SUM(bad),0) AS n FROM passage_votes"),
+    q("SELECT COUNT(*) AS n FROM missions WHERE status NOT IN ('draft','closed','cancelled','expired','failed_with_explanation')"),
+    q("SELECT COUNT(*) AS n FROM organizations WHERE kind='partner' AND status='active'"),
+    q("SELECT COUNT(*) AS n FROM fed_outbox WHERE state IN ('uncertain','failed','manual')"),
   ]);
   const v = (i: number) => ((rows[i]!.results[0] as { n: number | string | null } | undefined)?.n ?? 0) as string | number;
   return {
@@ -638,6 +653,9 @@ export async function status(db: D1Database): Promise<Record<string, string | nu
     "intros connected": v(10),
     "documents queued": v(11),
     "feedback up / down / wrong": v(12),
+    "open missions": v(13),
+    "active partners": v(14),
+    "partner messages needing attention": v(15),
   };
 }
 
@@ -652,6 +670,7 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
       await app.tg.call("editMessageReplyMarkup", { chat_id: cb.message.chat.id, message_id: cb.message.message_id, reply_markup: { inline_keyboard: [] } }).catch(() => undefined);
     }
   };
+  if (["m", "o", "r", "d", "x"].includes(kind ?? "")) return assistCallback(app, cb, await memberByTg(app.db, cb.from.id), data);
   const pre = T(await langForUser(app, cb.from));
   if (kind === "u") {
     if (!isOwner(app, cb.from.id)) {
@@ -705,6 +724,7 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
     }
   } else if (kind === "fm") {
     if (a === "yes") {
+      keys = await forgetMissions(app, mem.id);
       const r = await forgetMember(app.db, mem.id, mem.tg_id);
       await answerCb(m.deleted);
       await reply(app, cb.from.id, m.forgetDone(r.passages, r.skills, r.intros));

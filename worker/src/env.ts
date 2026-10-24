@@ -15,6 +15,14 @@ export interface Env {
   OFFLOAD_DOCUMENTS?: string;
   /** Public https origin of this Worker, e.g. https://telepathy.you.workers.dev (Mini App links). */
   PUBLIC_URL?: string;
+  /** "true" enables the partner gateway (/v1/*, /.well-known/nexus-node.json). Off by default. */
+  FEDERATION_ENABLED?: string;
+  /** This node's id as partners know it; defaults to PUBLIC_URL. */
+  FEDERATION_NODE_ID?: string;
+  /** Ed25519 public key (base64, raw), published in the node manifest. */
+  FEDERATION_PUBLIC_KEY?: string;
+  /** Secret: Ed25519 private key (base64 pkcs8). `npm run fed:keys` makes a pair. */
+  FEDERATION_PRIVATE_KEY?: string;
 }
 
 export function ownerIds(env: Env): Set<number> {

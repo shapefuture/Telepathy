@@ -20,6 +20,15 @@ invariants:
   - {id: C12, hard: true, description: "Active release has identity and rollback ancestor"}
   - {id: C13, hard: true, description: "Consent withdrawal invalidates derived projections"}
   - {id: C14, hard: true, description: "No free NVIDIA trial production processing"}
+  # Federation invariants (Opportunity Internet plan I01-I16; enforced in worker/src/{domain,assist,federation})
+  - {id: C15, hard: true, description: "Cross-organization access is deny-by-default; only allowlisted, active partners with a key are heard (I01, I06)"}
+  - {id: C16, hard: true, description: "Nothing leaves the node without a current member grant bound to mission version, policy version, audience and fields (I02, I08)"}
+  - {id: C17, hard: true, description: "Envelopes carry only job, summary, criteria and a per-exchange pseudonym; no Telegram ids, contacts, archives (I05)"}
+  - {id: C18, hard: true, description: "Contact reveal needs the member's reveal grant for that one partner and the provider's offer (I03)"}
+  - {id: C19, hard: true, description: "Capacity is reserved atomically with the commitment; no overbooking (I12)"}
+  - {id: C20, hard: true, description: "Inbound messages are signed, addressed to this node, unexpired, non-forwardable and replay-checked (I06, J.2)"}
+  - {id: C21, hard: true, description: "Withdrawal propagates: partner copies of summary and contact are deleted; grants revoked (I09)"}
+  - {id: C22, hard: true, description: "Unverified outcomes are never reported as success (I11)"}
 authority:
   builder: [repo_read, isolated_workcell_write, test_run, candidate_publish]
   independent_reviewer: [repo_read, hidden_eval_run, evidence_sign]

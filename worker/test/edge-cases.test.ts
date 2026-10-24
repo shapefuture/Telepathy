@@ -59,6 +59,19 @@ describe("/forget by the author", () => {
   });
 });
 
+describe("Telegram HTML in bot texts", () => {
+  it("/retention usage parses as Telegram HTML (an unescaped <days …> makes Telegram refuse it)", async () => {
+    for (const lang of ["en", "ru"] as const) {
+      const { app, texts } = testApp(undefined, lang);
+      await enableGroup(app);
+      await feed(app, groupCmd(OWNER, "/retention abc"));
+      const usage = texts(GROUP).at(-1)!;
+      expect(usage).toContain("/retention");
+      expect(telegramHtmlErrors(usage)).toEqual([]);
+    }
+  });
+});
+
 describe("a Telegram failure in one part of an update doesn't skip the rest", () => {
   it("a joiner gets read access even if the group welcome can't be posted", async () => {
     const t = testApp();

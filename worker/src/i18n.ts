@@ -85,7 +85,7 @@ const EN = {
     `Telepathy is now <b>collecting</b> this chat (visibility: ${vis}, full history kept). ` +
     "Members can search it with /ask, here or in a DM with the bot. DM the bot /privacy for details or /forget_me to delete your data.",
   disabled: "Telepathy stopped collecting this chat. Existing messages are excluded from all answers.",
-  retentionUsage: "Usage: /retention <days 1..3650> to purge older messages, or /retention 0 to keep full history.",
+  retentionUsage: "Usage: /retention &lt;days 1..3650&gt; to purge older messages, or /retention 0 to keep full history.",
   retentionKeepAll: "Full history will be kept. Nothing is purged automatically.",
   retentionSet: (days: number) => `Retention set to ${days} days. Older messages are purged daily.`,
   removed: "Removed from Telepathy.",
@@ -324,7 +324,7 @@ const RU: Messages = {
     `Миндальная связь теперь <b>сохраняет</b> этот чат (видимость: ${vis}, история хранится полностью). ` +
     "Участники могут искать по нему через /ask здесь или в личке с ботом. Подробности — /privacy в личке с ботом, удалить свои данные — /forget_me.",
   disabled: "Миндальная связь больше не сохраняет этот чат. Уже сохранённые сообщения исключены из всех ответов.",
-  retentionUsage: "Использование: /retention <дни 1..3650> — удалять старые сообщения, или /retention 0 — хранить всю историю.",
+  retentionUsage: "Использование: /retention &lt;дни 1..3650&gt; — удалять старые сообщения, или /retention 0 — хранить всю историю.",
   retentionKeepAll: "История будет храниться полностью. Ничего не удаляется автоматически.",
   retentionSet: (days: number) => `Срок хранения: ${days} дн. Более старые сообщения удаляются ежедневно.`,
   removed: "Удалено из «Миндальной связи».",

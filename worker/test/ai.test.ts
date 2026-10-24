@@ -41,7 +41,7 @@ function world(reply: string) {
     calls.push({ url, body: JSON.parse(String(init.body)) });
     return Response.json({ message: { role: "assistant", content: reply } });
   };
-  const app = makeApp({ ...(env as any), OLLAMA_API_KEY: "test-key" }, t.fetcher, net);
+  const app = makeApp({ ...(env as any), OLLAMA_API_KEY: "test-key", AI: undefined }, t.fetcher, net);
   return { app, t, calls, texts: (c: number) => t.sent(c).map((x) => x.params.text as string) };
 }
 
@@ -87,11 +87,11 @@ describe("Beam summary on /ask", () => {
   it("is off without a key and falls back silently on errors", async () => {
     const t = fakeTelegram();
     let called = 0;
-    const off = makeApp(env as any, t.fetcher, async () => (called++, new Response("x")));
+    const off = makeApp({ ...(env as any), AI: undefined }, t.fetcher, async () => (called++, new Response("x")));
     await seed(off);
     await feed(off, dm(12, "/ask visa paperwork"));
     expect(called).toBe(0);
-    const broken = makeApp({ ...(env as any), OLLAMA_API_KEY: "k" }, t.fetcher, async () => new Response("down", { status: 503 }));
+    const broken = makeApp({ ...(env as any), OLLAMA_API_KEY: "k", AI: undefined }, t.fetcher, async () => new Response("down", { status: 503 }));
     await feed(broken, dm(12, "/ask visa"));
     const last = t.sent(12).at(-1)!.params.text as string;
     expect(last).not.toContain("💡");
@@ -110,5 +110,59 @@ describe("forgetting clears AI summaries", () => {
     await feed(app, press(12, "fm:yes"));
     expect(await n()).toBe(0);
     expect(calls).toHaveLength(1);
+  });
+});
+
+describe("Workers AI backup", () => {
+  const fakeAi = (reply: string | Error) => {
+    const runs: { model: string; input: any }[] = [];
+    return {
+      runs,
+      binding: {
+        run: async (model: string, input: any) => {
+          runs.push({ model, input });
+          if (reply instanceof Error) throw reply;
+          return { response: reply };
+        },
+      } as unknown as Ai,
+    };
+  };
+
+  it("answers when Beam is down, with the same redaction and quote checks", async () => {
+    const t = fakeTelegram();
+    const ai = fakeAi('Took "three weeks at the city office" and "made up".');
+    const app = makeApp({ ...(env as any), OLLAMA_API_KEY: "k", AI: ai.binding }, t.fetcher, async () => new Response("quota", { status: 429 }));
+    await seed(app);
+    await feed(app, dm(12, "/ask visa paperwork"));
+    const out = t.sent(12).at(-1)!.params.text as string;
+    expect(out).toContain("💡");
+    expect(out).toContain("three weeks at the city office");
+    expect(out).not.toContain("made up");
+    expect(ai.runs).toHaveLength(1);
+    expect(ai.runs[0]!.model).toBe("@cf/meta/llama-3.3-70b-instruct-fp8-fast");
+    expect(JSON.stringify(ai.runs[0]!.input)).not.toContain("ann@example.com");
+  });
+
+  it("works with no Beam key at all, and can be switched off", async () => {
+    const t = fakeTelegram();
+    const ai = fakeAi('It is "three weeks at the city office".');
+    const app = makeApp({ ...(env as any), AI: ai.binding }, t.fetcher);
+    await seed(app);
+    await feed(app, dm(12, "/ask visa paperwork"));
+    expect(t.sent(12).at(-1)!.params.text).toContain("💡");
+    const off = makeApp({ ...(env as any), AI: ai.binding, WORKERS_AI_MODEL: "off" }, t.fetcher);
+    await feed(off, dm(12, "/ask visa"));
+    expect(ai.runs).toHaveLength(1);
+    expect(t.sent(12).at(-1)!.params.text).not.toContain("💡");
+  });
+
+  it("an error from Workers AI just shows the normal answer", async () => {
+    const t = fakeTelegram();
+    const app = makeApp({ ...(env as any), AI: fakeAi(new Error("neurons exhausted")).binding }, t.fetcher);
+    await seed(app);
+    await feed(app, dm(12, "/ask visa paperwork"));
+    const out = t.sent(12).at(-1)!.params.text as string;
+    expect(out).not.toContain("💡");
+    expect(out).toContain("paperwork");
   });
 });

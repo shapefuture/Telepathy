@@ -1,6 +1,6 @@
 // Check that every quotation in model output appears word for word in the sources.
 
-const QUOTE = /[«"“„]([^«»"“”„]{8,})[»"”]/g;
+const QUOTE = /[«"“„]([^«»"“”„]{3,})[»"”]/g;
 const fold = (s: string) => s.toLowerCase().replace(/ё/g, "е").replace(/[\s ]+/g, " ").trim();
 
 export interface Checked {

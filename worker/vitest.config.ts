@@ -8,6 +8,7 @@ export default defineConfig(async () => {
     plugins: [
       cloudflareTest({
         wrangler: { configPath: "./wrangler.jsonc" },
+        remoteBindings: false, // the AI binding is remote-only; tests use a stand-in
         miniflare: {
           bindings: {
             TEST_MIGRATIONS: migrations,

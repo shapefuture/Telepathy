@@ -112,7 +112,7 @@ or upload it anywhere.
 
 ## 4. Optional: AI summaries
 
-See [AI.md](AI.md). Off until you run `npx wrangler secret put OLLAMA_API_KEY`.
+See [AI.md](AI.md). Workers AI writes short summaries on top of `/ask` answers by default; add `OLLAMA_API_KEY` to use Beam first, or set `WORKERS_AI_MODEL` to `off` to turn the backup off.
 
 ## 5. Free-plan capacity (measured in tests)
 

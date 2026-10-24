@@ -1,19 +1,32 @@
-# AI summaries (Beam)
+# AI summaries (Beam, with Workers AI as backup)
 
 When it's on, `/ask` answers (in private, in groups and in the Mini App) start with a 1–3 sentence
 summary marked «Кратко от ИИ — сверься с источниками ниже». The found messages are still listed
 underneath, as before.
 
-It's **off** until you add a key:
+Two models can write it, tried in this order:
+
+1. **Beam on Ollama Cloud**, when `OLLAMA_API_KEY` is set.
+2. **Cloudflare Workers AI** (binding `AI` in `wrangler.jsonc`), when Beam is not set up, down or out
+   of free quota. Text goes to Cloudflare's own AI in your account, not to another company. It has a
+   daily free allowance; when that's used up, answers simply appear without a summary until the next day.
+   The default model is `@cf/meta/llama-3.3-70b-instruct-fp8-fast`. Set the var `WORKERS_AI_MODEL` to
+   pick another, or to `off` to disable the backup.
+
+Because the `AI` binding is in `wrangler.jsonc`, **summaries are on after deploy even without a Beam
+key** (from Workers AI). To turn all AI summaries off, set `WORKERS_AI_MODEL` to `off` and don't set
+`OLLAMA_API_KEY`.
+
+To add Beam:
 
 ```bash
 npx wrangler secret put OLLAMA_API_KEY    # from https://ollama.com/settings/keys
 # optional vars: BEAM_MODEL=beam:cloud if your account needs that spelling
 ```
 
-To turn it off, delete the secret with `npx wrangler secret delete OLLAMA_API_KEY`.
+To remove Beam, delete the secret with `npx wrangler secret delete OLLAMA_API_KEY`.
 
-## What is sent to Ollama
+## What is sent to Ollama or Workers AI
 
 | Sent | Never sent |
 | --- | --- |

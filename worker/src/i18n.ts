@@ -60,15 +60,25 @@ const EN = {
     "<b>In a group:</b> /ask (answers only from that group), or mention me with a question; reply /forget to your own message to delete it.",
   whereOwner:
     "\n\n<b>Owner, here:</b> /status, /sources, /uncertain, /desk, /offer, /partner, /fed, /ledger, /continuity, /destinations, /alert, /drill, /hydra.\n" +
-    "<b>Owner, in a group (you must be its admin):</b> /enable, /disable, /retention, /hints, /routing, /canonical and /notevent (as a reply).",
+    "<b>Owner, in a group (you must be its admin):</b> /enable, /disable, /retention, /hints, /routing, /welcome, /canonical and /notevent (as a reply).",
   adminGuide: (title: string) =>
     `<b>Group “${title}” is on.</b> Only you see this.\n\n` +
     "<b>In that group (as its admin):</b>\n" +
     "/disable — stop saving it\n/retention N — delete messages older than N days (0 = keep all)\n" +
     "/hints on|off — point to earlier answers to repeated questions\n/routing on|off — unanswered questions go to opted-in experts after 4 h\n" +
-    "/canonical (reply) — mark the best answer · /notevent (reply) — hide a wrong event\n\n" +
+    "/welcome on|off — greet new members (privately when possible)\n/canonical (reply) — mark the best answer · /notevent (reply) — hide a wrong event\n\n" +
     "<b>Members there:</b> /ask or @mention for answers from that group; /forget (reply) to delete their own message.\n" +
     "<b>Everything else works here, in private:</b> /status, /sources, /desk, /app and the rest (/help).",
+  welcomeDm: (title: string) =>
+    `👋 Hi! I'm the assistant of <b>${title}</b>.\n\n` +
+    "I'll help you find your way around this community and find anything that was ever discussed here. And if needed, I'll find the person who knows the answer to your question.\n\n" +
+    "Just write me your question, or open the app with the menu button. All commands: /help.",
+  welcomeGroup: (name: string) =>
+    `👋 ${name}, welcome! I'll help you find anything that was ever discussed here, and if needed, the person who knows the answer. Start a private chat with me to begin.`,
+  welcomeButton: "Start a chat",
+  welcomeUsage: "Usage: /welcome on or /welcome off (owner, in an enabled group).",
+  welcomeOn: "Welcome is <b>on</b>: new members get a short intro from me, privately when Telegram allows it.",
+  welcomeOff: "Welcome is <b>off</b> in this group.",
   enabled: (vis: string) =>
     `Telepathy is now <b>collecting</b> this chat (visibility: ${vis}, full history kept). ` +
     "Members can search it with /ask, here or in a DM with the bot. DM the bot /privacy for details or /forget_me to delete your data.",
@@ -286,15 +296,25 @@ const RU: Messages = {
     "<b>В группе:</b> /ask (ответ только из этой группы) или упомяните меня с вопросом; ответьте /forget на своё сообщение, чтобы удалить его.",
   whereOwner:
     "\n\n<b>Владельцу, здесь:</b> /status, /sources, /uncertain, /desk, /offer, /partner, /fed, /ledger, /continuity, /destinations, /alert, /drill, /hydra.\n" +
-    "<b>Владельцу, в группе (нужно быть её админом):</b> /enable, /disable, /retention, /hints, /routing, /canonical и /notevent (ответом на сообщение).",
+    "<b>Владельцу, в группе (нужно быть её админом):</b> /enable, /disable, /retention, /hints, /routing, /welcome, /canonical и /notevent (ответом на сообщение).",
   adminGuide: (title: string) =>
     `<b>Группа «${title}» подключена.</b> Это видите только вы.\n\n` +
     "<b>В этой группе (как её админ):</b>\n" +
     "/disable — перестать сохранять\n/retention N — удалять сообщения старше N дней (0 — хранить всё)\n" +
     "/hints on|off — подсказывать прошлые ответы на повторные вопросы\n/routing on|off — вопросы без ответа через 4 ч уходят экспертам\n" +
-    "/canonical (ответом) — отметить лучший ответ · /notevent (ответом) — скрыть ошибочное событие\n\n" +
+    "/welcome on|off — приветствовать новых участников (лично, когда возможно)\n/canonical (ответом) — отметить лучший ответ · /notevent (ответом) — скрыть ошибочное событие\n\n" +
     "<b>Участникам там:</b> /ask или упоминание бота — ответы из этой группы; /forget (ответом) — удалить своё сообщение.\n" +
     "<b>Всё остальное — здесь, в личном чате:</b> /status, /sources, /desk, /app и другие (/help).",
+  welcomeDm: (title: string) =>
+    `👋 Привет! Я помощник сообщества <b>${title}</b>.\n\n` +
+    "Я помогу тебе ориентироваться в этом сообществе и найти любую информацию, которая когда-то обсуждалась. А если потребуется — найду человека, который знает ответ на твой вопрос.\n\n" +
+    "Просто напиши мне вопрос или открой приложение кнопкой меню. Все команды — /help.",
+  welcomeGroup: (name: string) =>
+    `👋 ${name}, добро пожаловать! Я помогу найти любую информацию, которая здесь когда-то обсуждалась, а если потребуется — человека, который знает ответ. Создай личный чат со мной, чтобы начать.`,
+  welcomeButton: "Начать",
+  welcomeUsage: "Использование: /welcome on или /welcome off (владелец, в подключённой группе).",
+  welcomeOn: "Приветствие <b>включено</b>: новые участники получат от меня короткое интро — лично, когда Telegram это позволяет.",
+  welcomeOff: "Приветствие в этой группе <b>выключено</b>.",
   enabled: (vis: string) =>
     `Миндальная связь теперь <b>сохраняет</b> этот чат (видимость: ${vis}, история хранится полностью). ` +
     "Участники могут искать по нему через /ask здесь или в личке с ботом. Подробности — /privacy в личке с ботом, удалить свои данные — /forget_me.",

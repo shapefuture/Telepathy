@@ -16,6 +16,7 @@ import { dispatchAlerts } from "./continuity/alerts";
 import { classify, dispatchInvites, runCanaries } from "./hydra/regrow";
 import { dispatchAnnouncements } from "./hydra/notices";
 import { runEscrow } from "./hydra/escrow";
+import { deleteDue } from "./welcome";
 import { watchSeals } from "./hydra/fed";
 import { remindDrills } from "./hydra/chaos";
 import { bucket, computeGaps, setGapStatus } from "./assist/gaps";
@@ -116,6 +117,7 @@ export async function runCron(base: App, now = new Date()): Promise<Record<strin
       await step("hydra_drills_due", () => remindDrills(app, now));
     } else await step("hydra_seals", () => watchSeals(app, now));
   }
+  await step("welcome_cleanup", () => deleteDue(app, 5, now));
   await step("sent", () => dispatchPending(app.db, app.tg, Math.min(SEND_BUDGET, app.tg.calls + Math.max(0, app.budget!.left()))));
   return out;
 }

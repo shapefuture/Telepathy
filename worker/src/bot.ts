@@ -24,6 +24,7 @@ import { assistCallback, cmdHelpNeed, forgetMissions, listMissions, ownerAssistC
 import { answer, parseFilters, renderAnswer } from "./search";
 import type { Fetcher, InlineButton, Telegram } from "./telegram";
 import { DefiniteFailure } from "./telegram";
+import { welcomeJoinRequest, welcomeJoiner } from "./welcome";
 import { escapeHtml } from "./text";
 import { audit, DAY, HOUR, localParts, newId, nowIso, tzOffsetMinutes } from "./util";
 
@@ -44,9 +45,15 @@ interface CallbackQuery {
   message?: { message_id: number; chat: { id: number; type?: string } };
 }
 interface ChatMemberUpdated {
-  chat: { id: number; type: string };
+  chat: { id: number; type: string; title?: string };
   from: TgUser;
+  old_chat_member?: { status: string; user: TgUser };
   new_chat_member: { status: string; user: TgUser };
+}
+interface ChatJoinRequest {
+  chat: { id: number; type: string; title?: string };
+  from: TgUser;
+  user_chat_id?: number;
 }
 export interface Update {
   update_id: number;
@@ -55,6 +62,7 @@ export interface Update {
   callback_query?: CallbackQuery;
   my_chat_member?: ChatMemberUpdated;
   chat_member?: ChatMemberUpdated;
+  chat_join_request?: ChatJoinRequest;
 }
 
 /** Kept for tests and docs: the English privacy notice. */
@@ -150,6 +158,10 @@ export async function handleUpdate(app: App, u: Update): Promise<string[]> {
   if (u.callback_query) return onCallback(app, u.callback_query);
   if (u.my_chat_member) return onBotMembership(app, u.my_chat_member);
   if (u.chat_member) return onChatMember(app, u.chat_member);
+  if (u.chat_join_request) {
+    await welcomeJoinRequest(app, u.chat_join_request.chat.id, u.chat_join_request.from, u.chat_join_request.user_chat_id);
+    return [];
+  }
   return [];
 }
 
@@ -173,6 +185,7 @@ async function onMessage(app: App, msg: TgMessage, edited: boolean): Promise<str
       if (command.cmd === "retention") return cmdRetention(app, msg, command.args);
       if (command.cmd === "hints") return cmdToggle(app, msg, command.args, "hints");
       if (command.cmd === "routing") return cmdToggle(app, msg, command.args, "routing");
+      if (command.cmd === "welcome") return cmdToggle(app, msg, command.args, "welcome");
       if (command.cmd === "canonical") return cmdCanonical(app, msg);
       if (command.cmd === "notevent") return cmdNotEvent(app, msg);
       if (command.cmd === "forget") return cmdForgetMessage(app, msg);
@@ -298,18 +311,18 @@ async function cmdRetention(app: App, msg: TgMessage, args: string): Promise<str
 }
 
 /** Per-group opt-ins that make the bot speak unprompted: hints (P13-02) and routing (P13-03). */
-async function cmdToggle(app: App, msg: TgMessage, args: string, col: "hints" | "routing"): Promise<string[]> {
+async function cmdToggle(app: App, msg: TgMessage, args: string, col: "hints" | "routing" | "welcome"): Promise<string[]> {
   if (!(await ownerInGroup(app, msg))) return [];
   const m = T(await langForUser(app, msg.from));
   const src = await enabledSource(app.db, msg.chat.id);
   const arg = args.trim().toLowerCase();
   if (!src || (arg !== "on" && arg !== "off")) {
-    await reply(app, msg.chat.id, col === "hints" ? m.hintsUsage : m.routingUsage);
+    await reply(app, msg.chat.id, col === "hints" ? m.hintsUsage : col === "welcome" ? m.welcomeUsage : m.routingUsage);
     return [];
   }
   await app.db.prepare(`UPDATE sources SET ${col}=? WHERE id=?`).bind(arg === "on" ? 1 : 0, src.id).run();
   await audit(app.db, `source.${col}`, String(msg.from!.id), src.id, { on: arg === "on" });
-  const text = col === "hints" ? (arg === "on" ? m.hintsOn : m.hintsOff) : arg === "on" ? m.routingOn : m.routingOff;
+  const text = col === "hints" ? (arg === "on" ? m.hintsOn : m.hintsOff) : col === "welcome" ? (arg === "on" ? m.welcomeOn : m.welcomeOff) : arg === "on" ? m.routingOn : m.routingOff;
   await reply(app, msg.chat.id, text);
   return [];
 }
@@ -780,7 +793,11 @@ async function onBotMembership(app: App, ev: ChatMemberUpdated): Promise<string[
 }
 
 /** Leaving a group revokes read access to it (C06); joining grants it. */
+const IN = ["member", "administrator", "creator", "restricted"];
 async function onChatMember(app: App, ev: ChatMemberUpdated): Promise<string[]> {
+  // Newly joined (not a promotion or restriction change): a short welcome, privately when possible.
+  const was = ev.old_chat_member?.status ?? "left";
+  if (IN.includes(ev.new_chat_member.status) && !IN.includes(was)) await welcomeJoiner(app, ev.chat.id, ev.new_chat_member.user);
   const src = await enabledSource(app.db, ev.chat.id);
   const m = src ? await memberByTg(app.db, ev.new_chat_member.user.id) : null;
   if (!src || !m) return [];

@@ -22,7 +22,7 @@ import { dispatchPending } from "./outbox";
 import { createTelegram, DefiniteFailure, type Fetcher } from "./telegram";
 import { nowIso, safeEqual } from "./util";
 
-export const ALLOWED_UPDATES = ["message", "edited_message", "callback_query", "my_chat_member", "chat_member"];
+export const ALLOWED_UPDATES = ["message", "edited_message", "callback_query", "my_chat_member", "chat_member", "chat_join_request"];
 
 export const COMMANDS = [
   { command: "ask", description: "Search your groups with cited answers" },

@@ -882,3 +882,18 @@ describe("audit: one-time login codes", () => {
     expect(tries.filter((r) => r.json?.ok).length).toBe(1);
   });
 });
+
+describe("audit: imports", () => {
+  it("an import never attaches someone's verified heads to another person's unverified address", async () => {
+    const n = node();
+    await setup(n, 93);
+    const api = miniApp(n, 93);
+    expect((await api("POST", "passport/enrol", { topics: [] })).json.ok).toBe(true);
+    await api("POST", "passport/email", { email: "victim@proton.me" }); // typed, never verified
+    const stranger = (await q<{ person_id: string }>("SELECT person_id FROM delivery_registrations WHERE channel='email'"))!.person_id;
+    const doc = { schema: "nexus.continuity-export.v1", org: ORG, generated_at: iso(Date.now()), root_version: 1, manifest_version: 1, suppressions: [], people: [{ ref: "victim", emails: ["victim@proton.me"], heads: [{ channel: "sms", address: "+15557654321" }], ops: [{ seq: 1, op: "FOLLOW", topic: "critical", at: iso(Date.now()) }], memberships: [] }] };
+    expect((await n.admin("POST", "/admin/continuity/import", await signWith({ signed: doc }, ON.privateKey, ON.publicKey))).status).toBe(200);
+    const sms = await q<{ person_id: string }>("SELECT person_id FROM delivery_registrations WHERE channel='sms'");
+    expect(sms!.person_id).not.toBe(stranger);
+  });
+});

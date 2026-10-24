@@ -871,4 +871,14 @@ describe("audit: one-time login codes", () => {
     expect(tries.filter((r) => r.json?.ok).length).toBe(1);
   });
 
+  it("a passport-id login code logs in once, even when sent in parallel", async () => {
+    const n = node();
+    await setup(n, 92);
+    const portal = await member(n, 92, "m92@proton.me");
+    const handle = (await portal("GET", "hydra")).json.handle as string;
+    const ticket = (await n.http("POST", "/portal/api/login/handle", { handle }, P)).json.ticket;
+    const code = codeIn(n.mails.at(-1)!.text);
+    const tries = await Promise.all(Array.from({ length: 4 }, () => n.http("POST", "/portal/api/login/handle/verify", { ticket, code }, P)));
+    expect(tries.filter((r) => r.json?.ok).length).toBe(1);
+  });
 });

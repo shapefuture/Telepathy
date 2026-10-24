@@ -64,14 +64,17 @@ export async function handlePortal(req: Request, app: App): Promise<Response> {
   }
   if (!p.startsWith("/portal/api/")) return new Response("not found", { status: 404 });
   if (req.method === "POST" && req.headers.get("x-portal") !== "1") return json({ error: "forbidden" }, 403);
-  const body = req.method === "POST" ? ((await req.json().catch(() => ({}))) as Record<string, unknown>) : {};
+  const parsed: unknown = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+  const body = (parsed && typeof parsed === "object" ? parsed : {}) as Record<string, unknown>;
   const route = p.slice("/portal/api/".length);
 
   // ---- unauthenticated: start a login ----
   if (route === "login" && req.method === "POST") {
     const r = await requestLogin(app, String(body.email ?? ""));
     // Same answer whether or not the address is registered: a ticket either way.
-    const ticket = r.registrationId ?? (await hmacHex(app.env.CONTINUITY_KEY, "fake", String(body.email ?? ""))).slice(0, 32);
+    // The fake has the shape of a real one (newId: a UUID v4 without dashes).
+    const f = await hmacHex(app.env.CONTINUITY_KEY, "fake", String(body.email ?? ""));
+    const ticket = r.registrationId ?? `${f.slice(0, 12)}4${f.slice(13, 16)}${"89ab"[parseInt(f[16]!, 16) & 3]}${f.slice(17, 32)}`;
     return json({ ok: true, ticket });
   }
   if (route === "verify" && req.method === "POST") {
@@ -131,7 +134,7 @@ export async function handlePortal(req: Request, app: App): Promise<Response> {
       throw e;
     }
   }
-  if (route === "email/verify" && req.method === "POST") return json({ ok: !!(await checkCode(app, String(body.registration ?? ""), String(body.code ?? ""), "verify")) });
+  if (route === "email/verify" && req.method === "POST") return json({ ok: !!(await checkCode(app, String(body.registration ?? ""), String(body.code ?? ""), "verify", new Date(), s.personId)) });
   if (route === "revoke" && req.method === "POST") return json({ ok: await revokeEndpoint(app.db, s.personId, String(body.registration ?? "")) });
   if (route === "export" && req.method === "GET") return json({ ...(await personalExport(app.env, app.db, s.personId)), receipts: await receiptsFor(app, s.personId) }, 200, { "content-disposition": "attachment; filename=my-community-relationship.json" });
   if (route === "forget" && req.method === "POST" && body.confirm === "forget") {

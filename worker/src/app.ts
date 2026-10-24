@@ -221,7 +221,7 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
         throw e;
       }
     }
-    if (key === "POST passport" && p[1] === "email" && p[2] === "verify") return out({ ok: (await checkCode(app, String(body.registration ?? ""), String(body.code ?? ""), "verify")) === personId });
+    if (key === "POST passport" && p[1] === "email" && p[2] === "verify") return out({ ok: (await checkCode(app, String(body.registration ?? ""), String(body.code ?? ""), "verify", new Date(), personId)) === personId });
     if (key === "POST passport" && p[1] === "recovery") return out({ codes: await newRecoveryCodes(app.env, db, personId) });
     if (key === "POST passport" && p[1] === "topic") {
       if (!TOPICS.includes(body.topic as Topic)) return out({ ok: false }, undefined, 400);

@@ -125,19 +125,21 @@ export async function issueCode(app: App, registrationId: string, purpose: "veri
   return deliver(app, reg, { title: `${label}: your code ${code}`, text: `Your ${label} code is ${code}. It expires in 10 minutes.\n\nIf you didn't ask for it, ignore this message.` });
 }
 
-/** Check a code; on success the registration is verified. Returns the person id. */
-export async function checkCode(app: App, registrationId: string, code: string, purpose: "verify" | "login", now = new Date()): Promise<string | null> {
+/** Check a code; on success the registration is verified. Returns the person id. With `forPerson`, only that person's registration. */
+export async function checkCode(app: App, registrationId: string, code: string, purpose: "verify" | "login", now = new Date(), forPerson?: string): Promise<string | null> {
+  if (forPerson && !(await app.db.prepare("SELECT 1 FROM delivery_registrations WHERE id=? AND person_id=?").bind(registrationId, forPerson).first())) return null;
   const row = await app.db
     .prepare("SELECT id, code_hash, attempts FROM login_codes WHERE registration_id=? AND purpose=? AND used_at IS NULL AND expires_at>? ORDER BY expires_at DESC LIMIT 1")
     .bind(registrationId, purpose, nowIso(now))
     .first<{ id: string; code_hash: string; attempts: number }>();
   if (!row || row.attempts >= CODE_MAX_ATTEMPTS) return null;
   const ok = row.code_hash === (await hmacHex(app.env.CONTINUITY_KEY, "code", `${registrationId}:${code.trim()}`));
-  await app.db.prepare(`UPDATE login_codes SET attempts=attempts+1${ok ? ", used_at=?" : ""} WHERE id=?`).bind(...(ok ? [nowIso(now), row.id] : [row.id])).run();
-  if (!ok) return null;
+  // Atomic: parallel requests can't each pass the checks above and all use the same code.
+  const won = await app.db.prepare(`UPDATE login_codes SET attempts=attempts+1${ok ? ", used_at=?" : ""} WHERE id=? AND used_at IS NULL AND attempts<? RETURNING id`).bind(...(ok ? [nowIso(now), row.id] : [row.id]), CODE_MAX_ATTEMPTS).first();
+  if (!ok || !won) return null;
   const reg = await app.db
-    .prepare("UPDATE delivery_registrations SET status='verified', verified_at=COALESCE(verified_at, ?) WHERE id=? AND status<>'revoked' RETURNING person_id, suppress_hash")
-    .bind(nowIso(now), registrationId)
+    .prepare("UPDATE delivery_registrations SET status='verified', verified_at=COALESCE(verified_at, ?) WHERE id=? AND status<>'revoked' AND person_id=COALESCE(?, person_id) RETURNING person_id, suppress_hash")
+    .bind(nowIso(now), registrationId, forPerson ?? null)
     .first<{ person_id: string; suppress_hash: string }>();
   // Re-verifying an address is a new explicit action: it lifts an earlier endpoint revocation.
   if (reg) {
@@ -290,8 +292,9 @@ export async function forgetPerson(db: D1Database, personId: string): Promise<vo
   const now = nowIso();
   await db.batch([
     db.prepare("INSERT OR IGNORE INTO suppressions(address_hash, scope, created_at) SELECT suppress_hash, '*', ? FROM delivery_registrations WHERE person_id=?").bind(now, personId),
+    // This person's codes only: their heads' codes and their passport-id login codes ('h:<person>').
+    db.prepare("DELETE FROM login_codes WHERE registration_id IN (SELECT id FROM delivery_registrations WHERE person_id=?) OR registration_id=?").bind(personId, `h:${personId}`),
     db.prepare("DELETE FROM delivery_registrations WHERE person_id=?").bind(personId),
-    db.prepare("DELETE FROM login_codes WHERE registration_id NOT IN (SELECT id FROM delivery_registrations)"),
     db.prepare("DELETE FROM recovery_codes WHERE person_id=?").bind(personId),
     db.prepare("UPDATE login_factors SET status='revoked', secret_enc=NULL WHERE person_id=?").bind(personId),
     db.prepare("UPDATE guardians SET status='removed' WHERE person_id=? OR guardian_id=?").bind(personId, personId),

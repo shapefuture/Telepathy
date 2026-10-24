@@ -90,7 +90,7 @@ export async function hydraAuthed(app: App, personId: string, method: string, ro
       const r = await addHead(app, personId, s("kind") as AddableKind, s("address"), body.keys as { p256dh?: string; auth?: string } | undefined);
       return json({ ok: true, registration: r.registrationId, sent: r.sent });
     }
-    if (method === "POST" && route === "head/verify") return json({ ok: (await checkCode(app, s("registration"), s("code"), "verify")) === personId });
+    if (method === "POST" && route === "head/verify") return json({ ok: (await checkCode(app, s("registration"), s("code"), "verify", new Date(), personId)) === personId });
     if (method === "POST" && route === "totp") return json({ ok: true, ...(await (async () => {
       const t = await enrolTotp(app, personId, s("label") || "Authenticator");
       return { ...t, qr: `data:image/svg+xml;base64,${btoa(qrSvg(t.uri, 4))}` };

@@ -84,7 +84,8 @@ export async function signWith<T>(doc: Signed<T> | { signed: T; signatures?: Sig
 export async function countValid<T>(doc: Signed<T>, keys: PubKey[]): Promise<number> {
   const data = enc.encode(canonical(doc.signed));
   const seen = new Set<string>();
-  for (const s of doc.signatures ?? []) {
+  for (const s of Array.isArray(doc.signatures) ? doc.signatures : []) {
+    if (!s || typeof s.sig !== "string") continue; // malformed entry: not counted
     const k = keys.find((x) => x.keyid === s.keyid);
     if (!k || seen.has(k.keyid)) continue;
     try {

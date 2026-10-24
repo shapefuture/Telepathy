@@ -881,6 +881,21 @@ describe("audit: one-time login codes", () => {
     const tries = await Promise.all(Array.from({ length: 4 }, () => n.http("POST", "/portal/api/login/handle/verify", { ticket, code }, P)));
     expect(tries.filter((r) => r.json?.ok).length).toBe(1);
   });
+
+  it("parallel authenticator guesses can't run past the five-failure lock", async () => {
+    const n = node();
+    await setup(n, 94);
+    const portal = await member(n, 94, "m94@proton.me");
+    const handle = (await portal("GET", "hydra")).json.handle;
+    const t = (await portal("POST", "totp", {})).json;
+    const step = Math.floor(Date.now() / 30_000);
+    await portal("POST", "totp/confirm", { id: t.id, code: await totp(unbase32(t.secret), step) });
+    const good = await totp(unbase32(t.secret), step + 1);
+    const wrong = good === "000000" ? "111111" : "000000";
+    const tries = await Promise.all([...Array.from({ length: 20 }, () => wrong), good].map((code) => n.http("POST", "/portal/api/login/totp", { handle, code }, P)));
+    expect(tries.at(-1)!.status).toBe(401);
+    expect(await q("SELECT failures>=5 AS locked FROM login_factors WHERE id=?", t.id)).toEqual({ locked: 1 });
+  });
 });
 
 describe("audit: imports", () => {

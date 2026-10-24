@@ -128,8 +128,13 @@ export async function loginTotp(app: App, handle: string, code: string, now = Da
   const factors = (await app.db.prepare("SELECT id, secret_enc, last_step, failures, locked_until FROM login_factors WHERE person_id=? AND kind='totp' AND status='active'").bind(person).all<{ id: string; secret_enc: string; last_step: number; failures: number; locked_until: string | null }>()).results;
   for (const f of factors) {
     if (f.locked_until && f.locked_until > nowIso(new Date(now))) continue;
-    if (await checkTotp(app, f, code, now)) return person;
-    await app.db.prepare("UPDATE login_factors SET failures=failures+1, locked_until=CASE WHEN failures+1>=5 THEN ? ELSE locked_until END WHERE id=?").bind(nowIso(new Date(now + 15 * 60_000)), f.id).run();
+    // Count the attempt before checking it, atomically, so parallel guesses can't all slip past the lock.
+    const claimed = await app.db.prepare("UPDATE login_factors SET failures=failures+1, locked_until=CASE WHEN failures+1>=5 THEN ? ELSE locked_until END WHERE id=? AND (locked_until IS NULL OR locked_until<=?) RETURNING id").bind(nowIso(new Date(now + 15 * 60_000)), f.id, nowIso(new Date(now))).first();
+    if (!claimed) continue;
+    if (await checkTotp(app, f, code, now)) {
+      await app.db.prepare("UPDATE login_factors SET failures=0, locked_until=NULL WHERE id=?").bind(f.id).run();
+      return person;
+    }
   }
   return null;
 }

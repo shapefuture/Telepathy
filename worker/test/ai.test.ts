@@ -7,7 +7,7 @@ import { redact } from "../src/ai/redact";
 import { conversation } from "../src/ai/threads";
 import { resetRateLimits } from "../src/bot";
 import { makeApp } from "../src/index";
-import { GROUP, dm, enableGroup, fakeTelegram, feed, groupMsg, nextMsg } from "./helpers";
+import { GROUP, dm, press, enableGroup, fakeTelegram, feed, groupMsg, nextMsg } from "./helpers";
 
 beforeEach(() => resetRateLimits());
 
@@ -96,5 +96,19 @@ describe("Beam summary on /ask", () => {
     const last = t.sent(12).at(-1)!.params.text as string;
     expect(last).not.toContain("💡");
     expect(last).toContain("paperwork");
+  });
+});
+
+describe("forgetting clears AI summaries", () => {
+  it("/forget_me and /forget drop cached summaries that could quote the person", async () => {
+    const { app, calls } = world('It took "three weeks at the city office".');
+    await seed(app);
+    await feed(app, dm(12, "/ask visa paperwork"));
+    const n = async () => (await env.DB.prepare("SELECT COUNT(*) AS n FROM ai_cache").first<{ n: number }>())!.n;
+    expect(await n()).toBe(1);
+    await feed(app, dm(12, "/forget_me"));
+    await feed(app, press(12, "fm:yes"));
+    expect(await n()).toBe(0);
+    expect(calls).toHaveLength(1);
   });
 });

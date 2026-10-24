@@ -4,7 +4,7 @@
 //   MEMBER_CONSENTED    -> members with an active grant for that source
 //   INTERNAL_RESTRICTED -> active grant AND role >= moderator
 
-import { langFromCode, type Lang } from "./i18n";
+import { defaultLang, langFromCode, type Lang } from "./i18n";
 import { newId, nowIso } from "./util";
 
 export type Role = "member" | "moderator" | "admin" | "owner";
@@ -27,8 +27,8 @@ export interface Member {
   catchup_at: string | null;
 }
 
-/** Interface language for a member (stored choice, else English). */
-export const langOf = (m: Pick<Member, "lang"> | null | undefined): Lang => m?.lang ?? "en";
+/** Interface language for a member: their explicit choice, else the default (Russian). */
+export const langOf = (m: Pick<Member, "lang"> | null | undefined): Lang => m?.lang ?? defaultLang();
 
 export const isStaff = (role: Role): boolean => role !== "member";
 

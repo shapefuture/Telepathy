@@ -11,7 +11,7 @@ import { recordAnswer, vote } from "./feedback";
 import { build as buildDigest } from "./digest";
 import { answerSuggestion, detectEvent, markCanonical, toIcs, upcomingEvents } from "./features";
 import { maybeHint } from "./hints";
-import { langFromCode, T, type Lang, type Messages } from "./i18n";
+import { defaultLang, langFromCode, T, type Lang, type Messages } from "./i18n";
 import { citation, docOffloadable, docSupported, EDGE_DOC_MAX_BYTES, enabledSource, ingestMessage, removeMessage, storeDocument, type TgMessage, type TgUser } from "./ingest";
 import { act, cancelNeed, IntroError, requestIntro } from "./intros";
 import { reconcile } from "./outbox";
@@ -123,7 +123,7 @@ const reply = (app: App, chatId: number, text: string, buttons?: InlineButton[][
 
 /** Language for someone we may not know yet: stored choice, else their Telegram setting. */
 async function langForUser(app: App, user?: TgUser): Promise<Lang> {
-  if (!user) return "en";
+  if (!user) return defaultLang();
   const m = await memberByTg(app.db, user.id);
   return m?.lang_explicit ? langOf(m) : langFromCode(user.language_code);
 }

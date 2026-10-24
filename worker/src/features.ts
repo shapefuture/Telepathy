@@ -5,7 +5,7 @@
 import { langOf, readableSets, type Member } from "./acl";
 import { classify } from "./classify";
 import { eligibleCandidates, labelIn, labelsFor, matchSkills, TAXONOMY } from "./experts";
-import { T, type Lang } from "./i18n";
+import { defaultLang, T, type Lang } from "./i18n";
 import { citation } from "./ingest";
 import { effectStatement } from "./outbox";
 import { search } from "./search";
@@ -127,7 +127,7 @@ export async function suggestSkills(db: D1Database, now = new Date()): Promise<s
     .all<{ author_id: string; body: string; tg_id: number; lang: Lang | null }>();
   const counts = new Map<string, { tg: number; lang: Lang; codes: Map<string, number> }>();
   for (const r of results) {
-    const e = counts.get(r.author_id) ?? { tg: r.tg_id, lang: r.lang ?? "en", codes: new Map() };
+    const e = counts.get(r.author_id) ?? { tg: r.tg_id, lang: r.lang ?? defaultLang(), codes: new Map() };
     for (const c of matchSkills(r.body)) e.codes.set(c, (e.codes.get(c) ?? 0) + 1);
     counts.set(r.author_id, e);
   }

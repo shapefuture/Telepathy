@@ -15,6 +15,7 @@ import { partnerList, receive, safeEndpoint } from "../federation/gateway";
 import type { MessageType } from "../federation/envelope";
 import { addOffer, listOffers, MODES, openOffers, withdrawOffer, type CommitmentMode } from "./capacity";
 import { A, type AssistMessages } from "./i18n";
+import { defaultLang } from "../i18n";
 import { createDraft, getMission, isTerminal, MissionError, openMissions, report, type Mission } from "./missions";
 import { b } from "./notify";
 import { deskAction, deskActions, exchangeAction, forgetMissions, gapAction, jobLabel, memberAction, offerChoice, rateMission, short, type Outcome } from "./actions";
@@ -78,7 +79,7 @@ interface Cb {
 
 export async function assistCallback(app: App, cb: Cb, mem: Member | null, data: string): Promise<string[]> {
   const [kind, id = "", act = "", extra = ""] = data.split(":");
-  const lang: Lang = mem ? langOf(mem) : "en";
+  const lang: Lang = mem ? langOf(mem) : defaultLang();
   const a = A(lang);
   const toast = (text = "", alert = false) => app.tg.call("answerCallbackQuery", { callback_query_id: cb.id, text: text.slice(0, 190), show_alert: alert });
   const clear = async () => {

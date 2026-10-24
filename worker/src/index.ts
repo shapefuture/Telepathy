@@ -10,6 +10,7 @@ import { attestationStatus } from "./continuity/passport";
 import { exportBundle, importBundle, PortableError } from "./continuity/portable";
 import { metrics as continuityMetrics } from "./continuity/alerts";
 import { runCron } from "./cron";
+import { setDefaultLang } from "./i18n";
 import { anchorRecord, handleFeeds, publishNotice } from "./hydra/notices";
 import { handleMailEvent } from "./hydra/heads";
 import { hydraMetrics } from "./hydra/graph";
@@ -42,6 +43,7 @@ export const COMMANDS = [
 ];
 
 export function makeApp(env: Env, fetcher?: Fetcher, net?: Fetcher): App {
+  setDefaultLang(env.DEFAULT_LANG);
   return { env, db: env.DB, tg: createTelegram(env.BOT_TOKEN, fetcher), net };
 }
 
@@ -53,6 +55,7 @@ function bearerOk(req: Request, env: Env): boolean {
 }
 
 export async function handleFetch(req: Request, env: Env, fetcher?: Fetcher, net?: Fetcher): Promise<Response> {
+  setDefaultLang(env.DEFAULT_LANG);
   const url = new URL(req.url);
   if (req.method === "GET" && url.pathname === "/health") return new Response("ok");
   // ---- Continuity: public identity, attestation status, independent portal ----

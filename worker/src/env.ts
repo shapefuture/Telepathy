@@ -7,6 +7,8 @@ export interface Env {
   OWNER_IDS: string; // comma-separated Telegram user ids
   // Vars
   COMMUNITY_LABEL?: string;
+  /** Interface language for people who haven't chosen one: "ru" (default) or "en". */
+  DEFAULT_LANG?: string;
   /** Product name shown in the Mini App header (default "Миндальная связь", as on the landing). */
   BRAND_NAME?: string;
   TIMEZONE?: string;

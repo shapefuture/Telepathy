@@ -30,7 +30,8 @@ npx wrangler secret put WEBHOOK_SECRET
 npx wrangler secret put ADMIN_TOKEN      # at least 16 characters
 npx wrangler secret put OWNER_IDS        # e.g. 123456789 or 123,456
 
-# Optional: edit "vars" in wrangler.jsonc: TIMEZONE, DIGEST_HOUR, COMMUNITY_LABEL,
+# Optional: edit "vars" in wrangler.jsonc: DEFAULT_LANG ("ru" by default; members can still
+# switch with /language en), TIMEZONE, DIGEST_HOUR, COMMUNITY_LABEL,
 # and BOT_USERNAME (without @). It lets members ask by @mention in groups and makes the
 # bot ignore commands addressed to other bots.
 

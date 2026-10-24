@@ -811,14 +811,14 @@ const IN = ["member", "administrator", "creator", "restricted"];
 // A restricted person who leaves stays "restricted" with is_member false (Bot API ChatMemberRestricted).
 const inChat = (cm?: { status: string; is_member?: boolean }) => !!cm && IN.includes(cm.status) && !(cm.status === "restricted" && cm.is_member === false);
 async function onChatMember(app: App, ev: ChatMemberUpdated): Promise<string[]> {
-  // Newly joined (not a promotion or restriction change): a short welcome, privately when possible.
   const src = await enabledSource(app.db, ev.chat.id);
   const m = src ? await memberByTg(app.db, ev.new_chat_member.user.id) : null;
   if (src && m) {
     if (!inChat(ev.new_chat_member)) await revoke(app.db, src.id, m.id);
     else await grantStatement(app.db, src.id, m.id).run();
   }
-  // After the access change: a welcome Telegram refuses (400/403) must not skip it.
+  // Newly joined (not a promotion or restriction change): a short welcome, privately when possible.
+  // After the access change, so a welcome Telegram refuses (400/403) can't skip it.
   if (inChat(ev.new_chat_member) && !inChat(ev.old_chat_member)) await welcomeJoiner(app, ev.chat.id, ev.new_chat_member.user);
   return [];
 }

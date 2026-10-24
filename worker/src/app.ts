@@ -26,6 +26,7 @@ import { answer, parseFilters } from "./search";
 import { createTelegram, type Fetcher } from "./telegram";
 import { audit, DAY, HOUR, localParts, nowIso, safeEqual } from "./util";
 import { PAGE } from "./app-page";
+import { hydraAuthed } from "./hydra/portal";
 import { activeAttestations, addEmail, checkCode, ContinuityError, enrolFromTelegram, follows, forgetPerson, newRecoveryCodes, personalExport, personForMember, protection, refreshMembership, revokeEndpoint, setTopic, TOPICS, type Topic } from "./continuity/people";
 import { currentManifest } from "./continuity/identity";
 import { issuePass } from "./continuity/passport";
@@ -148,6 +149,7 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
       skillLabels: skills.map((c) => ({ code: c, label: jobLabel(c, lang) })),
       counts: { requests: n(req!), offers: n(offers!), invites: n(invites!) },
       startParam: user.startParam ?? null,
+      brand: app.env.BRAND_NAME || "Миндальная связь",
     });
   }
   if (key === "POST settings") {
@@ -201,6 +203,12 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
       return out({ ok: true });
     }
     if (!personId) return out({ error: "not enrolled" }, undefined, 409);
+    // Hydra heads (more paths, authenticator, buddies, guardians, receipts): same handlers as the portal.
+    if (p[1] === "h" && p[2]) {
+      const res = await hydraAuthed(app, personId, method, p.slice(2).join("/"), body, (d, status = 200) => new Response(JSON.stringify(d), { status }));
+      if (res) return out(await res.json(), undefined, res.status === 200 ? undefined : res.status);
+      return notFound();
+    }
     if (key === "POST passport" && p[1] === "email" && !p[2]) {
       try {
         const r = await addEmail(app, personId, String(body.email ?? ""));
@@ -448,4 +456,4 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
   return notFound();
 }
 
-const CSP = "default-src 'none'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'";
+const CSP = "default-src 'none'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'";

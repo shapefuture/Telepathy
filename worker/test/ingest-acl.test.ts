@@ -117,6 +117,6 @@ describe("access control (negative tests, QG01)", () => {
     await env.DB.prepare("UPDATE members SET removed_at='x' WHERE tg_id=1").run();
     expect((await ctxFor(1)).size).toBe(0);
     await feed(app, dm(1, "/ask anything"));
-    expect(texts(1).at(-1)).toContain("don't know you");
+    expect(texts(1).at(-1)).toContain("haven't met yet");
   });
 });

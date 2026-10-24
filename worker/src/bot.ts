@@ -197,7 +197,12 @@ async function onMessage(app: App, msg: TgMessage, edited: boolean): Promise<str
     keys.push(...(await ingest(app, msg, edited)));
     return keys;
   }
-  if (msg.chat.type !== "private" || !command || !msg.from) return [];
+  if (msg.chat.type !== "private" || !msg.from) return [];
+  // In private, a plain message is a question: no command needed.
+  if (!command) {
+    const q = (msg.text ?? "").trim();
+    return q && !edited ? privateCommand(app, msg, "ask", q) : [];
+  }
   return privateCommand(app, msg, command.cmd, command.args);
 }
 
@@ -412,9 +417,8 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
   const pre = T(await langForUser(app, from));
   switch (cmd) {
     case "start":
-      await reply(app, chat, pre.start + pre.help);
-      // Private chat, so only this person sees which commands work where.
-      await reply(app, chat, pre.whereMember + (isOwner(app, from.id) ? pre.whereOwner : ""));
+      // One short message: what I do, where things work (owners: their tools). Private, so only them.
+      await reply(app, chat, pre.start + pre.whereMember + (isOwner(app, from.id) ? pre.whereOwner : ""));
       return [];
     case "help":
       if (args.trim()) break; // "/help <need>" opens a mission below

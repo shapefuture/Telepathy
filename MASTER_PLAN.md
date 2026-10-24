@@ -64,6 +64,7 @@ Checkboxes and issue status are unchanged; completion still requires recorded ev
 | K19 | v2.1 member features | Backlog phase **P13** (below) holds 11 member-facing features proposed 2026-10-23. Five extend existing items (P06-07, P07-06/07, P08-04, P10-06, P11-01/02). P13 is tracked in `delivery/backlog-v2.1.json`, kept out of `taskmap.json` so the 130-task P00–P12 map and its CI check stay intact. Recommended order: P13-01, 02, 04, 05 first; then 03. |
 | K20 | GitHub Actions minutes | Cron moves to **every minute on Cloudflare** (free), replacing the hourly Actions queue drain (now manual only). Document parsing runs every 4 h. CI is split by path and cancels superseded runs. Every job has a no-Actions path: `scripts/check.sh`, Cloudflare Workers Builds, `scripts/backup-local.sh`, `scripts/offload-local.sh` (files then skip GitHub entirely). Public repos don't use quota on standard runners. See `docs/GITHUB_ACTIONS.md`. |
 | K21 | Opportunity Internet (owner request 2026-10-24) | Telepathy stays the local kernel; adds the **Assistance OS** (missions, desk, offers, receipts) and a **partner gateway** (`nexus.v1` signed envelopes, E0 manual + E2 HTTP). One Worker per organization (ADR-001); disclosure stages and consent records (ADR-002); trust model (ADR-003). Phase **P14** below, tracked in `delivery/backlog-v3.json`. Source plan: `docs/OPPORTUNITY_INTERNET_PLAN.md`. Federation is off by default; real cross-community use waits for gates G0–G3. |
+| K22 | Continuity / community sovereignty (owner request 2026-10-24) | Members can opt in to an independent link (verified email, recovery codes, per-purpose follows) and the club gets a TUF-style verifiable identity whose primary address moves only with root-threshold signatures. Signed export restores without Telepathy (Python verifier). Alerts, drills and metrics count only verified routes. Nothing is enabled for anyone automatically. Phase **P15**, `delivery/backlog-v4.json`; runbook `docs/CONTINUITY.md`; ADR-005. |
 
 ## Phase sequence and dependency gates
 
@@ -284,6 +285,22 @@ Each item below is deliberately specific. Checkbox markers start empty, do not m
 - [ ] **P14-10 Gap signals -> new capacity.** _built · issue #166. Evidence: tests, independent review, commit SHA._
 - [ ] **P14-11 Owner: job research, partner commitment, first exchange.** _tooling built; owner task open · issue #167. Evidence: tests, independent review, commit SHA._
 - [ ] **P14-12 Federation maturity: key rotation, A2A, trust registry.** _built · issue #168. Evidence: tests, independent review, commit SHA._
+
+
+### P15 — Continuity: community sovereignty (K22)
+**Depends on:** P12 local launch; CONT-0 pilot evidence before selling it. **Risk:** R3 (identity, external email). Issues #169–#172.
+
+- [ ] **CONT-0 Pilot: real-loss evidence, honest limits, first drill.** _owner task · issue #169. Evidence: tests, independent review, commit SHA._
+- [ ] **CONT-1 Verified community identity (TUF-style root, online key, signed destinations).** _built · issue #170. Evidence: tests, independent review, commit SHA._
+- [ ] **CONT-2 /passport and Mini App enrolment, explicit consent.** _built · issue #170. Evidence: tests, independent review, commit SHA._
+- [ ] **CONT-3 Independent login (email code, recovery codes), truthful 'protected'.** _built · issue #170. Evidence: tests, independent review, commit SHA._
+- [ ] **CONT-4 FollowIntent ops log, delivery registrations, preference centre, tombstones.** _built · issue #170. Evidence: tests, independent review, commit SHA._
+- [ ] **CONT-5 Signed export/import; restore without Nexus (Python).** _built · issue #171. Evidence: tests, independent review, commit SHA._
+- [ ] **CONT-6 Verified relocation and low-frequency continuity alerts.** _built · issue #171. Evidence: tests, independent review, commit SHA._
+- [ ] **CONT-7 Club passport for partners (pairwise, signed, revocable).** _built · issue #172. Evidence: tests, independent review, commit SHA._
+- [ ] **CONT-8 Rescue relay among partner clubs.** _built · issue #172. Evidence: tests, independent review, commit SHA._
+- [ ] **CONT-9 Recovery drills and metrics (IER, VAR, RE, RDS, PI).** _built; drills owner task · issue #171. Evidence: tests, independent review, commit SHA._
+- [ ] **CONT-10 Continuity SDK, vectors, independent Python implementation.** _built · issue #172. Evidence: tests, independent review, commit SHA._
 
 ## Hard quality gates (release-blocking)
 

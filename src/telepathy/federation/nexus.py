@@ -19,7 +19,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
 SCHEMA = "nexus.v1"
-TYPES = ("inquiry", "offer", "decline", "approval", "commitment", "withdraw")
+TYPES = ("inquiry", "offer", "decline", "approval", "commitment", "withdraw", "notice")
 ENVELOPE_FIELDS = ("job", "summary", "criteria")
 INQUIRY_KEYS = {
     "mission_ref",

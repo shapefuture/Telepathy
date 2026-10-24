@@ -8,7 +8,7 @@
   "additionalProperties": false,
   "properties": {
     "schema": { "const": "nexus.v1" },
-    "type": { "enum": ["inquiry", "offer", "decline", "approval", "commitment", "withdraw"] },
+    "type": { "enum": ["inquiry", "offer", "decline", "approval", "commitment", "withdraw", "notice"] },
     "exchange_id": { "type": "string", "maxLength": 200, "description": "Always the requester node's exchange id." },
     "issuer_org": { "type": "string", "maxLength": 200 },
     "recipient_org": { "type": "string", "maxLength": 200 },
@@ -53,6 +53,10 @@
     "POST /v1/opportunities/{exchange_id}/offers": "offer | decline",
     "POST /v1/opportunities/{exchange_id}/approvals": "approval",
     "POST /v1/commitments/{exchange_id}/events": "commitment",
-    "POST /v1/exchanges/{exchange_id}/withdraw": "withdraw"
+    "POST /v1/exchanges/{exchange_id}/withdraw": "withdraw",
+    "POST /v1/notices": "notice (relocation relay: body.community = {root, destinations})",
+    "GET /v1/relay": "verified relocation notices this node relays for its partners",
+    "GET /.well-known/nexus-community.json": "club root + destinations (continuity)",
+    "GET /v1/attestations/{id}/status": "active | revoked | expired | unknown"
   }
 }

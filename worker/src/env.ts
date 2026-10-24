@@ -25,6 +25,19 @@ export interface Env {
   FEDERATION_PRIVATE_KEY?: string;
   /** JSON rotation proof from `npm run fed:rotate`, published in the manifest after a key change. */
   FEDERATION_ROTATION?: string;
+  // ---- Continuity (CONT-1..10) ----
+  /** Secret: 32+ random bytes, base64. Keys address encryption, code/session hashes, pseudonyms. */
+  CONTINUITY_KEY?: string;
+  /** Secret: Ed25519 online key (pkcs8 base64) delegated by the club root to sign address lists. */
+  IDENTITY_ONLINE_KEY?: string;
+  /** Its public half (raw base64). */
+  IDENTITY_ONLINE_PUBLIC_KEY?: string;
+  /** "resend" | "log" | "" (off). */
+  EMAIL_PROVIDER?: string;
+  /** Secret for the email provider. */
+  EMAIL_API_KEY?: string;
+  EMAIL_FROM?: string;
+  EMAIL_API_URL?: string;
 }
 
 export function ownerIds(env: Env): Set<number> {

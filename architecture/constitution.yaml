@@ -29,6 +29,12 @@ invariants:
   - {id: C20, hard: true, description: "Inbound messages are signed, addressed to this node, unexpired, non-forwardable and replay-checked (I06, J.2)"}
   - {id: C21, hard: true, description: "Withdrawal propagates: partner copies of summary and contact are deleted; grants revoked (I09)"}
   - {id: C22, hard: true, description: "Unverified outcomes are never reported as success (I11)"}
+  # Continuity (docs/CONTINUITY_PLAN_RU.md)
+  - {id: C23, hard: true, description: "No one is enrolled, followed or emailed without their own action; Telegram ids never become email consent"}
+  - {id: C24, hard: true, description: "The primary club address moves only with a root-threshold-signed relocation; no heuristic or AI-detected 'new address'"}
+  - {id: C25, hard: true, description: "A withdrawn consent can't be revived by restore, replay or import (versioned ops + tombstones)"}
+  - {id: C26, hard: true, description: "'Protected' and reach metrics count only verified routes; Telegram group size is never reach"}
+  - {id: C27, hard: true, description: "Recovery works without Telepathy: signed export + independent verifier"}
 authority:
   builder: [repo_read, isolated_workcell_write, test_run, candidate_publish]
   independent_reviewer: [repo_read, hidden_eval_run, evidence_sign]

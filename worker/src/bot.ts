@@ -16,6 +16,8 @@ import { citation, docOffloadable, docSupported, EDGE_DOC_MAX_BYTES, enabledSour
 import { act, cancelNeed, IntroError, requestIntro } from "./intros";
 import { reconcile } from "./outbox";
 import { forgetMember } from "./rights";
+import { forgetPerson, personForMember } from "./continuity/people";
+import { cmdPassport, CONTINUITY_OWNER, ownerContinuity } from "./continuity/bot";
 import { assistCallback, cmdHelpNeed, forgetMissions, listMissions, ownerAssistCommand, OWNER_COMMANDS } from "./assist/bot";
 import { answer, parseFilters, renderAnswer } from "./search";
 import type { Fetcher, InlineButton, Telegram } from "./telegram";
@@ -53,7 +55,7 @@ export interface Update {
 /** Kept for tests and docs: the English privacy notice. */
 export const PRIVACY_NOTICE = T("en").privacy;
 
-const PRIVATE_ONLY = new Set(["intro", "expert", "profile", "optin", "optout", "skills", "forget_me", "digest", "requests", "language", "catchup", "events", "pings", "app", "cancel", "desk", "offer", "partner", "fed", "ledger"]);
+const PRIVATE_ONLY = new Set(["intro", "expert", "profile", "optin", "optout", "skills", "forget_me", "digest", "requests", "language", "catchup", "events", "pings", "app", "cancel", "desk", "offer", "partner", "fed", "ledger", "passport", "continuity", "destinations", "alert", "drill"]);
 const GROUP_TYPES = new Set(["group", "supergroup"]);
 const btn = (text: string, data: string): InlineButton => ({ text, callback_data: data });
 
@@ -401,6 +403,11 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
       if (!isOwner(app, from.id)) return [];
       return ownerCommand(app, chat, cmd, pre);
   }
+  if (CONTINUITY_OWNER.has(cmd)) {
+    if (!isOwner(app, from.id)) return [];
+    const owner = await ensureMember(app.db, from.id, "owner", from.language_code);
+    return ownerContinuity(app, chat, cmd, args, owner.id);
+  }
   if (OWNER_COMMANDS.has(cmd)) {
     if (!isOwner(app, from.id)) return [];
     const owner = await ensureMember(app.db, from.id, "owner", from.language_code);
@@ -421,6 +428,7 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
   const lang = langOf(mem);
   const m = T(lang);
   if (cmd === "help") return cmdHelpNeed(app, chat, mem, args);
+  if (cmd === "passport") return cmdPassport(app, chat, mem);
   switch (cmd) {
     case "ask": {
       if (!rateOk(from.id, rateLimit(app))) {
@@ -725,6 +733,8 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
   } else if (kind === "fm") {
     if (a === "yes") {
       keys = await forgetMissions(app, mem.id);
+      const personId = await personForMember(app.db, mem.id);
+      if (personId) await forgetPerson(app.db, personId);
       const r = await forgetMember(app.db, mem.id, mem.tg_id);
       await answerCb(m.deleted);
       await reply(app, cb.from.id, m.forgetDone(r.passages, r.skills, r.intros));

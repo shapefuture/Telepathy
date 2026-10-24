@@ -12,12 +12,13 @@ import { liveCommitment, release } from "./assist/capacity";
 import { expireMissions, revokeGrants } from "./assist/missions";
 import { dispatchFed, expireExchanges, fedEnabled, partnerList, withdrawMission } from "./federation/gateway";
 import { refreshPartner } from "./federation/keys";
+import { dispatchAlertEmails } from "./continuity/alerts";
 import { bucket, computeGaps, setGapStatus } from "./assist/gaps";
 import { b, notifyOwners } from "./assist/notify";
 import { escapeHtml } from "./text";
 import { localParts, nowIso } from "./util";
 
-export const SEND_BUDGET = 36; // Telegram calls per run; with FED_BUDGET (5) stays under the 50-subrequest free limit
+export const SEND_BUDGET = 32; // Telegram calls per run; + partners (5) + emails (5) + key checks (3) stays under 50
 
 export async function runCron(app: App, now = new Date()): Promise<Record<string, number>> {
   const out: Record<string, number> = {};
@@ -83,6 +84,7 @@ export async function runCron(app: App, now = new Date()): Promise<Record<string
   });
   await step("exchanges_expired", () => expireExchanges(app.db, nowIso(now)));
   await step("fed_sent", () => dispatchFed(app));
+  await step("alert_emails", () => (app.env.CONTINUITY_KEY ? dispatchAlertEmails(app, 5) : Promise.resolve(0)));
   await step("sent", () => dispatchPending(app.db, app.tg, SEND_BUDGET));
   return out;
 }

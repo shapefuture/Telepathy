@@ -71,6 +71,12 @@ Platforms that aren't Telepathy can connect with `contracts/` (SDK, schema, Open
 vectors), or over A2A at `/a2a` (the same signed messages; agent card at
 `/.well-known/agent-card.json`).
 
+## Continuity (members reachable without Telegram)
+
+See `CONTINUITY.md`. Commands: `/continuity` (metrics), `/destinations [add|remove|resign]`,
+`/alert incident|relocation <note>`, `/drill start|end`. Partners' club roots: `/partner root <id>
+<json>` or `/partner pin <id>`, then confirm the key ids with them in person or by phone.
+
 ## When a partner asks you
 
 You get **Request from <partner>** with the type and summary only. Press **Offer: <your offer>**

@@ -54,6 +54,9 @@ describe("Mini App identity", () => {
     expect(html).toContain("telegram-web-app.js");
     expect(html.match(/<script src=/g)).toHaveLength(1); // only Telegram's script
     expect(html).not.toContain("innerHTML");
+    // The inline script must parse (a stray escape in the template once broke the whole app).
+    const script = html.split("<script>")[1]!.split("</script>")[0]!;
+    expect(() => new Function(script)).not.toThrow();
   });
 });
 

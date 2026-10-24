@@ -21,6 +21,8 @@ import { deskAction, deskActions, exchangeAction, forgetMissions, gapAction, job
 import { balances, formatAmount, parsePrice, recent, reverse } from "./ledger";
 import { bucket, openGaps } from "./gaps";
 import { applyRotation, refreshPartner, verifyRotation, type RotationProof } from "../federation/keys";
+import { verifyRoot, type RootMeta } from "../continuity/identity";
+import type { Signed } from "../continuity/crypto";
 
 const send = (app: App, chat: number, text: string, buttons?: InlineButton[][]) => app.tg.sendMessage(chat, text, { buttons });
 const isOwner = (app: App, tgId: number) => ownerIds(app.env).has(tgId);
@@ -278,6 +280,26 @@ export async function ownerAssistCommand(app: App, chat: number, cmd: string, ar
       const ok = !!p?.public_key && !!proof && (await verifyRotation(proof, p.public_key, p.id));
       if (ok) await applyRotation(app.db, p!.id, proof!, ownerMemberId);
       await send(app, chat, a.rotated(ok ? "rotated" : "rejected"));
+      return [];
+    }
+    if ((words[0] === "root" || words[0] === "pin") && words[1]) {
+      // Pin a partner's club root (CONT-8). Operators confirm it out of band; we only check that it
+      // is internally valid (threshold of its own keys) and, on update, chained to the old pin.
+      const p = await app.db.prepare("SELECT id, endpoint, root_json FROM organizations WHERE id=? AND kind='partner'").bind(words[1]).first<{ id: string; endpoint: string | null; root_json: string | null }>();
+      let doc: unknown = null;
+      try {
+        if (words[0] === "root") doc = JSON.parse(words.slice(2).join(" "));
+        else if (p?.endpoint) doc = ((await (await (app.net ?? fetch)(`${p.endpoint}/.well-known/nexus-community.json`, { signal: AbortSignal.timeout(5000) } as RequestInit)).json()) as { root?: unknown }).root;
+      } catch {
+        doc = null;
+      }
+      const v = p && doc ? await verifyRoot(doc as Signed<RootMeta>, p.root_json ? JSON.parse(p.root_json) : null) : { ok: false as const, reason: "unknown" };
+      if (v.ok) {
+        await app.db.prepare("UPDATE organizations SET root_json=? WHERE id=?").bind(JSON.stringify(doc), p!.id).run();
+        await audit(app.db, "partner.root_pinned", ownerMemberId, p!.id);
+        const r = (doc as Signed<RootMeta>).signed;
+        await send(app, chat, `Root pinned for <code>${escapeHtml(p!.id)}</code>: ${escapeHtml(r.org)} v${r.version}, ${r.threshold} of ${r.root_keys.length} keys (${r.root_keys.map((k) => k.keyid).join(", ")}). Confirm these key ids with the partner by phone or in person.`);
+      } else await send(app, chat, `Not pinned: <code>${escapeHtml(v.ok ? "" : v.reason)}</code>`);
       return [];
     }
     if (words[0] === "suspend" && words[1]) {

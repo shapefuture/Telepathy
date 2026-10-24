@@ -19,3 +19,9 @@
 | A2A as a bypass | A2A only carries signed nexus messages through the same `receive` | slices: "A2A transport" |
 | Ledger tampering / double posting | balanced entries only, one txn per business key, one reversal | slices: "ledger" |
 | Gap signals identifying people | ≥ 5 distinct members, coarse buckets, no ids | slices: "gap signals" |
+| Address hijack via stolen online key | primary changes need root threshold + relocation record | continuity: "a stolen online key can't move the audience" |
+| Old consent revived by a restore | versioned ops; newest import wins; tombstones at send time | continuity: "restores can't re-enable an unfollow" |
+| Email enumeration on login | same response shape for known and unknown addresses | continuity: "no address enumeration" |
+| Portal CSRF / session theft | SameSite=Strict HttpOnly cookie, x-portal header, 2 factors for alerts | continuity: portal tests |
+| Partner relays a fake relocation | verified against a pinned root, root-signed only | continuity: "forged or unpinned notices are refused" |
+| Member list leakage via passes | pairwise pseudonym, one audience, 7 days | continuity: "a pass proves membership to one partner" |

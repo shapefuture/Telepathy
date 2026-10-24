@@ -26,6 +26,9 @@ import { answer, parseFilters } from "./search";
 import { createTelegram, type Fetcher } from "./telegram";
 import { audit, DAY, HOUR, localParts, nowIso, safeEqual } from "./util";
 import { PAGE } from "./app-page";
+import { activeAttestations, addEmail, checkCode, ContinuityError, enrolFromTelegram, follows, forgetPerson, newRecoveryCodes, personalExport, personForMember, protection, refreshMembership, revokeEndpoint, setTopic, TOPICS, type Topic } from "./continuity/people";
+import { currentManifest } from "./continuity/identity";
+import { issuePass } from "./continuity/passport";
 
 export const INIT_DATA_MAX_AGE_S = 24 * 3600;
 
@@ -165,8 +168,69 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
   if (key === "POST forget") {
     if (body.confirm !== "forget") return out({ ok: false }, undefined, 400);
     const keys = await forgetMissions(app, m.id);
+    const personId = await personForMember(db, m.id);
+    if (personId) await forgetPerson(db, personId);
     const r = await forgetMember(db, m.id, m.tg_id);
     return out({ ok: true, ...r }, keys);
+  }
+
+  // ---- passport (CONT-2..4, 7): independent link to the club, only by the member's own action ----
+  if (p[0] === "passport") {
+    if (!app.env.CONTINUITY_KEY) return out({ error: "continuity off" }, undefined, 404);
+    let personId = await personForMember(db, m.id);
+    if (key === "GET passport" && !p[1]) {
+      if (personId) await refreshMembership(db, personId, m);
+      const man = await currentManifest(db);
+      const partners = (await partnerList(db)).filter((x) => x.status === "active").map((x) => ({ id: x.id, label: x.brand_label }));
+      return out({
+        topics: TOPICS,
+        protection: await protection(app.env, db, personId),
+        memberships: personId ? await activeAttestations(db, personId) : [],
+        destinations: man?.signed.destinations ?? [],
+        manifestVersion: man?.signed.version ?? null,
+        portal: app.env.PUBLIC_URL ? `${app.env.PUBLIC_URL.replace(/\/$/, "")}/portal` : null,
+        partners,
+      });
+    }
+    if (key === "POST passport" && p[1] === "enrol") {
+      personId = await enrolFromTelegram(db, m);
+      await refreshMembership(db, personId, m);
+      // Topics chosen on the enrolment screen; nothing is pre-selected server-side.
+      const chosen = Array.isArray(body.topics) ? (body.topics as unknown[]).filter((t): t is Topic => TOPICS.includes(t as Topic)) : [];
+      for (const t of chosen) await setTopic(app, personId, t, true);
+      return out({ ok: true });
+    }
+    if (!personId) return out({ error: "not enrolled" }, undefined, 409);
+    if (key === "POST passport" && p[1] === "email" && !p[2]) {
+      try {
+        const r = await addEmail(app, personId, String(body.email ?? ""));
+        return out({ ok: true, registration: r.registrationId, sent: r.sent });
+      } catch (e) {
+        if (e instanceof ContinuityError) return out({ ok: false, reason: e.message }, undefined, 400);
+        throw e;
+      }
+    }
+    if (key === "POST passport" && p[1] === "email" && p[2] === "verify") return out({ ok: (await checkCode(app, String(body.registration ?? ""), String(body.code ?? ""), "verify")) === personId });
+    if (key === "POST passport" && p[1] === "recovery") return out({ codes: await newRecoveryCodes(app.env, db, personId) });
+    if (key === "POST passport" && p[1] === "topic") {
+      if (!TOPICS.includes(body.topic as Topic)) return out({ ok: false }, undefined, 400);
+      await setTopic(app, personId, body.topic as Topic, body.on === true);
+      return out({ ok: true, topics: await follows(db, personId) });
+    }
+    if (key === "POST passport" && p[1] === "revoke") return out({ ok: await revokeEndpoint(db, personId, String(body.registration ?? "")) });
+    if (key === "GET passport" && p[1] === "export") return out(await personalExport(app.env, db, personId));
+    if (key === "POST passport" && p[1] === "pass") {
+      const partner = (await partnerList(db)).find((x) => x.id === body.audience && x.status === "active");
+      if (!partner) return out({ ok: false, reason: "unknown_partner" }, undefined, 400);
+      const pass = await issuePass(app, personId, partner.id);
+      return out(pass ? { ok: true, pass } : { ok: false, reason: "no_membership" });
+    }
+    if (key === "POST passport" && p[1] === "forget") {
+      if (body.confirm !== "forget") return out({ ok: false }, undefined, 400);
+      await forgetPerson(db, personId);
+      return out({ ok: true });
+    }
+    return notFound();
   }
 
   // ---- search ------------------------------------------------------------------------------

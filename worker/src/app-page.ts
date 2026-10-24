@@ -52,7 +52,15 @@ forgotten:"Deleted.",needs:"Open intro requests",withdraw:"Withdraw",dReq:"Reque
 mayShare:"may ask partners",caseT:"Case type",manual:"Carry by hand",copy:"Copy",copied:"Copied",markSent:"Marked sent",addOffer:"Publish an offer",
 skill:"Skill",slots:"Slots",mode:"Terms",price:"Price, e.g. 49.90EUR",desc:"Description",publish:"Publish",used:"used",report:"Stages",gaps:"Unserved needs (5+ members)",
 gapAct:"Create capacity",dismiss:"Dismiss",ledger:"Ledger (+ = partner owes you)",health:"Health",fedOff:"Partner gateway is off.",contact:"Contact",
-openApp:"Open this from the Telepathy bot.",err:"Something went wrong. Try again.",empty:"Nothing here."},
+openApp:"Open this from the Telepathy bot.",err:"Something went wrong. Try again.",empty:"Nothing here.",
+pass:"Passport",passWhy:"Stay connected to your community even if this chat changes or Telegram is unavailable. You choose what you receive; nothing is turned on without you.",
+passKeep:"Keep my connection",lvl_protected:"Protected: you can log in and be reached without Telegram.",lvl_login_only:"You can log in without Telegram, but critical notices have no verified route yet.",
+lvl_not_yet_protected:"Not yet protected: add and verify an email.",lvl_not_enrolled:"Not set up yet.",places:"Official places",noPlaces:"Not published yet.",emails:"Email addresses",
+addEmail:"Add email",emailPh:"you@example.com",codePh:"6-digit code",verify:"Verify",codeSent:"We sent a code to that address.",mailOff:"Email sending isn't configured by the community yet.",
+recov:"Recovery codes",recovWhy:"One-time codes to log in without Telegram or email. Store them somewhere safe; they're shown only once.",recovMake:"Create recovery codes",left:"left",
+receive:"What you receive",t_critical:"Critical notices (address changes, outages)",t_events:"Events",t_requests:"Updates on my requests",t_news:"Community news",t_commercial:"Offers from the community",t_partner_offers:"Offers from partner communities",
+member:"Membership",noMember:"No current membership on record. Your subscriptions stay yours either way.",passFor:"Membership pass for a partner",makePass:"Create pass",passNote:"Valid 7 days, only for this partner, under a pseudonym. Copy it and give it to the partner.",
+portal:"Open the portal (works without Telegram)",export:"Download my data",delPass:"Delete my passport",delPassQ:"Delete your addresses, subscriptions and recovery codes? Your addresses stay blocked from future messages.",remove:"Remove"},
 ru:{home:"Главная",ask:"Поиск",req:"Запросы",ev:"События",me:"Профиль",desk:"Пульт",hi:"Привет! Что нужно?",askPh:"Спросите свои группы…",search:"Искать",
 needHelp:"Нужна помощь?",newReq:"Новый запрос",reqPh:"Что нужно? Одно-два предложения, без контактов и ссылок.",create:"Дальше",
 open:"открытых запросов",offers:"предложений вам",inv:"приглашений",catch:"Что нового",c12:"12 ч",c3:"3 дня",cLast:"С прошлого раза",nothingNew:"Ничего нового.",
@@ -71,7 +79,15 @@ forgotten:"Удалено.",needs:"Открытые запросы на знак
 mayShare:"можно спросить партнёров",caseT:"Тип случая",manual:"Передать вручную",copy:"Копировать",copied:"Скопировано",markSent:"Отправлено",addOffer:"Опубликовать предложение",
 skill:"Навык",slots:"Мест",mode:"Условия",price:"Цена, напр. 49.90EUR",desc:"Описание",publish:"Опубликовать",used:"занято",report:"Этапы",gaps:"Неудовлетворённые запросы (5+)",
 gapAct:"Создать предложение",dismiss:"Скрыть",ledger:"Учёт (+ = партнёр должен вам)",health:"Состояние",fedOff:"Шлюз партнёров выключен.",contact:"Контакт",
-openApp:"Откройте это из бота Telepathy.",err:"Что-то пошло не так. Попробуйте ещё раз.",empty:"Здесь пусто."}};
+openApp:"Откройте это из бота Telepathy.",err:"Что-то пошло не так. Попробуйте ещё раз.",empty:"Здесь пусто.",
+pass:"Паспорт",passWhy:"Оставайтесь на связи с сообществом, даже если чат изменится или Telegram будет недоступен. Вы сами выбираете, что получать; без вас ничего не включается.",
+passKeep:"Сохранить связь",lvl_protected:"Защищено: вы можете войти и получать сообщения без Telegram.",lvl_login_only:"Вы можете войти без Telegram, но для важных уведомлений ещё нет проверенного канала.",
+lvl_not_yet_protected:"Пока не защищено: добавьте и подтвердите email.",lvl_not_enrolled:"Ещё не настроено.",places:"Официальные адреса",noPlaces:"Пока не опубликованы.",emails:"Адреса email",
+addEmail:"Добавить email",emailPh:"you@example.com",codePh:"Код из 6 цифр",verify:"Подтвердить",codeSent:"Мы отправили код на этот адрес.",mailOff:"Сообщество ещё не настроило отправку писем.",
+recov:"Коды восстановления",recovWhy:"Одноразовые коды для входа без Telegram и email. Сохраните их в надёжном месте; они показываются один раз.",recovMake:"Создать коды",left:"осталось",
+receive:"Что вы получаете",t_critical:"Важные уведомления (смена адреса, сбои)",t_events:"События",t_requests:"Новости по моим запросам",t_news:"Новости сообщества",t_commercial:"Предложения сообщества",t_partner_offers:"Предложения партнёрских сообществ",
+member:"Членство",noMember:"Текущее членство не подтверждено. Ваши подписки остаются вашими в любом случае.",passFor:"Пропуск для партнёра",makePass:"Создать пропуск",passNote:"Действует 7 дней, только для этого партнёра, под псевдонимом. Скопируйте и передайте партнёру.",
+portal:"Открыть портал (работает без Telegram)",export:"Скачать мои данные",delPass:"Удалить паспорт",delPassQ:"Удалить ваши адреса, подписки и коды восстановления? Адреса останутся заблокированными для будущих рассылок.",remove:"Удалить"}};
 var S={lang:"en",me:null,tab:"home",sub:"req",draft:null,local:{},prefill:""};
 var t=function(k){return (L[S.lang]||L.en)[k]||L.en[k]||k};
 var main=document.getElementById("main"),nav=document.getElementById("nav");
@@ -100,15 +116,15 @@ function setMain(nodes){main.replaceChildren.apply(main,[].concat(nodes));window
 // ---- navigation ----
 var ICONS={home:["M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"],ask:["M4 11a7 7 0 1 0 14 0a7 7 0 1 0-14 0","M20 20l-4-4"],
  req:["M3 13h5l2 3h4l2-3h5","M5.5 5h13L21 13v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6z"],ev:["M4 5h16a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z","M3 10h18","M8 3v4","M16 3v4"],
- me:["M8 8a4 4 0 1 0 8 0a4 4 0 1 0-8 0","M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"],desk:["M3 8h18v12H3z","M8 8V5h8v3","M3 13h18"]};
+ me:["M8 8a4 4 0 1 0 8 0a4 4 0 1 0-8 0","M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"],desk:["M3 8h18v12H3z","M8 8V5h8v3","M3 13h18"],pass:["M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z","M9 12l2 2 4-4"]};
 function icon(name){var NS="http://www.w3.org/2000/svg";var svg=document.createElementNS(NS,"svg");svg.setAttribute("viewBox","0 0 24 24");svg.setAttribute("width","22");svg.setAttribute("height","22");
  svg.setAttribute("fill","none");svg.setAttribute("stroke","currentColor");svg.setAttribute("stroke-width","1.8");svg.setAttribute("stroke-linecap","round");svg.setAttribute("stroke-linejoin","round");
  ICONS[name].forEach(function(d){var p=document.createElementNS(NS,"path");p.setAttribute("d",d);svg.append(p)});return svg}
-var TABS=[["home"],["ask"],["req"],["ev"],["me"]];
+var TABS=[["home"],["ask"],["req"],["pass"],["me"]];
 function renderNav(){var tabs=TABS.slice();if(S.me&&S.me.owner)tabs.push(["desk"]);nav.replaceChildren.apply(nav,tabs.map(function(x){
  var badge=x[0]==="req"&&S.me?(S.me.counts.offers+S.me.counts.invites):0;
  return h("button",{cls:S.tab===x[0]?"on":"",onclick:function(){haptic("tap");go(x[0])}},icon(x[0]),h("span",null,t(x[0]),badge?h("span",{cls:"badge",text:String(badge)}):null))}))}
-function go(tab){S.tab=tab;renderNav();hideMain();if(tg&&tg.BackButton)tg.BackButton.hide();({home:home,ask:askView,req:reqView,ev:events,me:meView,desk:desk})[tab]()}
+function go(tab){S.tab=tab;renderNav();hideMain();if(tg&&tg.BackButton)tg.BackButton.hide();({home:home,ask:askView,req:reqView,ev:events,me:meView,desk:desk,pass:passport})[tab]()}
 var mainCb=null;function hideMain(){if(tg&&tg.MainButton){if(mainCb)tg.MainButton.offClick(mainCb);tg.MainButton.hide()}mainCb=null}
 function mainButton(text,fn){if(!tg||!tg.MainButton||!ver("6.1"))return false;hideMain();mainCb=fn;tg.MainButton.setText(text);tg.MainButton.onClick(fn);tg.MainButton.show();return true}
 function refreshMe(){return get("me").then(function(m){S.me=m;renderNav();return m})}
@@ -192,6 +208,31 @@ function eventCard(e){var d=new Date(e.starts_at);var when=d.toLocaleString(S.la
 function events(){var box=h("div",null,h("p",{cls:"muted",text:"…"}));setMain([h("h1",{text:t("ev")}),box]);
  get("events").then(function(list){box.replaceChildren.apply(box,list.length?list.map(eventCard).concat([h("div",{cls:"btns"},h("button",{cls:"sec",onclick:function(e){busy(e.target,post("events/ics")).then(function(){toast(t("sent"))})}},"📅 "+t("ics")))]):[empty(t("noEv"))])})}
 
+// ---- passport (continuity) ----
+function passport(){var box=h("div",null,h("p",{cls:"muted",text:"…"}));setMain([h("h1",{text:t("pass")}),box]);
+ get("passport").then(function(d){var p=d.protection;var out=[];
+  if(!p.enrolled){var picks={};var list=h("div",null,d.topics.map(function(tp){var c=h("input",{type:"checkbox",style:"width:auto"});c.addEventListener("change",function(){picks[tp]=c.checked});return h("label",{cls:"sw"},h("span",{text:t("t_"+tp)}),c)}));
+   out.push(card(h("p",{text:t("passWhy")}),list,h("div",{cls:"btns"},h("button",{onclick:function(e){busy(e.target,post("passport/enrol",{topics:Object.keys(picks).filter(function(k){return picks[k]})})).then(function(){haptic("success");passport()})}},t("passKeep")))));
+   box.replaceChildren.apply(box,out);return}
+  out.push(card(h("b",{cls:p.level==="protected"?"pill ok":"pill warn",text:t("lvl_"+p.level)})));
+  out.push(section(t("places")),card(d.destinations.length?d.destinations.map(function(x){return h("div",{cls:"row"},h("span",{cls:"muted",text:x.role+" · "+x.kind}),h("button",{cls:"link grow",style:"text-align:left",onclick:function(){openUrl(x.url)}},x.url))}):h("p",{cls:"muted",text:t("noPlaces")}),
+   d.manifestVersion?h("div",{cls:"muted",text:"v"+d.manifestVersion+" ✓"}):null));
+  var em=h("input",{type:"email",placeholder:t("emailPh"),autocomplete:"email"});var code=h("input",{inputmode:"numeric",placeholder:t("codePh"),style:"display:none"});var reg=null;var emsg=h("p",{cls:"muted"});
+  var emBtn=h("button",{onclick:function(e){if(!reg){busy(e.target,post("passport/email",{email:em.value})).then(function(r){if(!r.ok){toast(r.reason||t("err"));return}reg=r.registration;code.style.display="";emBtn.textContent=t("verify");emsg.textContent=r.sent==="disabled"?t("mailOff"):t("codeSent")})}
+   else busy(e.target,post("passport/email/verify",{registration:reg,code:code.value})).then(function(r){if(r.ok){haptic("success");passport()}else toast(t("err"))})}},t("addEmail"));
+  out.push(section(t("emails")),card(p.emails.map(function(x){return h("div",{cls:"row"},h("span",{cls:"grow",text:x.address}),h("span",{cls:x.status==="verified"?"pill ok":"pill warn",text:x.status}),
+   h("button",{cls:"danger",onclick:function(e){busy(e.target,post("passport/revoke",{registration:x.id})).then(passport)}},t("remove")))}),em,code,h("div",{cls:"btns"},emBtn),emsg));
+  var rc=h("div");out.push(section(t("recov")),card(h("p",{cls:"muted",text:t("recovWhy")}),h("div",{cls:"muted",text:p.recoveryCodes+" "+t("left")}),rc,h("div",{cls:"btns"},h("button",{cls:"sec",onclick:function(e){
+   busy(e.target,post("passport/recovery")).then(function(r){rc.replaceChildren(h("pre",{text:r.codes.join("\\n")}),h("button",{cls:"sec",onclick:function(){navigator.clipboard&&navigator.clipboard.writeText(r.codes.join("\\n")).then(function(){toast(t("copied"))})}},t("copy")))})}},t("recovMake")))));
+  out.push(section(t("receive")),card(d.topics.map(function(tp){var c=h("input",{type:"checkbox",style:"width:auto"});c.checked=p.topics[tp]==="following";c.addEventListener("change",function(){haptic("tap");post("passport/topic",{topic:tp,on:c.checked})});return h("label",{cls:"sw"},h("span",{text:t("t_"+tp)}),c)})));
+  out.push(section(t("member")),card(d.memberships.length?d.memberships.map(function(x){return h("div",{text:x.tier+" · "+x.expires_at.slice(0,10)})}):h("p",{cls:"muted",text:t("noMember")})));
+  if(d.partners.length&&d.memberships.length){var sel=h("select",null,d.partners.map(function(x){return h("option",{value:x.id,text:x.label})}));var po=h("div");
+   out.push(section(t("passFor")),card(h("p",{cls:"muted",text:t("passNote")}),sel,h("div",{cls:"btns"},h("button",{cls:"sec",onclick:function(e){busy(e.target,post("passport/pass",{audience:sel.value})).then(function(r){if(!r.ok){toast(r.reason);return}var j=JSON.stringify(r.pass);
+    po.replaceChildren(h("pre",{text:j}),h("button",{cls:"sec",onclick:function(){navigator.clipboard&&navigator.clipboard.writeText(j).then(function(){toast(t("copied"))})}},t("copy")))})}},t("makePass"))),po))}
+  out.push(card(d.portal?h("button",{cls:"link",onclick:function(){openUrl(d.portal)}},t("portal")+" ↗"):null,h("button",{cls:"link",onclick:function(){get("passport/export").then(function(x){var s2=JSON.stringify(x,null,1);out2.replaceChildren(h("pre",{text:s2}))})}},t("export")),
+   h("div",{cls:"btns"},h("button",{cls:"danger",onclick:function(e){ask(t("delPassQ")).then(function(ok){if(ok)busy(e.target,post("passport/forget",{confirm:"forget"})).then(passport)})}},t("delPass")))));
+  var out2=h("div");out.push(out2);box.replaceChildren.apply(box,out)}).catch(function(){box.replaceChildren(empty(t("empty")))})}
+
 // ---- me ----
 var allSkills=null;
 function meView(){var m=S.me;var sw=h("div",null,["digest","discoverable","available","reminders","routing"].map(function(f){var c=h("input",{type:"checkbox",style:"width:auto"});c.checked=!!m.flags[f];
@@ -202,7 +243,7 @@ function meView(){var m=S.me;var sw=h("div",null,["digest","discoverable","avail
  function loadSkills(){if(allSkills){dl.replaceChildren.apply(dl,allSkills.map(function(s){return h("option",{value:s.label})}));return}get("skills").then(function(x){allSkills=x;loadSkills()})}loadSkills();
  add.addEventListener("change",function(){var s=(allSkills||[]).find(function(x){return x.label===add.value})||{code:add.value};post("skills",{code:s.code,on:true}).then(function(r){if(r.ok){haptic("success");refreshMe().then(meView)}else toast(t("err"))})});
  var priv=h("div");
- setMain([h("h1",{text:t("me")}),section(t("settings")),card(sw),section(t("skills")),card(sk,add,dl),section(t("privacy")),
+ setMain([h("h1",{text:t("me")}),h("div",{cls:"btns"},h("button",{cls:"sec",onclick:function(){go("ev")}},"📅 "+t("ev"))),section(t("settings")),card(sw),section(t("skills")),card(sk,add,dl),section(t("privacy")),
   card(h("button",{cls:"link",onclick:function(){get("privacy").then(function(r){priv.replaceChildren(safe(r.html))})}},t("privacy")+" ›"),priv,
    h("div",{cls:"btns"},h("button",{cls:"danger",onclick:function(e){ask(t("forgetQ")).then(function(ok){if(ok)busy(e.target,post("forget",{confirm:"forget"})).then(function(){toast(t("forgotten"));refreshMe().then(meView)})})}},t("forget"))))])}
 
@@ -245,6 +286,6 @@ function deskIns(d){var r=d.report;var out=[section(t("report")),card(r.stages.l
  out.push(section(t("health")),card(Object.keys(d.health).map(function(k){return h("div",{cls:"row"},h("span",{cls:"grow muted",text:k}),h("span",{text:String(d.health[k])}))})));return out}
 
 // ---- start ----
-refreshMe().then(function(m){S.lang=m.lang;var sp=m.startParam||"";var tab=({ask:"ask",help:"req",requests:"req",events:"ev",profile:"me",desk:"desk"})[sp]||"home";
+refreshMe().then(function(m){S.lang=m.lang;var sp=m.startParam||"";if(!sp&&location.hash)sp=location.hash.slice(1);var tab=({ask:"ask",help:"req",requests:"req",events:"ev",profile:"me",desk:"desk",passport:"pass"})[sp]||"home";
  if(sp==="help")S.newReq=true;if(tab==="desk"&&!m.owner)tab="home";go(tab)}).catch(function(){main.replaceChildren(empty(L.en.openApp+" / "+L.ru.openApp))});
 </script></body></html>`;

@@ -7,7 +7,7 @@ import { newId } from "../util";
 import type { MessageType } from "./envelope";
 import { fedEnabled, nodeId, receive, type Received } from "./gateway";
 
-const TYPES: MessageType[] = ["inquiry", "offer", "decline", "approval", "commitment", "withdraw"];
+const TYPES: MessageType[] = ["inquiry", "offer", "decline", "approval", "commitment", "withdraw", "notice"];
 
 export function agentCard(app: App): Record<string, unknown> {
   const id = nodeId(app.env);

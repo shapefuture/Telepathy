@@ -15,6 +15,8 @@ import { escapeHtml } from "../text";
 import { audit, DAY, newId, nowIso } from "../util";
 import { postDelivery, type Terms } from "../assist/ledger";
 import { partnerKeys, refreshPartner } from "./keys";
+import { publicIdentity, verifyDestinations, verifyRoot, type DestMeta, type RootMeta } from "../continuity/identity";
+import type { Signed } from "../continuity/crypto";
 import { checkShape, SCHEMA, sha256, sign, verifySignature, MAX_BODY_BYTES, type FedMessage, type InquiryBody, type MessageType } from "./envelope";
 
 export const INQUIRY_TTL_DAYS = 14;
@@ -95,6 +97,7 @@ const PATHS: Record<MessageType, (id: string) => string> = {
   approval: (id) => `/v1/opportunities/${id}/approvals`,
   commitment: (id) => `/v1/commitments/${id}/events`,
   withdraw: (id) => `/v1/exchanges/${id}/withdraw`,
+  notice: () => "/v1/notices",
 };
 
 // ---- outbound ledger ------------------------------------------------------------------------
@@ -384,6 +387,7 @@ async function signedByPartner(app: App, p: Partner, msg: FedMessage, now: Date)
 async function apply(app: App, p: Partner, msg: FedMessage, now: Date): Promise<Received> {
   const ts = nowIso(now);
   const brand = escapeHtml(p.brand_label);
+  if (msg.type === "notice") return applyNotice(app, p, msg, now);
   if (msg.type === "inquiry") {
     const body = msg.body as unknown as InquiryBody;
     if (!partnerAccepts(p, body.job)) return fail(403, "category");
@@ -544,6 +548,7 @@ export async function handleFederation(req: Request, app: App): Promise<{ respon
   if (!fedEnabled(app.env)) return { response: new Response("not found", { status: 404 }), keys: [] };
   if (req.method === "GET" && url.pathname === "/.well-known/nexus-node.json") return { response: json(await nodeManifest(app)), keys: [] };
   if (req.method === "GET" && url.pathname === "/v1/capabilities") return { response: json({ categories: (await nodeManifest(app)).categories }), keys: [] };
+  if (req.method === "GET" && url.pathname === "/v1/relay") return { response: json({ notices: await relayList(app.db) }), keys: [] };
   if (req.method !== "POST") return { response: new Response("not found", { status: 404 }), keys: [] };
   const routes: [RegExp, MessageType[]][] = [
     [/^\/v1\/opportunities\/inquiries$/, ["inquiry"]],
@@ -551,6 +556,7 @@ export async function handleFederation(req: Request, app: App): Promise<{ respon
     [/^\/v1\/opportunities\/([\w-]{1,64})\/approvals$/, ["approval"]],
     [/^\/v1\/commitments\/([\w-]{1,64})\/events$/, ["commitment"]],
     [/^\/v1\/exchanges\/([\w-]{1,64})\/withdraw$/, ["withdraw"]],
+    [/^\/v1\/notices$/, ["notice"]],
   ];
   const hit = routes.map(([re, types]) => ({ m: re.exec(url.pathname), types })).find((r) => r.m);
   if (!hit) return { response: new Response("not found", { status: 404 }), keys: [] };
@@ -575,3 +581,60 @@ export async function expireExchanges(db: D1Database, now = nowIso()): Promise<n
   return a!.results.length;
 }
 
+
+// ---- CONT-8: rescue relay ------------------------------------------------------------------------
+
+/**
+ * A partner tells us its club moved. We accept it only if it verifies against the root we pinned
+ * for that partner (`/partner root` or `/partner pin`), including a proper root rotation chain and
+ * a root-signed relocation. Then we relay it publicly at GET /v1/relay and tell our operators.
+ * No member data travels: the notice is the partner's public identity document.
+ */
+async function applyNotice(app: App, p: Partner & { root_json?: string | null }, msg: FedMessage, now: Date): Promise<Received> {
+  const pinned = p.root_json ? (JSON.parse(p.root_json) as Signed<RootMeta>) : null;
+  if (!pinned) return fail(403, "no_pinned_root");
+  const c = msg.body.community as { root?: Signed<RootMeta>; destinations?: Signed<DestMeta> } | undefined;
+  if (!c?.root || !c.destinations) return fail(400, "community");
+  let root = pinned;
+  if (c.root.signed?.version !== pinned.signed.version) {
+    const v = await verifyRoot(c.root, pinned, nowIso(now));
+    if (!v.ok) return fail(403, v.reason);
+    root = c.root;
+  }
+  const last = await app.db.prepare("SELECT json FROM relay_notices WHERE partner_id=?").bind(p.id).first<{ json: string }>();
+  const lastDest = last ? ((JSON.parse(last.json) as { destinations: Signed<DestMeta> }).destinations) : null;
+  const v = await verifyDestinations(c.destinations, root, lastDest, nowIso(now));
+  if (!v.ok) return fail(403, v.reason);
+  if (!v.relocation) return fail(400, "not_a_relocation");
+  await app.db.batch([
+    app.db.prepare("UPDATE organizations SET root_json=? WHERE id=?").bind(JSON.stringify(root), p.id),
+    app.db
+      .prepare("INSERT INTO relay_notices(partner_id, manifest_version, json, received_at) VALUES (?,?,?,?) ON CONFLICT(partner_id) DO UPDATE SET manifest_version=excluded.manifest_version, json=excluded.json, received_at=excluded.received_at WHERE excluded.manifest_version > relay_notices.manifest_version")
+      .bind(p.id, c.destinations.signed.version, JSON.stringify({ root, destinations: c.destinations }), nowIso(now)),
+  ]);
+  const primary = c.destinations.signed.destinations.find((d) => d.role === "primary")!.url;
+  return ok(await notifyOwners(app, `relay:${p.id}:${c.destinations.signed.version}`, () => ({ text: `🔁 <b>${escapeHtml(p.brand_label)}</b> moved (verified with their club key): ${escapeHtml(primary)}` })));
+}
+
+/** Send our current (relocation) identity to every active partner with a key. */
+export async function relayRelocation(app: App): Promise<number> {
+  if (!fedEnabled(app.env)) return 0;
+  const community = await publicIdentity(app.db);
+  if (!community) return 0;
+  const version = (community.destinations as Signed<DestMeta> | null)?.signed.version ?? 0;
+  let n = 0;
+  for (const p of await partnerList(app.db)) {
+    if (p.status !== "active" || !p.public_key) continue;
+    await enqueue(app, p, "notice", `relay-${version}`, { community }, `notice:${p.id}:${version}`);
+    n++;
+  }
+  return n;
+}
+
+export async function relayList(db: D1Database): Promise<unknown[]> {
+  const { results } = await db.prepare("SELECT r.partner_id, r.manifest_version, r.json, o.brand_label FROM relay_notices r JOIN organizations o ON o.id=r.partner_id ORDER BY r.received_at DESC").all<{ partner_id: string; manifest_version: number; json: string; brand_label: string }>();
+  return results.map((r) => {
+    const doc = JSON.parse(r.json) as { root: Signed<RootMeta>; destinations: Signed<DestMeta> };
+    return { partner: r.partner_id, name: r.brand_label, version: r.manifest_version, primary: doc.destinations.signed.destinations.find((d) => d.role === "primary")?.url, community: doc };
+  });
+}

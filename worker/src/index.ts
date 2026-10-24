@@ -3,7 +3,12 @@
 import { handleUpdate, status, type App, type Update } from "./bot";
 import { handleApp } from "./app";
 import { agentCard, handleA2A } from "./federation/a2a";
-import { fedEnabled, handleFederation } from "./federation/gateway";
+import { fedEnabled, handleFederation, relayRelocation } from "./federation/gateway";
+import { handlePortal } from "./continuity/portal";
+import { installManifest, installRoot, publicIdentity } from "./continuity/identity";
+import { attestationStatus } from "./continuity/passport";
+import { exportBundle, importBundle, PortableError } from "./continuity/portable";
+import { metrics as continuityMetrics } from "./continuity/alerts";
 import { runCron } from "./cron";
 import type { Env } from "./env";
 import { MAX_CHUNKS, storeChunks } from "./ingest";
@@ -27,6 +32,7 @@ export const COMMANDS = [
   { command: "catchup", description: "What's new since last time" },
   { command: "events", description: "Upcoming events" },
   { command: "app", description: "Open the Telepathy app" },
+  { command: "passport", description: "Stay connected even without this chat" },
   { command: "help", description: "All commands, or /help <need> to ask for help" },
 ];
 
@@ -44,6 +50,14 @@ function bearerOk(req: Request, env: Env): boolean {
 export async function handleFetch(req: Request, env: Env, fetcher?: Fetcher, net?: Fetcher): Promise<Response> {
   const url = new URL(req.url);
   if (req.method === "GET" && url.pathname === "/health") return new Response("ok");
+  // ---- Continuity: public identity, attestation status, independent portal ----
+  if (req.method === "GET" && url.pathname === "/.well-known/nexus-community.json") {
+    const doc = await publicIdentity(env.DB);
+    return doc ? new Response(JSON.stringify(doc), { headers: { "content-type": "application/json", "access-control-allow-origin": "*", "cache-control": "max-age=300" } }) : new Response("not found", { status: 404 });
+  }
+  const att = /^\/v1\/attestations\/([0-9a-f]{32})\/status$/.exec(url.pathname);
+  if (req.method === "GET" && att) return json({ status: await attestationStatus(env.DB, att[1]!) });
+  if (url.pathname === "/portal" || url.pathname.startsWith("/portal/")) return handlePortal(req, makeApp(env, fetcher, net));
   if (url.pathname === "/a2a" || url.pathname === "/.well-known/agent-card.json" || url.pathname === "/.well-known/agent.json") {
     // A2A transport for the same signed messages (off unless federation is on).
     if (!fedEnabled(env)) return new Response("not found", { status: 404 });
@@ -102,7 +116,7 @@ export async function handleFetch(req: Request, env: Env, fetcher?: Fetcher, net
 
   if (url.pathname.startsWith("/admin/")) {
     if (!bearerOk(req, env)) return new Response("unauthorized", { status: 401 });
-    const app = makeApp(env, fetcher);
+    const app = makeApp(env, fetcher, net);
     if (req.method === "POST" && url.pathname === "/admin/setup") {
       const hook = await app.tg.call("setWebhook", {
         url: `${url.origin}/telegram`,
@@ -119,6 +133,30 @@ export async function handleFetch(req: Request, env: Env, fetcher?: Fetcher, net
     if (req.method === "POST" && url.pathname === "/admin/cron") return json(await runCron(app));
     if (req.method === "GET" && url.pathname === "/admin/docs/pending") return json(await pendingDocs(env.DB, Number(url.searchParams.get("limit") ?? "10")));
     if (req.method === "POST" && url.pathname === "/admin/docs/result") return json(await docResult(env.DB, await req.json()));
+    // Continuity administration (CONT-1, 5, 9). Root and relocation documents are signed offline.
+    if (req.method === "POST" && url.pathname === "/admin/identity/root") return json(await installRoot(env.DB, await req.json(), "admin"));
+    if (req.method === "POST" && url.pathname === "/admin/identity/manifest") {
+      const v = await installManifest(env.DB, await req.json(), "admin");
+      const relayed = v.ok && v.relocation ? await relayRelocation(app) : 0;
+      return json({ ...v, relayed });
+    }
+    if (req.method === "GET" && url.pathname === "/admin/continuity/export") {
+      try {
+        return json(await exportBundle(app));
+      } catch (e) {
+        if (e instanceof PortableError) return json({ error: e.message }, 409);
+        throw e;
+      }
+    }
+    if (req.method === "POST" && url.pathname === "/admin/continuity/import") {
+      try {
+        return json(await importBundle(app, await req.json(), "admin"));
+      } catch (e) {
+        if (e instanceof PortableError) return json({ error: e.message }, 409);
+        throw e;
+      }
+    }
+    if (req.method === "GET" && url.pathname === "/admin/continuity/metrics") return json(await continuityMetrics(env.DB));
   }
   return new Response("not found", { status: 404 });
 }

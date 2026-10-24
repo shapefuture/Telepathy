@@ -59,6 +59,15 @@ permissions after 14.
 and nobody could provide it, as a rough count ("5+", "10+") without names, so they can arrange
 new help. It never shows who asked.
 
+**Passport (optional).** If you choose to, you can add an email address and recovery codes so you
+can reach this community without Telegram. You pick what you receive (critical notices, events,
+updates on your requests, news, community offers, partner offers), each separately, and can change
+it any time in the app or the portal without Telegram. Your email address is stored encrypted and
+is sent to our email provider [name it here] only to deliver what you chose. When you unsubscribe
+or delete your passport, we keep a one-way fingerprint of the address so it can't be re-enabled by
+a restore or an import; it identifies nothing else. A membership pass you create for a partner
+shows only your membership level, under a pseudonym that differs for each partner.
+
 **Your controls.**
 - `/profile`: see and change everything stored about your discoverability and your digest.
 - `/optout`: stop being discoverable.

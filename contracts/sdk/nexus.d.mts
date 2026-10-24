@@ -1,5 +1,5 @@
 export declare const SCHEMA: "nexus.v1";
-export type MessageType = "inquiry" | "offer" | "decline" | "approval" | "commitment" | "withdraw";
+export type MessageType = "inquiry" | "offer" | "decline" | "approval" | "commitment" | "withdraw" | "notice";
 export interface NexusMessage {
   schema: "nexus.v1";
   type: MessageType;
@@ -21,3 +21,12 @@ export declare function buildMessage(o: { type: MessageType; exchangeId: string;
 export declare function inquiryBody(o: { missionRef: string; job: string; summary: string; criteria?: Record<string, unknown>; policyVersion?: number }): Record<string, unknown>;
 export declare function pathFor(msg: NexusMessage): string;
 export declare function send(endpoint: string, signed: NexusMessage, fetchImpl?: typeof fetch): Promise<{ status: number; body: unknown }>;
+export interface PubKey { keyid: string; key: string }
+export interface Signed<T> { signed: T; signatures: { keyid: string; sig: string }[] }
+export type Verdict = { ok: true; relocation?: boolean } | { ok: false; reason: string };
+export declare function keyId(publicKeyB64: string): Promise<string>;
+export declare function countValid(doc: Signed<unknown>, keys: PubKey[]): Promise<number>;
+export declare function verifyRoot(doc: Signed<any>, trusted: Signed<any> | null, now?: string): Promise<Verdict>;
+export declare function verifyDestinations(doc: Signed<any>, root: Signed<any>, last: Signed<any> | null, now?: string): Promise<Verdict>;
+export declare function verifyPass(pass: Signed<any>, issuerRoot: Signed<any>, me: string, now?: string): Promise<{ ok: boolean; reason?: string; claim?: any }>;
+export declare function followStateFrom(bundles: Signed<any>[]): Record<string, string>;

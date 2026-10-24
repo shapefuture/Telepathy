@@ -9,7 +9,7 @@ export const MAX_BODY_BYTES = 16 * 1024;
 export const MAX_TTL_MS = 15 * 24 * 3_600_000;
 export const CLOCK_SKEW_MS = 5 * 60_000;
 
-export type MessageType = "inquiry" | "offer" | "decline" | "approval" | "commitment" | "withdraw";
+export type MessageType = "inquiry" | "offer" | "decline" | "approval" | "commitment" | "withdraw" | "notice";
 
 export interface FedMessage {
   schema: typeof SCHEMA;
@@ -95,7 +95,7 @@ export function checkShape(msg: unknown, now: number): string | null {
   if (!msg || typeof msg !== "object") return "not_object";
   const m = msg as FedMessage;
   if (m.schema !== SCHEMA) return "schema";
-  if (!["inquiry", "offer", "decline", "approval", "commitment", "withdraw"].includes(m.type)) return "type";
+  if (!["inquiry", "offer", "decline", "approval", "commitment", "withdraw", "notice"].includes(m.type)) return "type";
   for (const k of ["exchange_id", "issuer_org", "recipient_org", "issued_at", "expires_at", "nonce"] as const) {
     if (typeof m[k] !== "string" || !m[k] || m[k].length > 200) return `field:${k}`;
   }

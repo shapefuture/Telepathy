@@ -106,3 +106,11 @@ describe("a Telegram failure in one part of an update doesn't skip the rest", ()
     expect(row?.body).toBe(text);
   });
 });
+
+describe("redact before Beam", () => {
+  it("masks tg:// and telegram.me links, which carry Telegram ids and usernames", () => {
+    const r = redact("ask him directly tg://user?id=123456789 or tg://resolve?domain=anna_k, or telegram.me/boris_v");
+    expect(r).not.toMatch(/123456789|anna_k|boris_v|tg:\/\//);
+  });
+
+});

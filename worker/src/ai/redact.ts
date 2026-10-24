@@ -3,7 +3,7 @@
 
 const RULES: [RegExp, string][] = [
   [/\b[\w.+-]+@[\w-]+(\.[\w-]+)+\b/g, "[email]"],
-  [/\bhttps?:\/\/\S+|\bt\.me\/\S+|\bwww\.\S+/gi, "[link]"],
+  [/\bhttps?:\/\/\S+|\bt\.me\/\S+|\bwww\.\S+|\btelegram\.me\/\S+|\btg:\/\/\S+/gi, "[link]"], // tg:// and telegram.me links carry ids and usernames
   [/(^|[^\w])@[A-Za-z][\w]{3,31}\b/g, "$1[user]"],
   [/\b(?:\d[ -]?){13,19}\b/g, "[card]"], // card-like numbers, before phones
   [/(?:\+|\b)\d[\d ()-]{8,}\d\b/g, "[phone]"],

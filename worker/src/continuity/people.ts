@@ -125,8 +125,9 @@ export async function issueCode(app: App, registrationId: string, purpose: "veri
   return deliver(app, reg, { title: `${label}: your code ${code}`, text: `Your ${label} code is ${code}. It expires in 10 minutes.\n\nIf you didn't ask for it, ignore this message.` });
 }
 
-/** Check a code; on success the registration is verified. Returns the person id. */
-export async function checkCode(app: App, registrationId: string, code: string, purpose: "verify" | "login", now = new Date()): Promise<string | null> {
+/** Check a code; on success the registration is verified. Returns the person id. With `forPerson`, only that person's registration. */
+export async function checkCode(app: App, registrationId: string, code: string, purpose: "verify" | "login", now = new Date(), forPerson?: string): Promise<string | null> {
+  if (forPerson && !(await app.db.prepare("SELECT 1 FROM delivery_registrations WHERE id=? AND person_id=?").bind(registrationId, forPerson).first())) return null;
   const row = await app.db
     .prepare("SELECT id, code_hash, attempts FROM login_codes WHERE registration_id=? AND purpose=? AND used_at IS NULL AND expires_at>? ORDER BY expires_at DESC LIMIT 1")
     .bind(registrationId, purpose, nowIso(now))
@@ -137,8 +138,8 @@ export async function checkCode(app: App, registrationId: string, code: string, 
   const won = await app.db.prepare(`UPDATE login_codes SET attempts=attempts+1${ok ? ", used_at=?" : ""} WHERE id=? AND used_at IS NULL AND attempts<? RETURNING id`).bind(...(ok ? [nowIso(now), row.id] : [row.id]), CODE_MAX_ATTEMPTS).first();
   if (!ok || !won) return null;
   const reg = await app.db
-    .prepare("UPDATE delivery_registrations SET status='verified', verified_at=COALESCE(verified_at, ?) WHERE id=? AND status<>'revoked' RETURNING person_id, suppress_hash")
-    .bind(nowIso(now), registrationId)
+    .prepare("UPDATE delivery_registrations SET status='verified', verified_at=COALESCE(verified_at, ?) WHERE id=? AND status<>'revoked' AND person_id=COALESCE(?, person_id) RETURNING person_id, suppress_hash")
+    .bind(nowIso(now), registrationId, forPerson ?? null)
     .first<{ person_id: string; suppress_hash: string }>();
   // Re-verifying an address is a new explicit action: it lifts an earlier endpoint revocation.
   if (reg) {

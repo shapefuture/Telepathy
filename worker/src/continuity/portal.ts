@@ -133,7 +133,7 @@ export async function handlePortal(req: Request, app: App): Promise<Response> {
       throw e;
     }
   }
-  if (route === "email/verify" && req.method === "POST") return json({ ok: !!(await checkCode(app, String(body.registration ?? ""), String(body.code ?? ""), "verify")) });
+  if (route === "email/verify" && req.method === "POST") return json({ ok: !!(await checkCode(app, String(body.registration ?? ""), String(body.code ?? ""), "verify", new Date(), s.personId)) });
   if (route === "revoke" && req.method === "POST") return json({ ok: await revokeEndpoint(app.db, s.personId, String(body.registration ?? "")) });
   if (route === "export" && req.method === "GET") return json({ ...(await personalExport(app.env, app.db, s.personId)), receipts: await receiptsFor(app, s.personId) }, 200, { "content-disposition": "attachment; filename=my-community-relationship.json" });
   if (route === "forget" && req.method === "POST" && body.confirm === "forget") {

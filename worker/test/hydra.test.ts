@@ -912,3 +912,17 @@ describe("audit: imports", () => {
     expect(sms!.person_id).not.toBe(stranger);
   });
 });
+
+describe("audit: verifying an address", () => {
+  it("a member's code never verifies an address that someone else has since claimed", async () => {
+    const n = node();
+    await setup(n, 95, 96);
+    const a = await member(n, 95, "m95@proton.me");
+    const b = await member(n, 96, "m96@proton.me");
+    const reg = (await a("POST", "email", { email: "second95@proton.me" })).json.registration;
+    expect((await b("POST", "email", { email: "second95@proton.me" })).json.registration).toBe(reg); // pending: B can claim it
+    // A sees two codes in their inbox and tries them.
+    for (const m of n.mails.filter((x) => x.to === "second95@proton.me")) expect((await a("POST", "email/verify", { registration: reg, code: codeIn(m.text) })).json.ok).toBe(false);
+    expect(await q("SELECT status FROM delivery_registrations WHERE id=?", reg)).toEqual({ status: "pending" });
+  });
+});

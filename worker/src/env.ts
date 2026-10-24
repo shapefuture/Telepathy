@@ -78,6 +78,17 @@ export interface Env {
   ESCROW_TARGETS?: string;
   /** Optional R2 bucket binding for one escrow copy (a second storage kind next to D1). */
   ESCROW_R2?: R2Bucket;
+  // ---- AI summaries (off until OLLAMA_API_KEY is set; docs/AI.md) ----
+  /** Secret: Ollama Cloud API key. Only redacted conversation text is sent. */
+  OLLAMA_API_KEY?: string;
+  /** Model name, default "beam" (some accounts need "beam:cloud"). */
+  BEAM_MODEL?: string;
+  /** API origin, default https://ollama.com. */
+  OLLAMA_URL?: string;
+  /** Cloudflare Workers AI binding: backup when Beam is unset or fails. Data stays in this account. */
+  AI?: Ai;
+  /** Workers AI model (default @cf/meta/llama-3.3-70b-instruct-fp8-fast); "off" disables the backup. */
+  WORKERS_AI_MODEL?: string;
 }
 
 export function ownerIds(env: Env): Set<number> {

@@ -125,19 +125,21 @@ export async function issueCode(app: App, registrationId: string, purpose: "veri
   return deliver(app, reg, { title: `${label}: your code ${code}`, text: `Your ${label} code is ${code}. It expires in 10 minutes.\n\nIf you didn't ask for it, ignore this message.` });
 }
 
-/** Check a code; on success the registration is verified. Returns the person id. */
-export async function checkCode(app: App, registrationId: string, code: string, purpose: "verify" | "login", now = new Date()): Promise<string | null> {
+/** Check a code; on success the registration is verified. Returns the person id. With `forPerson`, only that person's registration. */
+export async function checkCode(app: App, registrationId: string, code: string, purpose: "verify" | "login", now = new Date(), forPerson?: string): Promise<string | null> {
+  if (forPerson && !(await app.db.prepare("SELECT 1 FROM delivery_registrations WHERE id=? AND person_id=?").bind(registrationId, forPerson).first())) return null;
   const row = await app.db
     .prepare("SELECT id, code_hash, attempts FROM login_codes WHERE registration_id=? AND purpose=? AND used_at IS NULL AND expires_at>? ORDER BY expires_at DESC LIMIT 1")
     .bind(registrationId, purpose, nowIso(now))
     .first<{ id: string; code_hash: string; attempts: number }>();
   if (!row || row.attempts >= CODE_MAX_ATTEMPTS) return null;
   const ok = row.code_hash === (await hmacHex(app.env.CONTINUITY_KEY, "code", `${registrationId}:${code.trim()}`));
-  await app.db.prepare(`UPDATE login_codes SET attempts=attempts+1${ok ? ", used_at=?" : ""} WHERE id=?`).bind(...(ok ? [nowIso(now), row.id] : [row.id])).run();
-  if (!ok) return null;
+  // Atomic: parallel requests can't each pass the checks above and all use the same code.
+  const won = await app.db.prepare(`UPDATE login_codes SET attempts=attempts+1${ok ? ", used_at=?" : ""} WHERE id=? AND used_at IS NULL AND attempts<? RETURNING id`).bind(...(ok ? [nowIso(now), row.id] : [row.id]), CODE_MAX_ATTEMPTS).first();
+  if (!ok || !won) return null;
   const reg = await app.db
-    .prepare("UPDATE delivery_registrations SET status='verified', verified_at=COALESCE(verified_at, ?) WHERE id=? AND status<>'revoked' RETURNING person_id, suppress_hash")
-    .bind(nowIso(now), registrationId)
+    .prepare("UPDATE delivery_registrations SET status='verified', verified_at=COALESCE(verified_at, ?) WHERE id=? AND status<>'revoked' AND person_id=COALESCE(?, person_id) RETURNING person_id, suppress_hash")
+    .bind(nowIso(now), registrationId, forPerson ?? null)
     .first<{ person_id: string; suppress_hash: string }>();
   // Re-verifying an address is a new explicit action: it lifts an earlier endpoint revocation.
   if (reg) {
@@ -181,20 +183,44 @@ export async function useRecoveryCode(env: Env, db: D1Database, code: string, no
   return r?.person_id ?? null;
 }
 
-export async function newSession(env: Env, db: D1Database, personId: string, method: string, now = new Date()): Promise<string> {
+/** Login methods that can arrive in the same inbox count as one factor. */
+export const factorOf = (method: string) => (method === "email_code" || method === "head_code" ? "code" : method);
+const STRONG_WINDOW_MS = 15 * 60_000;
+
+/** `priorToken`: the session this browser already had, if any; a login made on top of it is linked. */
+export async function newSession(env: Env, db: D1Database, personId: string, method: string, now = new Date(), priorToken?: string | null): Promise<string> {
   const token = randomToken();
-  await db.prepare("INSERT INTO sessions(token_hash, person_id, method, created_at, expires_at) VALUES (?,?,?,?,?)").bind(await hmacHex(env.CONTINUITY_KEY, "session", token), personId, method, nowIso(now), nowIso(new Date(now.getTime() + SESSION_DAYS * DAY))).run();
+  let parent: string | null = null;
+  if (priorToken) {
+    const h = await hmacHex(env.CONTINUITY_KEY, "session", priorToken);
+    const prior = await db.prepare("SELECT token_hash FROM sessions WHERE token_hash=? AND person_id=? AND revoked_at IS NULL AND expires_at>?").bind(h, personId, nowIso(now)).first<{ token_hash: string }>();
+    parent = prior?.token_hash ?? null;
+  }
+  await db
+    .prepare("INSERT INTO sessions(token_hash, person_id, method, created_at, expires_at, parent_hash) VALUES (?,?,?,?,?,?)")
+    .bind(await hmacHex(env.CONTINUITY_KEY, "session", token), personId, method, nowIso(now), nowIso(new Date(now.getTime() + SESSION_DAYS * DAY)), parent)
+    .run();
   return token;
 }
 
+/** `methods`: the factors used in THIS browser's chain of logins within the last 15 minutes. */
 export async function sessionPerson(env: Env, db: D1Database, token: string | null, now = nowIso()): Promise<{ personId: string; methods: string[] } | null> {
   if (!token) return null;
   const h = await hmacHex(env.CONTINUITY_KEY, "session", token);
   const s = await db.prepare("SELECT s.person_id FROM sessions s JOIN people p ON p.id=s.person_id WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>? AND p.removed_at IS NULL").bind(h, now).first<{ person_id: string }>();
   if (!s) return null;
-  // Methods used recently by this person (strong auth = two different factors within 15 minutes).
-  const { results } = await db.prepare("SELECT DISTINCT method FROM sessions WHERE person_id=? AND revoked_at IS NULL AND created_at>?").bind(s.person_id, nowIso(new Date(Date.parse(now) - 15 * 60_000))).all<{ method: string }>();
-  return { personId: s.person_id, methods: results.map((r) => r.method) };
+  const since = nowIso(new Date(Date.parse(now) - STRONG_WINDOW_MS));
+  const { results } = await db
+    .prepare(
+      "WITH RECURSIVE chain(token_hash, parent_hash, method, created_at, depth) AS (" +
+        "SELECT token_hash, parent_hash, method, created_at, 0 FROM sessions WHERE token_hash=? " +
+        "UNION ALL SELECT x.token_hash, x.parent_hash, x.method, x.created_at, c.depth+1 FROM sessions x JOIN chain c ON x.token_hash=c.parent_hash " +
+        "WHERE x.person_id=? AND x.revoked_at IS NULL AND c.depth<5) " +
+        "SELECT DISTINCT method FROM chain WHERE created_at>?",
+    )
+    .bind(h, s.person_id, since)
+    .all<{ method: string }>();
+  return { personId: s.person_id, methods: [...new Set(results.map((r) => factorOf(r.method)))] };
 }
 
 export async function endSession(env: Env, db: D1Database, token: string): Promise<void> {
@@ -290,8 +316,9 @@ export async function forgetPerson(db: D1Database, personId: string): Promise<vo
   const now = nowIso();
   await db.batch([
     db.prepare("INSERT OR IGNORE INTO suppressions(address_hash, scope, created_at) SELECT suppress_hash, '*', ? FROM delivery_registrations WHERE person_id=?").bind(now, personId),
+    // This person's codes only: their heads' codes and their passport-id login codes ('h:<person>').
+    db.prepare("DELETE FROM login_codes WHERE registration_id IN (SELECT id FROM delivery_registrations WHERE person_id=?) OR registration_id=?").bind(personId, `h:${personId}`),
     db.prepare("DELETE FROM delivery_registrations WHERE person_id=?").bind(personId),
-    db.prepare("DELETE FROM login_codes WHERE registration_id NOT IN (SELECT id FROM delivery_registrations)"),
     db.prepare("DELETE FROM recovery_codes WHERE person_id=?").bind(personId),
     db.prepare("UPDATE login_factors SET status='revoked', secret_enc=NULL WHERE person_id=?").bind(personId),
     db.prepare("UPDATE guardians SET status='removed' WHERE person_id=? OR guardian_id=?").bind(personId, personId),

@@ -24,11 +24,11 @@ describe("P13-04 Russian / English interface", () => {
     await enableGroup(app);
     await feed(app, groupMsg(5, "hello"));
     await feed(app, dm(5, "/help", "en")); // an English Telegram app still gets the Russian default
-    expect(texts(5).at(-1)).toContain("<b>Поиск</b>");
+    expect(texts(5).at(-1)).toContain("<b>Как пользоваться</b>");
     await feed(app, dm(5, "/language en", "ru"));
     expect(texts(5).at(-1)).toBe("Language set to English.");
     await feed(app, dm(5, "/help", "ru")); // explicit choice wins over the Telegram setting
-    expect(texts(5).at(-1)).toContain("<b>Search</b>");
+    expect(texts(5).at(-1)).toContain("<b>How to use me</b>");
     await feed(app, press(5, "p:lang:ru"));
     expect((await env.DB.prepare("SELECT lang, lang_explicit FROM members WHERE tg_id=5").first())).toEqual({ lang: "ru", lang_explicit: 1 });
   });
@@ -192,4 +192,16 @@ it("member rows from group posts get the default language, whatever Telegram's i
   await enableGroup(app);
   await feed(app, groupMsg(9, "hello", { from: { id: 9, is_bot: false, language_code: "en" } }));
   expect((await ensureMember(env.DB, 9)).lang).toBe("ru");
+});
+
+it("command guides go only to the person: /start in private, /enable's admin guide by DM", async () => {
+  const { app, texts } = testApp();
+  await enableGroup(app);
+  expect(texts(OWNER).some((t) => t.includes("Only you see this") && t.includes("/retention"))).toBe(true);
+  expect(texts(GROUP).some((t) => t.includes("Only you see this"))).toBe(false);
+  await feed(app, dm(7, "/start"));
+  expect(texts(7).at(-1)).toContain("In a group");
+  expect(texts(7).at(-1)).not.toContain("Owner");
+  await feed(app, dm(OWNER, "/start"));
+  expect(texts(OWNER).at(-1)).toContain("/enable");
 });

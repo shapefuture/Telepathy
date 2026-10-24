@@ -95,7 +95,7 @@ var L={en:{home:"Home",ask:"Ask",req:"Requests",ev:"Events",me:"Me",desk:"Desk",
 needHelp:"Need help with something?",newReq:"New request",reqPh:"What do you need? One or two sentences, without contacts or links.",create:"Continue",
 open:"open requests",offers:"offers for you",inv:"intro invitations",catch:"What's new",c12:"12 h",c3:"3 days",cLast:"Since last time",nothingNew:"Nothing new.",
 next:"Coming up",noEv:"No upcoming events in your groups.",ics:"Send calendar file to chat",sent:"Sent to your chat.",allGroups:"All groups",anyTime:"Any time",
-withFile:"With files",noRes:"No answer found.",fixed:"Corrected:",helpful:"Helpful",notHelpful:"Not helpful",wrong:"Wrong source",thx:"Thanks!",
+withFile:"With files",noRes:"No answer found.",aiNote:"AI summary — check it against the sources below.",fixed:"Corrected:",helpful:"Helpful",notHelpful:"Not helpful",wrong:"Wrong source",thx:"Thanks!",
 toReq:"Didn't help? Turn it into a request",draft:"Draft",draftNote:"If you confirm, I search your groups first and the community operator can see this summary. Nothing leaves this community without your separate permission.",
 confirm:"Confirm",cancel:"Cancel",solved:"Solved",more:"I still need help",toDesk:"Send to the operator desk",fromGroups:"From your groups",
 pv:"Ask partner communities",allow:"Allow sharing",inside:"Keep it inside",pvTitle:"Partners would receive only",pvNot:"Not your name, Telegram account, groups or messages. Valid 14 days; withdraw any time.",
@@ -122,7 +122,7 @@ ru:{home:"Главная",ask:"Поиск",req:"Запросы",ev:"Событи
 needHelp:"Нужна помощь?",newReq:"Новый запрос",reqPh:"Что нужно? Одно-два предложения, без контактов и ссылок.",create:"Дальше",
 open:"открытых запросов",offers:"предложений вам",inv:"приглашений",catch:"Что нового",c12:"12 ч",c3:"3 дня",cLast:"С прошлого раза",nothingNew:"Ничего нового.",
 next:"Скоро",noEv:"В ваших группах нет предстоящих событий.",ics:"Прислать файл календаря",sent:"Отправлено в чат.",allGroups:"Все группы",anyTime:"За всё время",
-withFile:"С файлами",noRes:"Ответ не найден.",fixed:"Исправлено:",helpful:"Помогло",notHelpful:"Не помогло",wrong:"Не тот источник",thx:"Спасибо!",
+withFile:"С файлами",noRes:"Ответ не найден.",aiNote:"Кратко от ИИ — сверься с источниками ниже.",fixed:"Исправлено:",helpful:"Помогло",notHelpful:"Не помогло",wrong:"Не тот источник",thx:"Спасибо!",
 toReq:"Не помогло? Создайте запрос",draft:"Черновик",draftNote:"Если подтвердите, я сначала поищу в ваших группах, а оператор сообщества увидит это описание. Без вашего отдельного разрешения ничего не уходит за пределы сообщества.",
 confirm:"Подтвердить",cancel:"Отмена",solved:"Решено",more:"Нужна ещё помощь",toDesk:"Передать оператору",fromGroups:"Из ваших групп",
 pv:"Спросить партнёров",allow:"Разрешить",inside:"Оставить внутри",pvTitle:"Партнёры получат только",pvNot:"Без вашего имени, аккаунта Telegram, групп и сообщений. Действует 14 дней; отозвать можно в любой момент.",
@@ -239,6 +239,7 @@ function quoteCard(x,i,answerId){var meta=[(x.event_at||"").slice(0,10),x.label,
   answerId?h("button",{cls:"link",title:t("wrong"),onclick:function(e){vote(answerId,"bad"+i,e.target)}},"⚑"):null))}
 function vote(id,action,btn){busy(btn,post("vote",{answerId:id,action:action})).then(function(){haptic("success");toast(t("thx"))})}
 function answerView(a,q){var box=h("div");if(a.status!=="answered"){box.append(card(art("lost","art-sm"),h("div",{style:"margin-top:8px",text:a.noAnswer||t("noRes")}),h("div",{cls:"btns"},h("button",{onclick:function(){S.newReq=true;S.prefill=q;go("req")}},t("toReq")))));return box}
+ if(a.brief)box.append(card(h("div",{text:"💡 "+a.brief}),h("p",{cls:"muted",text:t("aiNote")})));
  if(a.fixes&&a.fixes.length)box.append(h("p",{cls:"muted",text:t("fixed")+" "+a.fixes.map(function(f){return f[0]+" → "+f[1]}).join(", ")}));
  box.append(card(a.quotes.map(function(x,i){return quoteCard(x,i,a.answerId)}),h("div",{cls:"btns"},h("button",{cls:"sec",onclick:function(e){vote(a.answerId,"up",e.target)}},"👍 "+t("helpful")),
   h("button",{cls:"sec",onclick:function(e){vote(a.answerId,"down",e.target)}},"👎 "+t("notHelpful")),h("button",{cls:"link",onclick:function(){S.newReq=true;S.prefill=q;go("req")}},t("toReq")))));return box}

@@ -1,6 +1,7 @@
 // Scheduled work (every 5 minutes). Each step is idempotent and bounded so one run stays
 // inside the free plan's CPU and subrequest limits; leftovers are picked up next run.
 
+import { pruneCache } from "./ai/cache";
 import type { App } from "./bot";
 import { digestStep } from "./digest";
 import { routeUnanswered, suggestSkills } from "./features";
@@ -16,6 +17,7 @@ import { dispatchAlerts } from "./continuity/alerts";
 import { classify, dispatchInvites, runCanaries } from "./hydra/regrow";
 import { dispatchAnnouncements } from "./hydra/notices";
 import { runEscrow } from "./hydra/escrow";
+import { deleteDue } from "./welcome";
 import { watchSeals } from "./hydra/fed";
 import { remindDrills } from "./hydra/chaos";
 import { bucket, computeGaps, setGapStatus } from "./assist/gaps";
@@ -30,13 +32,46 @@ export const SEND_BUDGET = 24;
 /** Free plan: 50 subrequests per invocation. Keep a margin for D1-adjacent and retry calls. */
 export const SUBREQUEST_LIMIT = 46;
 
+/** D1 queries per cron run above which we log a warning (a batch counts once). */
+export const D1_SOFT_LIMIT = 50;
+
+/** Wraps D1 so the cron can see how many queries it has used. */
+export function countingDb(db: D1Database): { db: D1Database; used: () => number } {
+  let n = 0;
+  const real = new WeakMap<object, D1PreparedStatement>();
+  const stmt = (s: D1PreparedStatement): D1PreparedStatement => {
+    const p = new Proxy(s, {
+      get(t, k) {
+        const v = Reflect.get(t, k, t);
+        if (k === "bind") return (...a: unknown[]) => stmt((v as Function).apply(t, a));
+        if (k === "first" || k === "all" || k === "run" || k === "raw") return (...a: unknown[]) => ((n += 1), (v as Function).apply(t, a));
+        return typeof v === "function" ? v.bind(t) : v;
+      },
+    });
+    real.set(p, s);
+    return p;
+  };
+  const wrapped = new Proxy(db, {
+    get(t, k) {
+      const v = Reflect.get(t, k, t);
+      if (k === "prepare") return (sql: string) => stmt((v as Function).call(t, sql));
+      // Hand D1 its own statement objects; a batch counts as one query.
+      if (k === "batch") return (list: D1PreparedStatement[]) => ((n += 1), (v as Function).call(t, list.map((x) => real.get(x) ?? x)));
+      if (k === "exec") return (...a: unknown[]) => ((n += 1), (v as Function).apply(t, a));
+      return typeof v === "function" ? v.bind(t) : v;
+    },
+  });
+  return { db: wrapped, used: () => n };
+}
+
 export async function runCron(base: App, now = new Date()): Promise<Record<string, number>> {
   const out: Record<string, number> = {};
   // Count every outbound fetch (partners, email, push, ntfy, Matrix, escrow…) plus Telegram calls,
   // so later steps stop before the platform limit instead of recording false failures.
   let used = 0;
   const raw = base.net ?? ((u: string, i: RequestInit) => fetch(u, i));
-  const app: App = { ...base, net: (u, i) => ((used += 1), raw(u, i)) };
+  const d1 = countingDb(base.db);
+  const app: App = { ...base, db: d1.db, net: (u, i) => ((used += 1), raw(u, i)) };
   app.budget = { left: () => SUBREQUEST_LIMIT - used - app.tg.calls };
   const step = async (name: string, fn: () => Promise<number>) => {
     try {
@@ -50,6 +85,7 @@ export async function runCron(base: App, now = new Date()): Promise<Record<strin
   await step("expired", async () => (await expireDue(app.db, nowIso(now))).length);
   await step("reminders", async () => (await sendReminders(app.db, nowIso(now))).length);
   await step("digest", async () => (await digestStep(app.db, now, timezone(app.env), digestHour(app.env))).keys.length);
+  await step("ai_cache", () => pruneCache(app.db, now));
   await step("retention", async () => {
     const today = localParts(now, timezone(app.env)).date;
     const last = await app.db.prepare("SELECT value FROM settings WHERE key='retention.day'").first<{ value: string }>();
@@ -116,6 +152,11 @@ export async function runCron(base: App, now = new Date()): Promise<Record<strin
       await step("hydra_drills_due", () => remindDrills(app, now));
     } else await step("hydra_seals", () => watchSeals(app, now));
   }
+  await step("welcome_cleanup", () => deleteDue(app, 5, now));
   await step("sent", () => dispatchPending(app.db, app.tg, Math.min(SEND_BUDGET, app.tg.calls + Math.max(0, app.budget!.left()))));
+  // Cloudflare's docs disagree on the free-plan D1 cap (50 on the D1 page, 1000 for internal
+  // services on the Workers page). Measure it, so a busy run is visible in the logs.
+  out.d1_queries = d1.used();
+  if (out.d1_queries > D1_SOFT_LIMIT) console.warn(`cron used ${out.d1_queries} D1 queries (free-plan D1 docs say 50)`);
   return out;
 }

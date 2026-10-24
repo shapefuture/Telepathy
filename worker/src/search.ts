@@ -227,7 +227,7 @@ export function renderAnswer(
   a: Answer,
   tz: string,
   lang: Lang = "en",
-  opts: { scope?: "dm" | "group"; answerId?: string } = {},
+  opts: { scope?: "dm" | "group"; answerId?: string; brief?: string | null } = {},
 ): { text: string; buttons?: InlineButton[][] } {
   const m = T(lang);
   if (a.status === "empty") return { text: m.askUsage };
@@ -235,6 +235,7 @@ export function renderAnswer(
   if (a.status === "insufficient") return { text: opts.scope === "group" ? m.insufficientGroup : m.insufficient };
   const date = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });
   const lines = [opts.scope === "group" ? m.foundGroup(a.quotes.length) : m.found(a.quotes.length)];
+  if (opts.brief) lines.unshift(`💡 ${escapeHtml(opts.brief)}\n<i>${m.aiNote}</i>\n`);
   if (a.fixes.size) lines.push(m.alsoSearched(escapeHtml([...a.fixes].map(([k, v]) => `${k} → ${v}`).join(", "))));
   a.quotes.forEach((q, i) => {
     const when = date.format(new Date(q.event_at));

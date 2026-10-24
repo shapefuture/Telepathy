@@ -18,6 +18,7 @@
   // reminders, digest batches, retention. Replaces the old GitHub Actions "maintenance" burst job.
   // Illustrations for the Mini App (small WebP copies of the landing art), served before the Worker.
   "assets": { "directory": "./public" },
+  "ai": { "binding": "AI" },
   "triggers": { "crons": ["* * * * *"] },
   "vars": {
     "COMMUNITY_LABEL": "Community",

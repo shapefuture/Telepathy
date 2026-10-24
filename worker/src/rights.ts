@@ -21,6 +21,8 @@ export async function forgetMember(db: D1Database, memberId: string, tgId: numbe
     db
       .prepare("UPDATE members SET discoverable=0, available=0, digest=0, collection_opt_out=1 WHERE id=?")
       .bind(memberId),
+    // AI summaries can quote anyone; they're only a cache, so drop them all rather than keep their words.
+    db.prepare("DELETE FROM ai_cache"),
   ]);
   const report = { passages: p!.results.length, skills: s!.results.length, intros: i!.results.length };
   await audit(db, "member.forget", memberId, memberId, report);
@@ -42,6 +44,9 @@ export async function applyRetention(db: D1Database, now = new Date(), batch = 5
       .all();
     total += r.results.length;
   }
-  if (total) await audit(db, "retention.purge", "system", null, { passages: total });
+  if (total) {
+    await db.prepare("DELETE FROM ai_cache").run();
+    await audit(db, "retention.purge", "system", null, { passages: total });
+  }
   return total;
 }

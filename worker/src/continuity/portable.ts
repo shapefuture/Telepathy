@@ -76,11 +76,11 @@ export async function importBundle(app: App, bundle: Signed<ExportDoc>, by: stri
   for (const p of d.people) {
     let personId: string | null = null;
     for (const e of p.emails) {
-      const r = await app.db.prepare("SELECT person_id FROM delivery_registrations WHERE channel='email' AND address_hash=?").bind(await addressHash(app.env, "email", e)).first<{ person_id: string }>();
+      const r = await app.db.prepare("SELECT person_id FROM delivery_registrations WHERE channel='email' AND address_hash=? AND status<>'pending'").bind(await addressHash(app.env, "email", e)).first<{ person_id: string }>();
       if (r) personId = r.person_id;
     }
     for (const h of p.heads ?? []) {
-      const r = await app.db.prepare("SELECT person_id FROM delivery_registrations WHERE channel=? AND address_hash=?").bind(h.channel, await addressHash(app.env, h.channel, h.address)).first<{ person_id: string }>();
+      const r = await app.db.prepare("SELECT person_id FROM delivery_registrations WHERE channel=? AND address_hash=? AND status<>'pending'").bind(h.channel, await addressHash(app.env, h.channel, h.address)).first<{ person_id: string }>();
       if (r) personId = r.person_id;
     }
     if (!personId && p.handle) personId = (await app.db.prepare("SELECT id FROM people WHERE handle=?").bind(p.handle).first<{ id: string }>())?.id ?? null;

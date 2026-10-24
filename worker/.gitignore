@@ -4,3 +4,5 @@ dist/
 import/
 *.sql.age
 .dev.vars
+backfill/
+*.session

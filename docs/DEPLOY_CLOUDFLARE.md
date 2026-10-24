@@ -51,12 +51,17 @@ curl -X POST https://telepathy.<you>.workers.dev/admin/setup \
 4. Optional: `/hints on` in a group. When someone asks a question that group already answered,
    the bot replies once with a link to the earlier thread (at most one hint per 10 minutes per
    group). It's off by default because the bot then speaks without being asked.
-5. Optional: `/routing on` in a group. Questions with no reply after 4 hours go privately to at
+5. **Welcome** (on by default; `/welcome off` per group): people who join get a short intro from
+   the bot. It's private when Telegram allows it: if they've opened the bot before, or if the group
+   uses join requests ("approve new members"). Otherwise a message in the group tags them with a
+   "Start" button and deletes itself after 2 minutes. After this update, re-run `POST /admin/setup`
+   once so Telegram sends join requests to the bot.
+6. Optional: `/routing on` in a group. Questions with no reply after 4 hours go privately to at
    most 2 opted-in experts who can read that group (max 3 pings per expert per day; experts stop
    them with `/pings off`). Also off by default.
-6. Moderation (owner + chat admin, reply to a message): `/canonical` marks the best answer on a
+7. Moderation (owner + chat admin, reply to a message): `/canonical` marks the best answer on a
    topic, and older canonical answers on it are labelled outdated. `/notevent` hides a wrong event.
-7. Members: `/catchup [12h|3d]`, `/events` (with an .ics file), search filters
+8. Members: `/catchup [12h|3d]`, `/events` (with an .ics file), search filters
    `in:<group> since:<date|7d> has:file`, and the **Mini App** (chat menu button set by
    `/admin/setup`; set `PUBLIC_URL` in `wrangler.jsonc` to also enable the `/app` button).
    The app has tabs for Home (search, catch-up, counters, next events), Ask (filters, sources,
@@ -71,7 +76,27 @@ and `/retention 0` returns to keep-all.
 
 ## 3. Import past history
 
-Bots only see messages sent after they joined. To add older history:
+Bots only see messages sent after they joined. There are two ways to add older history.
+
+**Automatic (recommended): fetch it with your own account.** This needs no export file. It runs
+on your computer, and your login and the messages stay there.
+
+1. Get `api_id` and `api_hash` at <https://my.telegram.org> → *API development tools*.
+2. Enable the group (step 2), then run:
+   ```bash
+   export TG_API_ID=... TG_API_HASH=...
+   npm run backfill -- --chat @yourgroup        # first time: your phone number + login code
+   npm run import -- backfill/chat123.json --chat-id -100123   # the line it prints
+   npx wrangler d1 execute telepathy --remote --file import/part-001.sql
+   ```
+3. Run `npm run backfill -- --chat @yourgroup` again any time. It fetches only new messages
+   since the last run.
+
+Your account must be a member of the group and able to see its history. Keep
+`~/.telepathy-backfill.session` private: it is a login to your Telegram account. Don't commit it
+or upload it anywhere.
+
+**Manual: Telegram Desktop export.**
 
 1. In Telegram Desktop: open the group → ⋮ → **Export chat history** → format **JSON**. Untick
    media to keep the file small.
@@ -85,7 +110,11 @@ Bots only see messages sent after they joined. To add older history:
    100,000 daily D1 writes, which leaves room for live traffic. Re-running a file is safe.
    Members who used `/forget_me` are skipped, and names are never stored.
 
-## 4. Free-plan capacity (measured in tests)
+## 4. Optional: AI summaries
+
+See [AI.md](AI.md). Workers AI writes short summaries on top of `/ask` answers by default; add `OLLAMA_API_KEY` to use Beam first, or set `WORKERS_AI_MODEL` to `off` to turn the backup off.
+
+## 5. Free-plan capacity (measured in tests)
 
 | Resource | Free limit | Telepathy usage | What it means |
 |---|---|---|---|
@@ -101,7 +130,7 @@ and [D1 limits](https://developers.cloudflare.com/d1/platform/limits) pages (che
 they can change). If you outgrow them, Workers Paid starts at $5/month and raises D1 to 10 GB per
 database. No code changes are needed.
 
-## 5. Daily operation
+## 6. Daily operation
 
 | When | What happens |
 |---|---|
@@ -116,7 +145,7 @@ HTTP (needs `Authorization: Bearer <ADMIN_TOKEN>`): `GET /admin/status`, `POST /
 
 Logs: `npx wrangler tail`. Message contents are never logged.
 
-## 6. Backups and restore
+## 7. Backups and restore
 
 - **Point-in-time restore (built into D1):** `npx wrangler d1 time-travel info telepathy`, then
   `npx wrangler d1 time-travel restore telepathy --timestamp=<ISO time>`. Check Cloudflare's
@@ -132,7 +161,7 @@ Logs: `npx wrangler tail`. Message contents are never logged.
   load the export with `wrangler d1 execute telepathy-restore --remote --file backup.sql`, and
   spot-check row counts.
 
-## 7. Upgrades and rollback
+## 8. Upgrades and rollback
 
 ```bash
 git pull && cd worker && npm ci && npm test
@@ -142,7 +171,7 @@ npm run deploy
 Roll back code with `npx wrangler rollback`. Migrations are never rolled back. If one ever has
 to be undone, use Time Travel to restore the database to just before it.
 
-## 8. Incidents
+## 9. Incidents
 
 | Symptom | Action |
 |---|---|
@@ -155,14 +184,14 @@ to be undone, use Time Travel to restore the database to just before it.
 | Group upgraded to a supergroup | Handled automatically: the bot follows Telegram's migration notice to the new chat id. Check `/sources`. |
 | A member asks for deletion | They use `/forget_me` themselves, or reply `/forget` to one message. |
 
-## 9. GitHub Actions (optional) and running without it
+## 10. GitHub Actions (optional) and running without it
 
 Automatic deploys, weekly encrypted backups and PDF/DOCX/PPTX parsing can run on GitHub's
 runners. Each is off until you set its variable. Every one of them also has a no-Actions path
 (Cloudflare Workers Builds, `scripts/backup-local.sh`, `scripts/offload-local.sh`,
 `scripts/check.sh`). See [`GITHUB_ACTIONS.md`](GITHUB_ACTIONS.md#if-your-actions-minutes-run-out).
 
-## 10. Assistance desk and partner gateway
+## 11. Assistance desk and partner gateway
 
 Members ask with `/help <need>`; owners work the desk with `/desk`, publish capacity with
 `/offer`, and connect partner communities with `/partner`. All of it works locally with
@@ -175,7 +204,7 @@ npx wrangler secret put FEDERATION_PRIVATE_KEY     # paste the private key
 npm run db:migrate:remote && npm run deploy
 ```
 
-## 11. What's different from the Python version
+## 12. What's different from the Python version
 
 | Python v1 (Linux host) | Worker v2 (this runbook) |
 |---|---|

@@ -128,8 +128,13 @@ export async function loginTotp(app: App, handle: string, code: string, now = Da
   const factors = (await app.db.prepare("SELECT id, secret_enc, last_step, failures, locked_until FROM login_factors WHERE person_id=? AND kind='totp' AND status='active'").bind(person).all<{ id: string; secret_enc: string; last_step: number; failures: number; locked_until: string | null }>()).results;
   for (const f of factors) {
     if (f.locked_until && f.locked_until > nowIso(new Date(now))) continue;
-    if (await checkTotp(app, f, code, now)) return person;
-    await app.db.prepare("UPDATE login_factors SET failures=failures+1, locked_until=CASE WHEN failures+1>=5 THEN ? ELSE locked_until END WHERE id=?").bind(nowIso(new Date(now + 15 * 60_000)), f.id).run();
+    // Count the attempt before checking it, atomically, so parallel guesses can't all slip past the lock.
+    const claimed = await app.db.prepare("UPDATE login_factors SET failures=failures+1, locked_until=CASE WHEN failures+1>=5 THEN ? ELSE locked_until END WHERE id=? AND (locked_until IS NULL OR locked_until<=?) RETURNING id").bind(nowIso(new Date(now + 15 * 60_000)), f.id, nowIso(new Date(now))).first();
+    if (!claimed) continue;
+    if (await checkTotp(app, f, code, now)) {
+      await app.db.prepare("UPDATE login_factors SET failures=0, locked_until=NULL WHERE id=?").bind(f.id).run();
+      return person;
+    }
   }
   return null;
 }
@@ -221,8 +226,9 @@ export async function checkHandleCode(app: App, ticket: string, code: string, no
   const row = await app.db.prepare("SELECT id, registration_id, code_hash, attempts FROM login_codes WHERE id=? AND purpose='login' AND used_at IS NULL AND expires_at>? AND registration_id LIKE 'h:%'").bind(ticket, nowIso(now)).first<{ id: string; registration_id: string; code_hash: string; attempts: number }>();
   if (!row || row.attempts >= CODE_MAX_ATTEMPTS) return null;
   const ok = row.code_hash === (await hmacHex(app.env.CONTINUITY_KEY, "code", `${row.registration_id}:${code.trim()}`));
-  await app.db.prepare(`UPDATE login_codes SET attempts=attempts+1${ok ? ", used_at=?" : ""} WHERE id=?`).bind(...(ok ? [nowIso(now), row.id] : [row.id])).run();
-  return ok ? row.registration_id.slice(2) : null;
+  // Atomic: parallel requests can't each pass the checks above and all use the same code.
+  const won = await app.db.prepare(`UPDATE login_codes SET attempts=attempts+1${ok ? ", used_at=?" : ""} WHERE id=? AND used_at IS NULL AND attempts<? RETURNING id`).bind(...(ok ? [nowIso(now), row.id] : [row.id]), CODE_MAX_ATTEMPTS).first();
+  return ok && won ? row.registration_id.slice(2) : null;
 }
 
 // ---- guardians (H5 social recovery) -------------------------------------------------------------

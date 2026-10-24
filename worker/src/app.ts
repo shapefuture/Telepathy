@@ -3,6 +3,7 @@
 // token, core.telegram.org/bots/webapps). Every route reuses the bot's ACL and the same
 // assistance actions as the inline buttons, so the app can't do anything the bot can't.
 
+import { brief } from "./ai/beam";
 import { ensureMember, langOf, memberByTg, readable, type Member } from "./acl";
 import { deskAction, deskActions, exchangeAction, forgetMissions, gapAction, jobLabel, memberAction, offerChoice, rateMission, short } from "./assist/actions";
 import { addOffer, listOffers, MODES, withdrawOffer, type CommitmentMode } from "./assist/capacity";
@@ -220,7 +221,7 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
         throw e;
       }
     }
-    if (key === "POST passport" && p[1] === "email" && p[2] === "verify") return out({ ok: (await checkCode(app, String(body.registration ?? ""), String(body.code ?? ""), "verify")) === personId });
+    if (key === "POST passport" && p[1] === "email" && p[2] === "verify") return out({ ok: (await checkCode(app, String(body.registration ?? ""), String(body.code ?? ""), "verify", new Date(), personId)) === personId });
     if (key === "POST passport" && p[1] === "recovery") return out({ codes: await newRecoveryCodes(app.env, db, personId) });
     if (key === "POST passport" && p[1] === "topic") {
       if (!TOPICS.includes(body.topic as Topic)) return out({ ok: false }, undefined, 400);
@@ -261,7 +262,8 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
     const f = await parseFilters(db, scope, q);
     const ans = await answer(db, f.readable, f.query, f.filters);
     const answerId = ans.status === "answered" ? await recordAnswer(db, m.id, ans.quotes.map((x) => x.id)) : null;
-    return out({ status: ans.status, answerId, quotes: quotesOut(ans.quotes), fixes: [...ans.fixes.entries()], noAnswer: T(lang).insufficient.replace(/<[^>]+>/g, "") });
+    const ai = ans.status === "answered" ? await brief(app, f.readable, f.query, ans.quotes, lang) : null;
+    return out({ status: ans.status, answerId, brief: ai, quotes: quotesOut(ans.quotes), fixes: [...ans.fixes.entries()], noAnswer: T(lang).insufficient.replace(/<[^>]+>/g, "") });
   }
   if (key === "POST vote") {
     const r = await vote(db, String(body.answerId ?? ""), m.id, String(body.action ?? ""));

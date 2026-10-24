@@ -21,8 +21,11 @@ import { cmdPassport, CONTINUITY_OWNER, ownerContinuity } from "./continuity/bot
 import { hydraStatus } from "./hydra/bot";
 import { touchOwners } from "./hydra/notices";
 import { assistCallback, cmdHelpNeed, forgetMissions, listMissions, ownerAssistCommand, OWNER_COMMANDS } from "./assist/bot";
+import { brief } from "./ai/beam";
 import { answer, parseFilters, renderAnswer } from "./search";
 import type { Fetcher, InlineButton, Telegram } from "./telegram";
+import { DefiniteFailure } from "./telegram";
+import { welcomeJoinRequest, welcomeJoiner } from "./welcome";
 import { escapeHtml } from "./text";
 import { audit, DAY, HOUR, localParts, newId, nowIso, tzOffsetMinutes } from "./util";
 
@@ -43,9 +46,15 @@ interface CallbackQuery {
   message?: { message_id: number; chat: { id: number; type?: string } };
 }
 interface ChatMemberUpdated {
-  chat: { id: number; type: string };
+  chat: { id: number; type: string; title?: string };
   from: TgUser;
-  new_chat_member: { status: string; user: TgUser };
+  old_chat_member?: { status: string; user: TgUser; is_member?: boolean };
+  new_chat_member: { status: string; user: TgUser; is_member?: boolean };
+}
+interface ChatJoinRequest {
+  chat: { id: number; type: string; title?: string };
+  from: TgUser;
+  user_chat_id?: number;
 }
 export interface Update {
   update_id: number;
@@ -54,6 +63,7 @@ export interface Update {
   callback_query?: CallbackQuery;
   my_chat_member?: ChatMemberUpdated;
   chat_member?: ChatMemberUpdated;
+  chat_join_request?: ChatJoinRequest;
 }
 
 /** Kept for tests and docs: the English privacy notice. */
@@ -149,6 +159,10 @@ export async function handleUpdate(app: App, u: Update): Promise<string[]> {
   if (u.callback_query) return onCallback(app, u.callback_query);
   if (u.my_chat_member) return onBotMembership(app, u.my_chat_member);
   if (u.chat_member) return onChatMember(app, u.chat_member);
+  if (u.chat_join_request) {
+    await welcomeJoinRequest(app, u.chat_join_request.chat.id, u.chat_join_request.from, u.chat_join_request.user_chat_id);
+    return [];
+  }
   return [];
 }
 
@@ -172,6 +186,7 @@ async function onMessage(app: App, msg: TgMessage, edited: boolean): Promise<str
       if (command.cmd === "retention") return cmdRetention(app, msg, command.args);
       if (command.cmd === "hints") return cmdToggle(app, msg, command.args, "hints");
       if (command.cmd === "routing") return cmdToggle(app, msg, command.args, "routing");
+      if (command.cmd === "welcome") return cmdToggle(app, msg, command.args, "welcome");
       if (command.cmd === "canonical") return cmdCanonical(app, msg);
       if (command.cmd === "notevent") return cmdNotEvent(app, msg);
       if (command.cmd === "forget") return cmdForgetMessage(app, msg);
@@ -179,11 +194,22 @@ async function onMessage(app: App, msg: TgMessage, edited: boolean): Promise<str
     const keys: string[] = [];
     const mentioned = edited ? null : mentionQuestion(msg, app.env.BOT_USERNAME);
     // Answer before storing, so the question can't match itself.
-    if (mentioned) keys.push(...(await groupAsk(app, msg, mentioned)));
+    if (mentioned) {
+      try {
+        keys.push(...(await groupAsk(app, msg, mentioned)));
+      } catch (e) {
+        if (!(e instanceof DefiniteFailure)) throw e; // a refused reply must not lose the message itself
+      }
+    }
     keys.push(...(await ingest(app, msg, edited)));
     return keys;
   }
-  if (msg.chat.type !== "private" || !command || !msg.from) return [];
+  if (msg.chat.type !== "private" || !msg.from) return [];
+  // In private, a plain message is a question: no command needed.
+  if (!command) {
+    const q = (msg.text ?? "").trim();
+    return q && !edited ? privateCommand(app, msg, "ask", q) : [];
+  }
   return privateCommand(app, msg, command.cmd, command.args);
 }
 
@@ -232,7 +258,8 @@ async function groupAsk(app: App, msg: TgMessage, question: string): Promise<str
   const f = await parseFilters(app.db, new Set([source.id]), question);
   const a = await answer(app.db, f.readable, f.query, f.filters);
   const answerId = a.status === "answered" ? await recordAnswer(app.db, asker.id, a.quotes.map((q) => q.id)) : undefined;
-  const r = renderAnswer(a, timezone(app.env), lang, { scope: "group", answerId });
+  const ai = a.status === "answered" ? await brief(app, f.readable, f.query, a.quotes, lang) : null;
+  const r = renderAnswer(a, timezone(app.env), lang, { scope: "group", answerId, brief: ai });
   await reply(app, msg.chat.id, r.text, r.buttons, msg.message_id);
   return [];
 }
@@ -262,6 +289,12 @@ async function cmdEnable(app: App, msg: TgMessage, args: string): Promise<string
   ]);
   await audit(app.db, "source.enable", owner.id, id, { visibility: vis });
   await reply(app, msg.chat.id, m.enabled(vis));
+  // The command guide goes to the admin privately, not to the whole group.
+  try {
+    await app.tg.sendMessage(msg.from!.id, m.adminGuide(escapeHtml(msg.chat.title ?? "")));
+  } catch (e) {
+    if (!(e instanceof DefiniteFailure)) throw e; // they never opened the bot privately: nothing to do
+  }
   return [];
 }
 
@@ -291,18 +324,18 @@ async function cmdRetention(app: App, msg: TgMessage, args: string): Promise<str
 }
 
 /** Per-group opt-ins that make the bot speak unprompted: hints (P13-02) and routing (P13-03). */
-async function cmdToggle(app: App, msg: TgMessage, args: string, col: "hints" | "routing"): Promise<string[]> {
+async function cmdToggle(app: App, msg: TgMessage, args: string, col: "hints" | "routing" | "welcome"): Promise<string[]> {
   if (!(await ownerInGroup(app, msg))) return [];
   const m = T(await langForUser(app, msg.from));
   const src = await enabledSource(app.db, msg.chat.id);
   const arg = args.trim().toLowerCase();
   if (!src || (arg !== "on" && arg !== "off")) {
-    await reply(app, msg.chat.id, col === "hints" ? m.hintsUsage : m.routingUsage);
+    await reply(app, msg.chat.id, col === "hints" ? m.hintsUsage : col === "welcome" ? m.welcomeUsage : m.routingUsage);
     return [];
   }
   await app.db.prepare(`UPDATE sources SET ${col}=? WHERE id=?`).bind(arg === "on" ? 1 : 0, src.id).run();
   await audit(app.db, `source.${col}`, String(msg.from!.id), src.id, { on: arg === "on" });
-  const text = col === "hints" ? (arg === "on" ? m.hintsOn : m.hintsOff) : arg === "on" ? m.routingOn : m.routingOff;
+  const text = col === "hints" ? (arg === "on" ? m.hintsOn : m.hintsOff) : col === "welcome" ? (arg === "on" ? m.welcomeOn : m.welcomeOff) : arg === "on" ? m.routingOn : m.routingOff;
   await reply(app, msg.chat.id, text);
   return [];
 }
@@ -337,7 +370,8 @@ async function cmdForgetMessage(app: App, msg: TgMessage): Promise<string[]> {
   const target = msg.reply_to_message;
   const src = await enabledSource(app.db, msg.chat.id);
   if (!target || !src || !msg.from) return [];
-  const isAuthor = target.from?.id === msg.from.id;
+  // Messages sent as a channel or an anonymous admin all share one fake `from`; compare the chat then.
+  const isAuthor = msg.sender_chat || target.sender_chat ? msg.sender_chat?.id === target.sender_chat?.id : target.from?.id === msg.from.id;
   if (!isAuthor && !(await ownerInGroup(app, msg))) return [];
   const m = T(await langForUser(app, msg.from));
   const ok = await removeMessage(app.db, src.id, target.message_id);
@@ -392,7 +426,8 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
   const pre = T(await langForUser(app, from));
   switch (cmd) {
     case "start":
-      await reply(app, chat, pre.start + pre.help);
+      // One short message: what I do, where things work (owners: their tools). Private, so only them.
+      await reply(app, chat, pre.start + pre.whereMember + (isOwner(app, from.id) ? pre.whereOwner : ""));
       return [];
     case "help":
       if (args.trim()) break; // "/help <need>" opens a mission below
@@ -443,7 +478,8 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
       const f = await parseFilters(app.db, await readable(app.db, mem), args);
       const a = await answer(app.db, f.readable, f.query, f.filters);
       const answerId = a.status === "answered" ? await recordAnswer(app.db, mem.id, a.quotes.map((q) => q.id)) : undefined;
-      const r = renderAnswer(a, timezone(app.env), lang, { answerId });
+      const ai = a.status === "answered" ? await brief(app, f.readable, f.query, a.quotes, lang) : null;
+      const r = renderAnswer(a, timezone(app.env), lang, { answerId, brief: ai });
       await reply(app, chat, r.text, r.buttons);
       return [];
     }
@@ -771,11 +807,18 @@ async function onBotMembership(app: App, ev: ChatMemberUpdated): Promise<string[
 }
 
 /** Leaving a group revokes read access to it (C06); joining grants it. */
+const IN = ["member", "administrator", "creator", "restricted"];
+// A restricted person who leaves stays "restricted" with is_member false (Bot API ChatMemberRestricted).
+const inChat = (cm?: { status: string; is_member?: boolean }) => !!cm && IN.includes(cm.status) && !(cm.status === "restricted" && cm.is_member === false);
 async function onChatMember(app: App, ev: ChatMemberUpdated): Promise<string[]> {
   const src = await enabledSource(app.db, ev.chat.id);
   const m = src ? await memberByTg(app.db, ev.new_chat_member.user.id) : null;
-  if (!src || !m) return [];
-  if (["left", "kicked"].includes(ev.new_chat_member.status)) await revoke(app.db, src.id, m.id);
-  else if (["member", "administrator", "creator", "restricted"].includes(ev.new_chat_member.status)) await grantStatement(app.db, src.id, m.id).run();
+  if (src && m) {
+    if (!inChat(ev.new_chat_member)) await revoke(app.db, src.id, m.id);
+    else await grantStatement(app.db, src.id, m.id).run();
+  }
+  // Newly joined (not a promotion or restriction change): a short welcome, privately when possible.
+  // After the access change, so a welcome Telegram refuses (400/403) can't skip it.
+  if (inChat(ev.new_chat_member) && !inChat(ev.old_chat_member)) await welcomeJoiner(app, ev.chat.id, ev.new_chat_member.user);
   return [];
 }

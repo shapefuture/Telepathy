@@ -22,11 +22,13 @@ export interface TgMessage {
   edit_date?: number;
   chat: { id: number; type: string; title?: string; username?: string };
   from?: TgUser;
+  /** Set when sent on behalf of a channel or an anonymous admin; `from` is then a shared fake user. */
+  sender_chat?: { id: number };
   text?: string;
   caption?: string;
   message_thread_id?: number;
   is_topic_message?: boolean;
-  reply_to_message?: { message_id: number; from?: TgUser };
+  reply_to_message?: { message_id: number; from?: TgUser; sender_chat?: { id: number } };
   document?: TgDocument;
   entities?: { type: string; offset: number; length: number }[];
   migrate_to_chat_id?: number;
@@ -107,6 +109,7 @@ export async function removeMessage(db: D1Database, sourceId: string, msgId: num
     .prepare("UPDATE passages SET body=NULL, removed_at=? WHERE source_id=? AND msg_id=? AND removed_at IS NULL")
     .bind(nowIso(), sourceId, msgId)
     .run();
+  if (r.meta.changes > 0) await db.prepare("DELETE FROM ai_cache").run(); // summaries may quote it
   return r.meta.changes > 0;
 }
 

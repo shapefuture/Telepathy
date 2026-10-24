@@ -22,25 +22,36 @@ import { dispatchPending } from "./outbox";
 import { createTelegram, DefiniteFailure, type Fetcher } from "./telegram";
 import { nowIso, safeEqual } from "./util";
 
-export const ALLOWED_UPDATES = ["message", "edited_message", "callback_query", "my_chat_member", "chat_member"];
+export const ALLOWED_UPDATES = ["message", "edited_message", "callback_query", "my_chat_member", "chat_member", "chat_join_request"];
 
-export const COMMANDS = [
-  { command: "ask", description: "Search your groups with cited answers" },
-  { command: "intro", description: "Request a consent-based introduction" },
-  { command: "expert", description: "How many experts match a topic" },
-  { command: "requests", description: "Your open requests" },
-  { command: "profile", description: "Your profile and settings" },
-  { command: "digest", description: "Turn the daily digest on or off" },
-  { command: "skills", description: "Manage your skills" },
-  { command: "privacy", description: "What is stored and why" },
-  { command: "forget_me", description: "Delete your data" },
-  { command: "language", description: "Interface language: en or ru" },
-  { command: "catchup", description: "What's new since last time" },
-  { command: "events", description: "Upcoming events" },
-  { command: "app", description: "Open the Telepathy app" },
-  { command: "passport", description: "Stay connected even without this chat" },
-  { command: "help", description: "All commands, or /help <need> to ask for help" },
+// Command menu (the list under "/"), in DEFAULT_LANG for everyone.
+export const COMMANDS_RU = [
+  { command: "ask", description: "Задать вопрос сообществу" },
+  { command: "app", description: "Открыть приложение" },
+  { command: "catchup", description: "Что нового" },
+  { command: "events", description: "Ближайшие встречи" },
+  { command: "intro", description: "Найти человека, который поможет" },
+  { command: "requests", description: "Мои запросы" },
+  { command: "profile", description: "Настройки" },
+  { command: "passport", description: "Остаться на связи без Telegram" },
+  { command: "help", description: "Как пользоваться" },
+  { command: "privacy", description: "Что я храню" },
 ];
+export const COMMANDS = [
+  { command: "ask", description: "Ask the community a question" },
+  { command: "app", description: "Open the app" },
+  { command: "catchup", description: "What's new" },
+  { command: "events", description: "Upcoming meetups" },
+  { command: "intro", description: "Find someone who can help" },
+  { command: "requests", description: "My requests" },
+  { command: "profile", description: "Settings" },
+  { command: "passport", description: "Stay connected without Telegram" },
+  { command: "help", description: "How to use me" },
+  { command: "privacy", description: "What I keep" },
+];
+/** In groups, only what works there. */
+export const GROUP_COMMANDS_RU = [{ command: "ask", description: "Спросить: отвечу из этой группы" }];
+export const GROUP_COMMANDS = [{ command: "ask", description: "Ask: I answer from this group" }];
 
 export function makeApp(env: Env, fetcher?: Fetcher, net?: Fetcher): App {
   setDefaultLang(env.DEFAULT_LANG);
@@ -141,9 +152,12 @@ export async function handleFetch(req: Request, env: Env, fetcher?: Fetcher, net
         allowed_updates: ALLOWED_UPDATES,
         max_connections: 10,
       });
-      const cmds = await app.tg.call("setMyCommands", { commands: COMMANDS, scope: { type: "all_private_chats" } });
+      // One menu for everyone, in DEFAULT_LANG (people switch the bot's language with /language).
+      const ru = (env.DEFAULT_LANG ?? "ru") !== "en";
+      const cmds = await app.tg.call("setMyCommands", { commands: ru ? COMMANDS_RU : COMMANDS, scope: { type: "all_private_chats" } });
+      await app.tg.call("setMyCommands", { commands: ru ? GROUP_COMMANDS_RU : GROUP_COMMANDS, scope: { type: "all_group_chats" } });
       // P13-11: Mini App in the chat menu button.
-      const menu = await app.tg.call("setChatMenuButton", { menu_button: { type: "web_app", text: "Telepathy", web_app: { url: `${url.origin}/app` } } });
+      const menu = await app.tg.call("setChatMenuButton", { menu_button: { type: "web_app", text: (env.DEFAULT_LANG ?? "ru") === "en" ? "App" : "Приложение", web_app: { url: `${url.origin}/app` } } });
       return json({ webhook: hook, commands: cmds, menu, url: `${url.origin}/telegram`, app: `${url.origin}/app` });
     }
     if (req.method === "GET" && url.pathname === "/admin/status") return json(await status(app.db));

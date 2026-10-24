@@ -19,8 +19,8 @@ export function langFromCode(_code?: string): Lang {
 
 const EN = {
   // general
-  dontKnowYou: "I don't know you yet. Post a message in an enabled community group first, then try again.",
-  privateOnly: "Please send that command to me in a private chat.",
+  dontKnowYou: "We haven't met yet 🙂 Write something in a community group I'm in, then come back.",
+  privateOnly: "This works in a private chat with me — message me there 🙂",
   tooMany: "Too many requests. Please wait a minute.",
   notAvailable: "Not available.",
   saved: "Saved.",
@@ -28,17 +28,17 @@ const EN = {
   no: "no",
   on: "on",
   off: "off",
-  start: "Hi! I search your community's enabled groups and answer with cited quotes, and I can introduce you to opted-in experts.\n\n",
-  help:
-    "<b>Search</b>\n/ask <i>question</i> — cited answers from your groups (typos and RU/EN spelling tolerated). In a group, /ask searches only that group.\n\n" +
-    "<b>Experts &amp; introductions</b>\n/intro <i>what you need</i> — consent-based introduction\n" +
-    "/expert <i>topic</i> — how many opted-in experts match\n/requests — your open requests\n\n" +
-    "<b>Your profile</b>\n/profile — view and change settings\n/digest on · /digest off — daily digest (opt-in)\n" +
-    "/optin · /optout — expert discoverability\n/skills · /skills add <i>skill</i> · /skills remove <i>skill</i> · /skills all\n" +
-    "/language en · /language ru — interface language\n/catchup — what's new since last time · /events — upcoming events · /pings on|off\n" +
-    "Search filters: <code>in:group since:2026-01-01 has:file</code>\n\n" +
-    "<b>Get help</b>\n/help <i>what you need</i> — a request the operator desk follows through; nothing leaves the community without your permission\n/requests · /cancel — your open requests\n\n" +
-    "<b>Your data</b>\n/privacy · /forget_me · /resume_collection",
+  start: "👋 Hi! I'm the Миндальная связь assistant.\n\n" +
+    "🔎 <b>I find answers.</b> Just type a question — I'll search everything discussed in your groups and show where it was.\n" +
+    "🤝 <b>I find people.</b> No answer? I'll point you to someone who knows. Introductions only if you both agree.\n" +
+    "📅 <b>I keep you posted.</b> What's new and what's coming up.\n\n" +
+    "Easiest in the app: the <b>Menu</b> button, bottom left.\n\n",
+  help: "<b>How to use me</b>\n\n" +
+    "🔎 <b>Ask</b>\nJust type your question here.\nIn a group: /ask <i>question</i> — I'll answer from that group.\n\n" +
+    "🤝 <b>Find a person</b>\n/intro <i>what you need</i> — I'll find who can help\n/help <i>what you need</i> — ask the community team for help\n/requests — your requests\n\n" +
+    "📅 <b>Stay in the loop</b>\n/catchup — what's new\n/events — upcoming meetups\n/digest on — a daily summary\n\n" +
+    "🙂 <b>About you</b>\n/profile — settings\n/skills — what you're good at\n/optin — let people find you as an expert\n/language ru — по-русски\n\n" +
+    "🔒 <b>Privacy</b>\n/privacy — what I keep\n/forget_me — delete everything about you",
   privacy:
     "<b>Telepathy privacy notice</b>\n" +
     "• Only groups an owner explicitly enabled are stored. Each group shows a notice.\n" +
@@ -54,11 +54,38 @@ const EN = {
 
   // owner commands in groups
   visibilityMust: (list: string) => `Visibility must be one of: ${list}`,
+  whereMember: "💡 <b>Where things work</b>\n" +
+    "Here, in private — everything.\n" +
+    "In a group — just /ask <i>question</i> (I answer from that group) and /forget as a reply to your own message to delete it.",
+  whereOwner: "\n\n🛠 <b>For the owner</b>\n" +
+    "Here: /status — is all well, /desk — help requests, /sources — connected groups.\n" +
+    "In a group where you're admin: /enable — connect, /disable — disconnect, /welcome — greet newcomers, /hints — hints, /routing — questions to experts.",
+  adminGuide: (title: string) =>
+    `✅ <b>“${title}” is connected.</b> Only you see this.\n\n` +
+    "Members can now ask me about anything discussed here — in the group with /ask, or privately.\n\n" +
+    "<b>What you can set in the group</b>\n" +
+    "/welcome on|off — greet newcomers (on now)\n" +
+    "/hints on|off — point to earlier answers to repeated questions\n" +
+    "/routing on|off — send questions unanswered for 4 hours to experts\n" +
+    "/retention 365 — keep only the last year (0 — everything)\n" +
+    "/disable — disconnect the group\n\n" +
+    "As a reply: /canonical — best answer, /notevent — not an event.\n" +
+    "Everything else is here, in private: /status, /desk, /help.",
+  welcomeDm: (title: string) =>
+    `👋 Hi! I'm the assistant of <b>${title}</b>.\n\n` +
+    "I'll help you find your way around this community and find anything that was ever discussed here. And if needed, I'll find the person who knows the answer to your question.\n\n" +
+    "Just type your question — or tap <b>Menu</b> at the bottom left to open the app. All commands: /help.",
+  welcomeGroup: (name: string) =>
+    `👋 ${name}, welcome! I'll help you find anything that was ever discussed here, and if needed, the person who knows the answer. Start a private chat with me to begin.`,
+  welcomeButton: "Start a chat",
+  welcomeUsage: "Usage: /welcome on or /welcome off (owner, in an enabled group).",
+  welcomeOn: "Welcome is <b>on</b>: new members get a short intro from me, privately when Telegram allows it.",
+  welcomeOff: "Welcome is <b>off</b> in this group.",
   enabled: (vis: string) =>
     `Telepathy is now <b>collecting</b> this chat (visibility: ${vis}, full history kept). ` +
     "Members can search it with /ask, here or in a DM with the bot. DM the bot /privacy for details or /forget_me to delete your data.",
   disabled: "Telepathy stopped collecting this chat. Existing messages are excluded from all answers.",
-  retentionUsage: "Usage: /retention <days 1..3650> to purge older messages, or /retention 0 to keep full history.",
+  retentionUsage: "Usage: /retention &lt;days 1..3650&gt; to purge older messages, or /retention 0 to keep full history.",
   retentionKeepAll: "Full history will be kept. Nothing is purged automatically.",
   retentionSet: (days: number) => `Retention set to ${days} days. Older messages are purged daily.`,
   removed: "Removed from Telepathy.",
@@ -71,6 +98,7 @@ const EN = {
 
   // search
   askUsage: "Usage: <code>/ask your question</code>",
+  aiNote: "AI summary — check it against the sources below.",
   noAccess: "I don't have any community sources you're allowed to read yet. Post in an enabled group first, or ask an admin.",
   insufficient: "<b>No reliable answer found</b> in sources you can access.\nTry different wording, or ask the community directly.",
   insufficientGroup: "<b>No reliable answer found</b> in this group.\nTry different wording.",
@@ -231,8 +259,8 @@ const EN = {
 export type Messages = typeof EN;
 
 const RU: Messages = {
-  dontKnowYou: "Я вас пока не знаю. Сначала напишите сообщение в одной из подключённых групп сообщества, затем попробуйте снова.",
-  privateOnly: "Пожалуйста, отправьте эту команду мне в личном чате.",
+  dontKnowYou: "Мы пока не знакомы 🙂 Напиши что-нибудь в группе сообщества, где я есть, — и возвращайся.",
+  privateOnly: "Это работает в личном чате со мной — напиши мне туда 🙂",
   tooMany: "Слишком много запросов. Подождите минуту.",
   notAvailable: "Недоступно.",
   saved: "Сохранено.",
@@ -240,19 +268,19 @@ const RU: Messages = {
   no: "нет",
   on: "вкл",
   off: "выкл",
-  start: "Привет! Я ищу по подключённым группам сообщества и отвечаю цитатами со ссылками, а ещё могу познакомить вас с экспертами, которые на это согласились.\n\n",
-  help:
-    "<b>Поиск</b>\n/ask <i>вопрос</i> — ответы с цитатами из ваших групп (понимаю опечатки и латиницу/кириллицу). В группе /ask ищет только по этой группе.\n\n" +
-    "<b>Эксперты и знакомства</b>\n/intro <i>что вам нужно</i> — знакомство только с согласия обеих сторон\n" +
-    "/expert <i>тема</i> — сколько экспертов подходит\n/requests — ваши открытые запросы\n\n" +
-    "<b>Ваш профиль</b>\n/profile — настройки\n/digest on · /digest off — ежедневная сводка (по желанию)\n" +
-    "/optin · /optout — видимость как эксперта\n/skills · /skills add <i>навык</i> · /skills remove <i>навык</i> · /skills all\n" +
-    "/language ru · /language en — язык интерфейса\n/catchup — что нового · /events — ближайшие события · /pings on|off\n" +
-    "Фильтры поиска: <code>in:группа since:2026-01-01 has:file</code>\n\n" +
-    "<b>Помощь</b>\n/help <i>что нужно</i> — запрос, который ведёт оператор; без вашего разрешения ничего не уходит за пределы сообщества\n/requests · /cancel — открытые запросы\n\n" +
-    "<b>Ваши данные</b>\n/privacy · /forget_me · /resume_collection",
+  start: "👋 Привет! Я — помощник «Миндальной связи».\n\n" +
+    "🔎 <b>Найду ответ.</b> Просто напиши вопрос — поищу во всём, что обсуждали в твоих группах, и покажу, где это было.\n" +
+    "🤝 <b>Найду человека.</b> Если ответа нет — подскажу, кто в сообществе разбирается. Познакомлю, только если вы оба согласны.\n" +
+    "📅 <b>Не дам пропустить важное.</b> Что нового и какие встречи впереди.\n\n" +
+    "Удобнее всего — в приложении: кнопка <b>Меню</b> слева внизу.\n\n",
+  help: "<b>Как пользоваться</b>\n\n" +
+    "🔎 <b>Спросить</b>\nПросто напиши вопрос сюда.\nВ группе: /ask <i>вопрос</i> — отвечу из этой группы.\n\n" +
+    "🤝 <b>Найти человека</b>\n/intro <i>что нужно</i> — найду, кто поможет\n/help <i>что нужно</i> — попросить помощи у команды сообщества\n/requests — твои запросы\n\n" +
+    "📅 <b>Быть в курсе</b>\n/catchup — что нового\n/events — ближайшие встречи\n/digest on — сводка раз в день\n\n" +
+    "🙂 <b>О тебе</b>\n/profile — настройки\n/skills — что ты умеешь\n/optin — разрешить находить тебя как эксперта\n/language en — English\n\n" +
+    "🔒 <b>Приватность</b>\n/privacy — что я храню\n/forget_me — удалить всё о тебе",
   privacy:
-    "<b>Telepathy: конфиденциальность</b>\n" +
+    "<b>Миндальная связь: конфиденциальность</b>\n" +
     "• Сохраняются только группы, которые явно подключил владелец. В каждой такой группе есть уведомление.\n" +
     "• Ваше имя, юзернейм и телефон не сохраняются; у вас случайный внутренний ID.\n" +
     "• Ответы — дословные цитаты со ссылкой, только из групп, которые вы можете читать.\n" +
@@ -265,14 +293,41 @@ const RU: Messages = {
   languageUsage: "Использование: <code>/language ru</code> или <code>/language en</code>",
 
   visibilityMust: (list: string) => `Видимость должна быть одной из: ${list}`,
+  whereMember: "💡 <b>Где что работает</b>\n" +
+    "Здесь, в личке, — всё.\n" +
+    "В группе — только /ask <i>вопрос</i> (отвечу из этой группы) и /forget ответом на своё сообщение, чтобы его удалить.",
+  whereOwner: "\n\n🛠 <b>Для владельца</b>\n" +
+    "Здесь: /status — всё ли в порядке, /desk — просьбы о помощи, /sources — подключённые группы.\n" +
+    "В группе, где ты админ: /enable — подключить, /disable — отключить, /welcome — приветствие новичков, /hints — подсказки, /routing — вопросы экспертам.",
+  adminGuide: (title: string) =>
+    `✅ <b>«${title}» подключена.</b> Это видишь только ты.\n\n` +
+    "Теперь участники могут спрашивать меня о том, что здесь обсуждали, — в группе через /ask или в личке.\n\n" +
+    "<b>Что можно настроить в группе</b>\n" +
+    "/welcome on|off — приветствовать новичков (сейчас включено)\n" +
+    "/hints on|off — подсказывать прошлые ответы на повторные вопросы\n" +
+    "/routing on|off — вопросы без ответа через 4 часа отправлять экспертам\n" +
+    "/retention 365 — хранить только последний год (0 — всё)\n" +
+    "/disable — отключить группу\n\n" +
+    "Ответом на сообщение: /canonical — лучший ответ, /notevent — это не событие.\n" +
+    "Всё остальное — здесь, в личке: /status, /desk, /help.",
+  welcomeDm: (title: string) =>
+    `👋 Привет! Я помощник сообщества <b>${title}</b>.\n\n` +
+    "Я помогу тебе ориентироваться в этом сообществе и найти любую информацию, которая когда-то обсуждалась. А если потребуется — найду человека, который знает ответ на твой вопрос.\n\n" +
+    "Просто напиши мне вопрос — или нажми <b>Меню</b> слева внизу, чтобы открыть приложение. Все команды — /help.",
+  welcomeGroup: (name: string) =>
+    `👋 ${name}, добро пожаловать! Я помогу найти любую информацию, которая здесь когда-то обсуждалась, а если потребуется — человека, который знает ответ. Создай личный чат со мной, чтобы начать.`,
+  welcomeButton: "Начать",
+  welcomeUsage: "Использование: /welcome on или /welcome off (владелец, в подключённой группе).",
+  welcomeOn: "Приветствие <b>включено</b>: новые участники получат от меня короткое интро — лично, когда Telegram это позволяет.",
+  welcomeOff: "Приветствие в этой группе <b>выключено</b>.",
   enabled: (vis: string) =>
-    `Telepathy теперь <b>сохраняет</b> этот чат (видимость: ${vis}, история хранится полностью). ` +
+    `Миндальная связь теперь <b>сохраняет</b> этот чат (видимость: ${vis}, история хранится полностью). ` +
     "Участники могут искать по нему через /ask здесь или в личке с ботом. Подробности — /privacy в личке с ботом, удалить свои данные — /forget_me.",
-  disabled: "Telepathy больше не сохраняет этот чат. Уже сохранённые сообщения исключены из всех ответов.",
-  retentionUsage: "Использование: /retention <дни 1..3650> — удалять старые сообщения, или /retention 0 — хранить всю историю.",
+  disabled: "Миндальная связь больше не сохраняет этот чат. Уже сохранённые сообщения исключены из всех ответов.",
+  retentionUsage: "Использование: /retention &lt;дни 1..3650&gt; — удалять старые сообщения, или /retention 0 — хранить всю историю.",
   retentionKeepAll: "История будет храниться полностью. Ничего не удаляется автоматически.",
   retentionSet: (days: number) => `Срок хранения: ${days} дн. Более старые сообщения удаляются ежедневно.`,
-  removed: "Удалено из Telepathy.",
+  removed: "Удалено из «Миндальной связи».",
   nothingStored: "Для этого сообщения ничего не сохранено.",
   hintsUsage: "Использование: /hints on или /hints off (владелец, в подключённой группе).",
   hintsOn: "Подсказки <b>включены</b>: если кто-то задаст вопрос, на который в группе уже отвечали, я один раз отвечу ссылкой на прошлый ответ.",
@@ -280,7 +335,8 @@ const RU: Messages = {
   hint: (link: string) => `💡 Похоже, здесь уже отвечали на это: ${link}`,
   earlierAnswer: "прошлое обсуждение",
 
-  askUsage: "Использование: <code>/ask ваш вопрос</code>",
+  askUsage: "Напиши вопрос после <code>/ask</code> — или просто отправь его мне в личку.",
+  aiNote: "Кратко от ИИ — сверься с источниками ниже.",
   noAccess: "Пока нет источников, которые вам разрешено читать. Сначала напишите в подключённой группе или обратитесь к админу.",
   insufficient: "<b>Надёжного ответа не нашлось</b> в доступных вам источниках.\nПопробуйте переформулировать или спросите в сообществе.",
   insufficientGroup: "<b>Надёжного ответа не нашлось</b> в этой группе.\nПопробуйте переформулировать.",

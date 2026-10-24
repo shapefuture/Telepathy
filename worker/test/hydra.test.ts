@@ -848,3 +848,119 @@ describe("H8 conformance: the Worker and the SDK agree with the shared Hydra vec
     for (const c of V.totp.cases) expect(await totp(secret, c.step)).toBe(c.expect);
   });
 });
+
+describe("audit: login enumeration", () => {
+  it("an email login ticket has the same shape whether or not the address is registered", async () => {
+    const n = node();
+    await setup(n, 90);
+    await member(n, 90, "m90@proton.me");
+    const uuidish = /^[0-9a-f]{12}4[0-9a-f]{3}[89ab][0-9a-f]{15}$/;
+    expect((await n.http("POST", "/portal/api/login", { email: "m90@proton.me" }, P)).json.ticket).toMatch(uuidish);
+    for (let i = 0; i < 8; i++) expect((await n.http("POST", "/portal/api/login", { email: `nobody${i}@proton.me` }, P)).json.ticket).toMatch(uuidish);
+  });
+});
+
+describe("audit: one-time login codes", () => {
+  it("an email login code logs in once, even when sent in parallel", async () => {
+    const n = node();
+    await setup(n, 91);
+    await member(n, 91, "m91@proton.me");
+    const ticket = (await n.http("POST", "/portal/api/login", { email: "m91@proton.me" }, P)).json.ticket;
+    const code = codeIn(n.mails.at(-1)!.text);
+    const tries = await Promise.all(Array.from({ length: 4 }, () => n.http("POST", "/portal/api/verify", { ticket, code }, P)));
+    expect(tries.filter((r) => r.json?.ok).length).toBe(1);
+  });
+
+  it("a passport-id login code logs in once, even when sent in parallel", async () => {
+    const n = node();
+    await setup(n, 92);
+    const portal = await member(n, 92, "m92@proton.me");
+    const handle = (await portal("GET", "hydra")).json.handle as string;
+    const ticket = (await n.http("POST", "/portal/api/login/handle", { handle }, P)).json.ticket;
+    const code = codeIn(n.mails.at(-1)!.text);
+    const tries = await Promise.all(Array.from({ length: 4 }, () => n.http("POST", "/portal/api/login/handle/verify", { ticket, code }, P)));
+    expect(tries.filter((r) => r.json?.ok).length).toBe(1);
+  });
+
+  it("parallel authenticator guesses can't run past the five-failure lock", async () => {
+    const n = node();
+    await setup(n, 94);
+    const portal = await member(n, 94, "m94@proton.me");
+    const handle = (await portal("GET", "hydra")).json.handle;
+    const t = (await portal("POST", "totp", {})).json;
+    const step = Math.floor(Date.now() / 30_000);
+    await portal("POST", "totp/confirm", { id: t.id, code: await totp(unbase32(t.secret), step) });
+    const good = await totp(unbase32(t.secret), step + 1);
+    const wrong = good === "000000" ? "111111" : "000000";
+    const tries = await Promise.all([...Array.from({ length: 20 }, () => wrong), good].map((code) => n.http("POST", "/portal/api/login/totp", { handle, code }, P)));
+    expect(tries.at(-1)!.status).toBe(401);
+    expect(await q("SELECT failures>=5 AS locked FROM login_factors WHERE id=?", t.id)).toEqual({ locked: 1 });
+  });
+});
+
+describe("audit: imports", () => {
+  it("an import never attaches someone's verified heads to another person's unverified address", async () => {
+    const n = node();
+    await setup(n, 93);
+    const api = miniApp(n, 93);
+    expect((await api("POST", "passport/enrol", { topics: [] })).json.ok).toBe(true);
+    await api("POST", "passport/email", { email: "victim@proton.me" }); // typed, never verified
+    const stranger = (await q<{ person_id: string }>("SELECT person_id FROM delivery_registrations WHERE channel='email'"))!.person_id;
+    const doc = { schema: "nexus.continuity-export.v1", org: ORG, generated_at: iso(Date.now()), root_version: 1, manifest_version: 1, suppressions: [], people: [{ ref: "victim", emails: ["victim@proton.me"], heads: [{ channel: "sms", address: "+15557654321" }], ops: [{ seq: 1, op: "FOLLOW", topic: "critical", at: iso(Date.now()) }], memberships: [] }] };
+    expect((await n.admin("POST", "/admin/continuity/import", await signWith({ signed: doc }, ON.privateKey, ON.publicKey))).status).toBe(200);
+    const sms = await q<{ person_id: string }>("SELECT person_id FROM delivery_registrations WHERE channel='sms'");
+    expect(sms!.person_id).not.toBe(stranger);
+  });
+});
+
+describe("audit: verifying an address", () => {
+  it("a member's code never verifies an address that someone else has since claimed", async () => {
+    const n = node();
+    await setup(n, 95, 96);
+    const a = await member(n, 95, "m95@proton.me");
+    const b = await member(n, 96, "m96@proton.me");
+    const reg = (await a("POST", "email", { email: "second95@proton.me" })).json.registration;
+    expect((await b("POST", "email", { email: "second95@proton.me" })).json.registration).toBe(reg); // pending: B can claim it
+    // A sees two codes in their inbox and tries them.
+    for (const m of n.mails.filter((x) => x.to === "second95@proton.me")) expect((await a("POST", "email/verify", { registration: reg, code: codeIn(m.text) })).json.ok).toBe(false);
+    expect(await q("SELECT status FROM delivery_registrations WHERE id=?", reg)).toEqual({ status: "pending" });
+  });
+});
+
+describe("audit: malformed input", () => {
+  it("receipts with broken signature lists are rejected, not a crash", async () => {
+    const n = node();
+    await setup(n, 97);
+    const portal = await member(n, 97, "m97@proton.me");
+    const signed = { schema: "nexus.follow-receipt.v1", org: ORG, person_ref: "x", seq: 1, op: "FOLLOW", topic: "critical", at: iso(Date.now()), consent_version: 1 };
+    const r = await portal("POST", "receipts", { receipts: [{ signed, signatures: [null] }, { signed, signatures: 7 }, { signed, signatures: [{ keyid: 1, sig: {} }] }] });
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ applied: 0, rejected: 3 });
+  });
+
+  it("a portal request whose JSON body is null or a number gets an answer, not a crash", async () => {
+    const n = node();
+    await setup(n, 98);
+    for (const body of [null, 5]) {
+      expect((await n.http("POST", "/portal/api/login", body, P)).json).toMatchObject({ ok: true });
+      expect((await n.http("POST", "/portal/api/login/totp", body, P)).status).toBe(401);
+    }
+  });
+});
+
+describe("audit: forgetting", () => {
+  it("forgetting one person removes their login codes and nobody else's", async () => {
+    const n = node();
+    await setup(n, 99, 100);
+    const a = await member(n, 99, "m99@proton.me");
+    const b = await member(n, 100, "m100@proton.me");
+    const hb = (await b("GET", "hydra")).json.handle as string;
+    const ha = (await a("GET", "hydra")).json.handle as string;
+    const ta = (await n.http("POST", "/portal/api/login/handle", { handle: ha }, P)).json.ticket;
+    const tb = (await n.http("POST", "/portal/api/login/handle", { handle: hb }, P)).json.ticket;
+    const code = codeIn(n.mails.at(-1)!.text);
+    expect((await a("POST", "forget", { confirm: "forget" })).json.ok).toBe(true);
+    expect(await q("SELECT COUNT(*) AS n FROM login_codes WHERE id=?", ta)).toEqual({ n: 0 });
+    expect((await n.http("POST", "/portal/api/login/handle/verify", { ticket: tb, code }, P)).json.ok).toBe(true);
+  });
+});

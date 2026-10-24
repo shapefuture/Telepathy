@@ -3,7 +3,7 @@
 // token, core.telegram.org/bots/webapps). Every route reuses the bot's ACL and the same
 // assistance actions as the inline buttons, so the app can't do anything the bot can't.
 
-import { langOf, memberByTg, readable, type Member } from "./acl";
+import { ensureMember, langOf, memberByTg, readable, type Member } from "./acl";
 import { deskAction, deskActions, exchangeAction, forgetMissions, gapAction, jobLabel, memberAction, offerChoice, rateMission, short } from "./assist/actions";
 import { addOffer, listOffers, MODES, withdrawOffer, type CommitmentMode } from "./assist/capacity";
 import { bucket, openGaps } from "./assist/gaps";
@@ -96,10 +96,12 @@ export async function handleApp(req: Request, env: Env, fetcher?: Fetcher, net?:
   }
   const user = await verifyInitUser(req.headers.get("x-telegram-init-data") ?? "", env.BOT_TOKEN);
   if (!user) return json({ error: "unauthorized" }, 401);
-  const m = await memberByTg(env.DB, user.id);
+  const owner = ownerIds(env).has(user.id);
+  // Owners get in on first open; everyone else becomes a member by writing in an enabled group.
+  let m = await memberByTg(env.DB, user.id);
+  if (!m && owner) m = await ensureMember(env.DB, user.id, "owner");
   if (!m || m.removed_at) return json({ error: "unknown member" }, 403);
   const app: App = { env, db: env.DB, tg: createTelegram(env.BOT_TOKEN, fetcher), net };
-  const owner = ownerIds(env).has(user.id);
   const path = url.pathname.slice("/app/api/".length).split("/").filter(Boolean);
   let body: Record<string, unknown> = {};
   if (req.method === "POST") {

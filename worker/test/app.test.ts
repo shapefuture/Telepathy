@@ -41,6 +41,11 @@ async function world() {
 }
 
 describe("Mini App identity", () => {
+  it("an owner who never wrote anything can open the app; a stranger gets a clear 403", async () => {
+    expect((await client(OWNER).get("me")).status).toBe(200);
+    expect((await client(424242).get("me"))).toMatchObject({ status: 403, body: { error: "unknown member" } });
+  });
+
   it("reads username and start_param only from signed initData", async () => {
     const u = await verifyInitUser(await initFor(7, { start_param: "help" }), "123456:TEST");
     expect(u).toEqual({ id: 7, username: "user7x", startParam: "help" });

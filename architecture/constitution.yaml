@@ -35,6 +35,12 @@ invariants:
   - {id: C25, hard: true, description: "A withdrawn consent can't be revived by restore, replay or import (versioned ops + tombstones)"}
   - {id: C26, hard: true, description: "'Protected' and reach metrics count only verified routes; Telegram group size is never reach"}
   - {id: C27, hard: true, description: "Recovery works without Telepathy: signed export + independent verifier"}
+  # Hydra (docs/HYDRA_PLAN.md)
+  - {id: C28, hard: true, description: "Reach is counted in independent failure domains from verified heads only; channels sharing a domain count once"}
+  - {id: C29, hard: true, description: "Regrowth never subscribes anyone: invitations go over heads the person already verified, only with critical-notice consent"}
+  - {id: C30, hard: true, description: "No single partner, owner or key can release a sealed relocation: k shares, each released only on its holder's own evidence"}
+  - {id: C31, hard: true, description: "Public heads (feeds, social, mirrors, anchors) carry only signed public notices, never member data"}
+  - {id: C32, hard: true, description: "A withdrawn choice stays withdrawn across receipts, escrow restores and gossip (highest sequence wins; tombstones checked at send)"}
 authority:
   builder: [repo_read, isolated_workcell_write, test_run, candidate_publish]
   independent_reviewer: [repo_read, hidden_eval_run, evidence_sign]

@@ -5,11 +5,14 @@ import type { App } from "../bot";
 import type { Lang } from "../i18n";
 import type { InlineButton } from "../telegram";
 import { escapeHtml } from "../text";
-import { AlertError, createAlert, endDrill, metrics, startDrill } from "./alerts";
+import { AlertError, createAlert, metrics, startDrill } from "./alerts";
+import { ownerHydra } from "../hydra/bot";
+import { endAnyDrill, HEAD_CHANNELS, startHeadOffDrill } from "../hydra/chaos";
+import { anchorRecord, publishNotice, touchOwners } from "../hydra/notices";
 import { currentManifest, editBackups, KINDS, type DestKind } from "./identity";
 import { personForMember, protection } from "./people";
 
-export const CONTINUITY_OWNER = new Set(["continuity", "destinations", "alert", "drill"]);
+export const CONTINUITY_OWNER = new Set(["continuity", "destinations", "alert", "drill", "hydra"]);
 
 const T = {
   en: {
@@ -47,6 +50,8 @@ export async function ownerContinuity(app: App, chat: number, cmd: string, args:
     await send(T.en.off);
     return [];
   }
+  await touchOwners(app.db); // heartbeat: owners are around (sealed relocations watch this)
+  if (cmd === "hydra") return ownerHydra(app, chat, args, by);
   const words = args.trim().split(/\s+/).filter(Boolean);
   if (cmd === "continuity") {
     const m = await metrics(app.db);
@@ -66,16 +71,19 @@ export async function ownerContinuity(app: App, chat: number, cmd: string, args:
   if (cmd === "destinations") {
     if (words[0] === "add" && KINDS.includes(words[1] as DestKind) && words[2]) {
       const r = await editBackups(app, { add: { kind: words[1] as DestKind, url: words[2], role: "backup" } }, by);
+      if (r.ok) await publishNotice(app, "anchor", "Address list updated", (await anchorRecord(app.db)) ?? "", by);
       await send(r.ok ? `Backup added; signed address list v${r.version}.` : `Not changed: <code>${escapeHtml(r.reason)}</code>`);
       return [];
     }
     if (words[0] === "remove" && words[1]) {
       const r = await editBackups(app, { removeUrl: words[1] }, by);
+      if (r.ok) await publishNotice(app, "anchor", "Address list updated", (await anchorRecord(app.db)) ?? "", by);
       await send(r.ok ? `Removed; signed address list v${r.version}.` : `Not changed: <code>${escapeHtml(r.reason)}</code>`);
       return [];
     }
     if (words[0] === "resign") {
       const r = await editBackups(app, null, by);
+      if (r.ok) await publishNotice(app, "anchor", "Address list updated", (await anchorRecord(app.db)) ?? "", by);
       await send(r.ok ? `Re-signed; v${r.version}, valid 30 days.` : `Not changed: <code>${escapeHtml(r.reason)}</code>`);
       return [];
     }
@@ -89,12 +97,15 @@ export async function ownerContinuity(app: App, chat: number, cmd: string, args:
   if (cmd === "alert") {
     const kind = words[0] === "relocation" ? "relocation" : words[0] === "incident" ? "incident" : null;
     if (!kind) {
-      await send("<code>/alert incident &lt;note&gt;</code> or <code>/alert relocation &lt;note&gt;</code>. Goes only to people who chose critical notices, over channels they verified; at most one a day.");
+      await send("<code>/alert incident [public] &lt;note&gt;</code> or <code>/alert relocation &lt;note&gt;</code>. Goes only to people who chose critical notices, over every path they verified; at most one a day. Relocations (and incidents marked public) also go to the signed public feeds.");
       return [];
     }
+    const isPublic = kind === "relocation" || words[1] === "public";
+    const note = words.slice(isPublic && kind === "incident" ? 2 : 1).join(" ");
     try {
-      const r = await createAlert(app, kind, words.slice(1).join(" "), by);
-      await send(`Queued: ${r.queued} deliveries.`);
+      const r = await createAlert(app, kind, note, by);
+      const pub = isPublic ? await publishNotice(app, kind, kind === "relocation" ? "We have moved" : "Service notice", note || "See the official address list.", by) : null;
+      await send(`Queued: ${r.queued} deliveries.${pub ? ` Public notice #${pub.signed.seq} published.` : ""}`);
       return []; // Telegram copies go out through the effect ledger on the next cron run
     } catch (e) {
       if (!(e instanceof AlertError)) throw e;
@@ -103,6 +114,16 @@ export async function ownerContinuity(app: App, chat: number, cmd: string, args:
     }
   }
   // drill
+  if (words[0] === "start" && words[1] === "head_off" && HEAD_CHANNELS.includes(words[2] ?? "")) {
+    try {
+      const r = await startHeadOffDrill(app, words[2]!, Number(words[3] ?? "20") || 20, by);
+      await send(`Head-off drill: ${words[2]} switched off for ${r.cohort} people; ${r.queued} drill deliveries queued over their other paths. They'll be invited to add two paths. End with /drill end.`);
+    } catch (e) {
+      if (!(e instanceof AlertError)) throw e;
+      await send(`Not started: <code>${e.message}</code>`);
+    }
+    return [];
+  }
   if (words[0] === "start" && ["telegram_down", "nexus_down", "domain_down"].includes(words[1] ?? "")) {
     try {
       const r = await startDrill(app, words[1] as "telegram_down", by);
@@ -114,10 +135,14 @@ export async function ownerContinuity(app: App, chat: number, cmd: string, args:
     return [];
   }
   if (words[0] === "end") {
-    const r = await endDrill(app.db, words.slice(1).join(" "));
-    await send(r ? `Drill ended: ${r.confirmed}/${r.invited} confirmed they could reach you without the failed platform.` : "No drill is running.");
+    const r = await endAnyDrill(app, words.slice(1).join(" "));
+    await send(
+      r
+        ? `Drill ended: ${r.confirmed}/${r.invited} confirmed (${r.reachedPct ?? "—"}%, target ≥90%).` + (r.regrowth ? ` Regrowth: ${r.regrowth.added} new paths for ${r.regrowth.lost} lost (ratio ${r.regrowth.ratio ?? "—"}, target ≥2; counts keep growing for 14 days, see /hydra).` : "")
+        : "No drill is running.",
+    );
     return [];
   }
-  await send("<code>/drill start telegram_down|nexus_down|domain_down</code> · <code>/drill end [notes]</code>");
+  await send(`<code>/drill start telegram_down|nexus_down|domain_down</code> · <code>/drill start head_off ${HEAD_CHANNELS.join("|")} [percent]</code> · <code>/drill end [notes]</code>`);
   return [];
 }

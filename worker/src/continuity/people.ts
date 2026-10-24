@@ -9,7 +9,7 @@ import type { App } from "../bot";
 import type { Env } from "../env";
 import { audit, DAY, HOUR, newId, nowIso } from "../util";
 import { hmacHex, numericCode, open, randomToken, recoveryCode, seal } from "./crypto";
-import { sendEmail } from "./email";
+import { computeDomains, deliver, type RegRow } from "../hydra/deliver";
 
 export const TOPICS = ["critical", "events", "requests", "news", "commercial", "partner_offers"] as const;
 export type Topic = (typeof TOPICS)[number];
@@ -76,7 +76,7 @@ export async function applyOp(db: D1Database, personId: string, op: Op, topic: T
 /** Person changes a purpose. Unfollow also suppresses their addresses for it; follow lifts that. */
 export async function setTopic(app: App, personId: string, topic: Topic, on: boolean): Promise<void> {
   await applyOp(app.db, personId, on ? "FOLLOW" : "UNFOLLOW", topic);
-  const hashes = (await app.db.prepare("SELECT suppress_hash FROM delivery_registrations WHERE person_id=? AND channel='email'").bind(personId).all<{ suppress_hash: string }>()).results.map((r) => r.suppress_hash);
+  const hashes = (await app.db.prepare("SELECT suppress_hash FROM delivery_registrations WHERE person_id=?").bind(personId).all<{ suppress_hash: string }>()).results.map((r) => r.suppress_hash);
   for (const h of hashes) {
     if (on) await app.db.prepare("DELETE FROM suppressions WHERE address_hash=? AND scope=?").bind(h, topic).run();
     else await app.db.prepare("INSERT OR IGNORE INTO suppressions(address_hash, scope, created_at) VALUES (?,?,?)").bind(h, topic, nowIso()).run();
@@ -110,10 +110,11 @@ export async function addEmail(app: App, personId: string, email: string, now = 
   return { registrationId: regId, sent };
 }
 
-async function issueCode(app: App, registrationId: string, purpose: "verify" | "login", now: Date): Promise<string> {
+/** Send a one-time code over the head itself (email, push, ntfy, Matrix, SMS): proof of control. */
+export async function issueCode(app: App, registrationId: string, purpose: "verify" | "login", now: Date): Promise<string> {
   const recent = await app.db.prepare("SELECT COUNT(*) AS n FROM login_codes WHERE registration_id=? AND expires_at>?").bind(registrationId, nowIso(new Date(now.getTime() - HOUR + CODE_TTL_MS))).first<{ n: number }>();
   if ((recent?.n ?? 0) >= CODES_PER_HOUR) throw new ContinuityError("too_many_codes");
-  const reg = await app.db.prepare("SELECT address_enc FROM delivery_registrations WHERE id=?").bind(registrationId).first<{ address_enc: string }>();
+  const reg = await app.db.prepare("SELECT id, person_id, channel, address_enc, meta_enc, domains FROM delivery_registrations WHERE id=?").bind(registrationId).first<RegRow>();
   if (!reg) throw new ContinuityError("unknown_registration");
   const code = numericCode();
   await app.db
@@ -121,11 +122,7 @@ async function issueCode(app: App, registrationId: string, purpose: "verify" | "
     .bind(newId(), registrationId, await hmacHex(app.env.CONTINUITY_KEY, "code", `${registrationId}:${code}`), purpose, nowIso(new Date(now.getTime() + CODE_TTL_MS)))
     .run();
   const label = app.env.COMMUNITY_LABEL || "your community";
-  return sendEmail(app, {
-    to: await open(app.env.CONTINUITY_KEY, reg.address_enc),
-    subject: `${label}: your code ${code}`,
-    text: `Your ${label} code is ${code}. It expires in 10 minutes.\n\nIf you didn't ask for it, ignore this message.`,
-  });
+  return deliver(app, reg, { title: `${label}: your code ${code}`, text: `Your ${label} code is ${code}. It expires in 10 minutes.\n\nIf you didn't ask for it, ignore this message.` });
 }
 
 /** Check a code; on success the registration is verified. Returns the person id. */
@@ -143,7 +140,10 @@ export async function checkCode(app: App, registrationId: string, code: string, 
     .bind(nowIso(now), registrationId)
     .first<{ person_id: string; suppress_hash: string }>();
   // Re-verifying an address is a new explicit action: it lifts an earlier endpoint revocation.
-  if (reg) await app.db.prepare("DELETE FROM suppressions WHERE address_hash=? AND scope='*'").bind(reg.suppress_hash).run();
+  if (reg) {
+    await app.db.prepare("DELETE FROM suppressions WHERE address_hash=? AND scope='*'").bind(reg.suppress_hash).run();
+    await computeDomains(app, registrationId);
+  }
   return reg?.person_id ?? null;
 }
 
@@ -230,25 +230,39 @@ export async function activeAttestations(db: D1Database, personId: string, now =
 
 export interface Protection {
   enrolled: boolean;
-  independentLogin: boolean; // verified email OR unused recovery codes
-  alternateDelivery: boolean; // verified email AND following 'critical' AND not suppressed
+  independentLogin: boolean; // any verified head, unused recovery codes, TOTP or a device key
+  alternateDelivery: boolean; // a verified head AND following 'critical' AND not suppressed
   recoveryCodes: number;
   emails: { id: string; address: string; status: string }[];
+  heads: { id: string; channel: string; address: string; status: string; health: string; domains: string[] }[];
+  factors: { id: string; kind: string; label: string | null }[];
   topics: Record<string, string>;
   level: "not_enrolled" | "not_yet_protected" | "login_only" | "protected";
 }
 
 export async function protection(env: Env, db: D1Database, personId: string | null): Promise<Protection> {
-  if (!personId) return { enrolled: false, independentLogin: false, alternateDelivery: false, recoveryCodes: 0, emails: [], topics: {}, level: "not_enrolled" };
-  const regs = (await db.prepare("SELECT id, address_enc, suppress_hash, status FROM delivery_registrations WHERE person_id=? AND channel='email' AND status<>'revoked'").bind(personId).all<{ id: string; address_enc: string; suppress_hash: string; status: string }>()).results;
+  if (!personId) return { enrolled: false, independentLogin: false, alternateDelivery: false, recoveryCodes: 0, emails: [], heads: [], factors: [], topics: {}, level: "not_enrolled" };
+  const regs = (await db.prepare("SELECT id, channel, address_enc, suppress_hash, status, health, domains FROM delivery_registrations WHERE person_id=? AND channel<>'telegram' AND status<>'revoked' ORDER BY created_at").bind(personId).all<{ id: string; channel: string; address_enc: string; suppress_hash: string; status: string; health: string; domains: string | null }>()).results;
+  const factors = (await db.prepare("SELECT id, kind, label FROM login_factors WHERE person_id=? AND status='active'").bind(personId).all<{ id: string; kind: string; label: string | null }>()).results;
   const codes = (await db.prepare("SELECT COUNT(*) AS n FROM recovery_codes WHERE person_id=? AND used_at IS NULL").bind(personId).first<{ n: number }>())?.n ?? 0;
   const topics = await follows(db, personId);
   const verified = regs.filter((r) => r.status === "verified");
   let alt = false;
   if (topics.critical === "following") for (const r of verified) if (!(await suppressed(db, r.suppress_hash, "critical"))) alt = true;
-  const login = verified.length > 0 || codes > 0;
-  const emails = await Promise.all(regs.map(async (r) => ({ id: r.id, address: await open(env.CONTINUITY_KEY, r.address_enc), status: r.status })));
-  return { enrolled: true, independentLogin: login, alternateDelivery: alt, recoveryCodes: codes, emails, topics, level: login && alt ? "protected" : login ? "login_only" : "not_yet_protected" };
+  const login = verified.length > 0 || codes > 0 || factors.length > 0;
+  const heads = await Promise.all(regs.map(async (r) => ({ id: r.id, channel: r.channel, address: displayAddress(r.channel, await open(env.CONTINUITY_KEY, r.address_enc)), status: r.status, health: r.health, domains: JSON.parse(r.domains ?? "[]") as string[] })));
+  const emails = heads.filter((h) => h.channel === "email").map(({ id, address, status }) => ({ id, address, status }));
+  return { enrolled: true, independentLogin: login, alternateDelivery: alt, recoveryCodes: codes, emails, heads, factors, topics, level: login && alt ? "protected" : login ? "login_only" : "not_yet_protected" };
+}
+
+/** Push endpoints are long capability URLs: show only the service. */
+function displayAddress(channel: string, a: string): string {
+  if (channel !== "webpush") return a;
+  try {
+    return `browser push (${new URL(a).hostname})`;
+  } catch {
+    return "browser push";
+  }
 }
 
 /** Personal export (free, always available): everything we hold about this person's relationship. */
@@ -259,7 +273,7 @@ export async function personalExport(env: Env, db: D1Database, personId: string)
     schema: "nexus.person-export.v1",
     exported_at: nowIso(),
     person_ref: personId,
-    channels: p.emails.map((e) => ({ channel: "email", address: e.address, status: e.status })),
+    channels: p.heads.map((e) => ({ channel: e.channel, address: e.address, status: e.status, domains: e.domains })),
     follows: p.topics,
     ops,
     memberships: await activeAttestations(db, personId),
@@ -279,6 +293,10 @@ export async function forgetPerson(db: D1Database, personId: string): Promise<vo
     db.prepare("DELETE FROM delivery_registrations WHERE person_id=?").bind(personId),
     db.prepare("DELETE FROM login_codes WHERE registration_id NOT IN (SELECT id FROM delivery_registrations)"),
     db.prepare("DELETE FROM recovery_codes WHERE person_id=?").bind(personId),
+    db.prepare("UPDATE login_factors SET status='revoked', secret_enc=NULL WHERE person_id=?").bind(personId),
+    db.prepare("UPDATE guardians SET status='removed' WHERE person_id=? OR guardian_id=?").bind(personId, personId),
+    db.prepare("UPDATE buddies SET status='ended' WHERE inviter=? OR invitee=?").bind(personId, personId),
+    db.prepare("UPDATE recovery_requests SET state='cancelled' WHERE person_id=? AND state='open'").bind(personId),
     db.prepare("UPDATE sessions SET revoked_at=? WHERE person_id=? AND revoked_at IS NULL").bind(now, personId),
     db.prepare("DELETE FROM follow_state WHERE person_id=?").bind(personId),
     db.prepare("DELETE FROM subscription_ops WHERE person_id=?").bind(personId),

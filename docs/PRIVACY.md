@@ -68,6 +68,21 @@ or delete your passport, we keep a one-way fingerprint of the address so it can'
 a restore or an import; it identifies nothing else. A membership pass you create for a partner
 shows only your membership level, under a pseudonym that differs for each partner.
 
+**More ways to stay in touch (optional).** You can add other ways for us to reach you: browser
+notifications (the message passes encrypted through your browser maker's push service), the ntfy
+app (via [ntfy server], which sees the notice text), Matrix (via [homeserver], which sees the notice
+text), SMS (via [SMS provider]) or a second email address (also possible via our backup email
+provider [name it here]). Each one is added by you, confirmed with a code sent over it, and removable
+at any time. We only ever send critical notices there unless you choose more. We record whether a
+path is working (delivered or failing), not what you do with it. You can also choose: an
+authenticator app or a key kept in this browser to log in; a buddy who agrees to pass critical notices
+to you (they see the name you give them, nothing else); and guardians who can approve a recovery of
+your access (they learn only that someone asked). Your device keeps signed copies of your choices so
+they can be restored if our records are lost. An encrypted backup of the addresses you added and your
+choices is stored with [backup storage provider(s)] and can be opened only by [named people/keys].
+Public channels (our feed, calendar, [Mastodon/Bluesky accounts], mirrors) carry only notices we
+publish for everyone, never anything about you.
+
 **Your controls.**
 - `/profile`: see and change everything stored about your discoverability and your digest.
 - `/optout`: stop being discoverable.

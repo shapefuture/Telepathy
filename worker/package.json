@@ -13,7 +13,8 @@
     "import": "node scripts/import-export.mjs",
     "fed:keys": "node scripts/fed-keys.mjs",
     "fed:rotate": "node scripts/fed-rotate.mjs",
-    "identity": "node scripts/identity.mjs"
+    "identity": "node scripts/identity.mjs",
+    "hydra": "node scripts/hydra.mjs"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "1.3.7",

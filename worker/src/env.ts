@@ -38,6 +38,42 @@ export interface Env {
   EMAIL_API_KEY?: string;
   EMAIL_FROM?: string;
   EMAIL_API_URL?: string;
+  // ---- Hydra (P16, docs/HYDRA.md): more independent heads. Each is off until configured. ----
+  /** Second email provider, a different company ("resend" | "postmark"); automatic failover. */
+  EMAIL_B_PROVIDER?: string;
+  EMAIL_B_API_KEY?: string;
+  EMAIL_B_FROM?: string;
+  EMAIL_B_API_URL?: string;
+  /** Secret: token in the provider's bounce webhook URL (/hydra/bounce?t=...). */
+  EMAIL_WEBHOOK_SECRET?: string;
+  /** Web Push (VAPID): public key var (base64url), private key secret, contact subject. */
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
+  VAPID_SUBJECT?: string;
+  /** ntfy servers members may use, comma-separated https origins (e.g. https://ntfy.sh). Unset = off. */
+  NTFY_SERVERS?: string;
+  /** Matrix bot: homeserver URL (var) and access token (secret). */
+  MATRIX_HOMESERVER?: string;
+  MATRIX_ACCESS_TOKEN?: string;
+  /** Optional paid SMS for critical notices: "twilio" + account SID, auth token (secret), sender. */
+  SMS_PROVIDER?: string;
+  SMS_ACCOUNT_SID?: string;
+  SMS_AUTH_TOKEN?: string;
+  SMS_FROM?: string;
+  /** Public announcements only (never a follow graph): Mastodon and Bluesky accounts. */
+  MASTODON_URL?: string;
+  MASTODON_TOKEN?: string;
+  BLUESKY_HANDLE?: string;
+  BLUESKY_APP_PASSWORD?: string;
+  BLUESKY_PDS?: string;
+  /** "true": ask the Internet Archive to save the public identity document after each change. */
+  ARCHIVE_ANCHOR?: string;
+  /** Escrow: comma-separated X25519 public keys (base64) that can decrypt nightly backups. */
+  ESCROW_RECIPIENTS?: string;
+  /** Escrow targets, JSON: [{"name","url","region","keyIdSecret","secretSecret"}] (S3-compatible). */
+  ESCROW_TARGETS?: string;
+  /** Optional R2 bucket binding for one escrow copy (a second storage kind next to D1). */
+  ESCROW_R2?: R2Bucket;
 }
 
 export function ownerIds(env: Env): Set<number> {

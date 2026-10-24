@@ -35,3 +35,12 @@ console.log(await send("https://club-a.example", await sign(msg, MY_PRIVATE_KEY)
 
 Canonical JSON: keys sorted, no whitespace, strings as `JSON.stringify` writes them, integers
 only (no floats).
+
+## Hydra (P16)
+
+`sdk/hydra.mjs` checks what a club publishes on its other heads, without Telepathy: failure
+domains and the hydra index, signed notices, follow receipts, heartbeats, anchor records, the newest
+valid address list among several sources (`bestManifest`), escrow decryption, Shamir recombination
+and TOTP. Vectors: `test-vectors/hydra-v1.json` (regenerate with `hydra-generate.mjs`). The Worker
+(`worker/test/hydra.test.ts`) and Python (`tests/test_hydra_conformance.py`) are both tested against
+them.

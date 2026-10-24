@@ -304,18 +304,18 @@ Each item below is deliberately specific. Checkbox markers start empty, do not m
 - [ ] **CONT-10 Continuity SDK, vectors, independent Python implementation.** _built · issue #172. Evidence: tests, independent review, commit SHA._
 
 
-### P16 — Hydra: antifragile reach (K23, planned)
+### P16 — Hydra: antifragile reach (K23, built; drills pending)
 **Depends on:** P15. **Order:** H0 → H1 → H3 → H2 → H4 → H5 → H6 → H7 → H8. **Decisive test:** three drills on three failure domains, each with ≥ 90% still reached, regrowth ratio ≥ 2, verified reroute < 1 h.
 
-- [ ] **H0 Head model: failure domains, k-path coverage, hydra index, regrowth ratio.** _planned. Evidence: tests, drill results, independent review, commit SHA._
-- [ ] **H1 More delivery heads: Web Push, ntfy, signed RSS/iCal, Matrix, second email provider.** _planned. Evidence: tests, drill results, independent review, commit SHA._
-- [ ] **H2 More login heads: TOTP, magic link over any head, device key, passkeys later.** _planned. Evidence: tests, drill results, independent review, commit SHA._
-- [ ] **H3 Regrowth engine + canaries: reroute, add-two-heads invitations, playbooks.** _planned. Evidence: tests, drill results, independent review, commit SHA._
-- [ ] **H4 Hosting and data multi-homing: second account, non-Cloudflare node, mirrors, 3-2-1 escrow, Shamir.** _planned. Evidence: tests, drill results, independent review, commit SHA._
-- [ ] **H5 Member-held proof: countersigned follow receipts, social recovery.** _planned. Evidence: tests, drill results, independent review, commit SHA._
-- [ ] **H6 Anchors and gossip: DNS/Nostr/AT/public repo/Archive, partner gossip, recovery cards.** _planned. Evidence: tests, drill results, independent review, commit SHA._
-- [ ] **H7 Sealed relocation (k-of-n dead man's switch) + chaos calendar.** _planned. Evidence: tests, drill results, independent review, commit SHA._
-- [ ] **H8 Conformance: SDK and vectors for heads, receipts, anchors, gossip.** _planned. Evidence: tests, drill results, independent review, commit SHA._
+- [ ] **H0 Head model: failure domains, k-path coverage, hydra index, regrowth ratio.** _built · issue #173. Evidence: tests, drill results, independent review, commit SHA._
+- [ ] **H1 More delivery heads: Web Push, ntfy, signed RSS/iCal, Matrix, second email provider.** _built · issue #174. Evidence: tests, drill results, independent review, commit SHA._
+- [ ] **H2 More login heads: TOTP, magic link over any head, device key, passkeys later.** _built · issue #175. Evidence: tests, drill results, independent review, commit SHA._
+- [ ] **H3 Regrowth engine + canaries: reroute, add-two-heads invitations, playbooks.** _built · issue #176. Evidence: tests, drill results, independent review, commit SHA._
+- [ ] **H4 Hosting and data multi-homing: second account, non-Cloudflare node, mirrors, 3-2-1 escrow, Shamir.** _built · issue #177. Evidence: tests, drill results, independent review, commit SHA._
+- [ ] **H5 Member-held proof: countersigned follow receipts, social recovery.** _built · issue #178. Evidence: tests, drill results, independent review, commit SHA._
+- [ ] **H6 Anchors and gossip: DNS/Nostr/AT/public repo/Archive, partner gossip, recovery cards.** _built · issue #178. Evidence: tests, drill results, independent review, commit SHA._
+- [ ] **H7 Sealed relocation (k-of-n dead man's switch) + chaos calendar.** _built · issue #178. Evidence: tests, drill results, independent review, commit SHA._
+- [ ] **H8 Conformance: SDK and vectors for heads, receipts, anchors, gossip.** _built · issue #178. Evidence: tests, drill results, independent review, commit SHA._
 
 ## Hard quality gates (release-blocking)
 

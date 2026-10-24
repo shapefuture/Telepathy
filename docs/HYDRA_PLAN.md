@@ -1,7 +1,8 @@
 # Hydra: an antifragile path between a community and its members
 
-**Status:** plan (2026-10-24). Builds on Continuity (P15, `docs/CONTINUITY.md`). Nothing here is
-implemented yet unless marked *exists*.
+**Status:** built in the prototype (2026-10-24), not yet drilled with a real club. Builds on
+Continuity (P15, `docs/CONTINUITY.md`). What exists and how to run it: [`HYDRA.md`](HYDRA.md).
+"*exists*" below marks what predates this plan.
 
 ## 1. The goal in one sentence
 

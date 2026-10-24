@@ -1,0 +1,903 @@
+{
+ "note": "Hydra (P16) conformance vectors. Test keys only.",
+ "now": "2030-01-02T00:00:00Z",
+ "root": {
+  "signed": {
+   "schema": "nexus.root.v1",
+   "org": "club-a",
+   "version": 1,
+   "expires": "2031-01-01T00:00:00Z",
+   "root_keys": [
+    {
+     "keyid": "001759f3a01151f5",
+     "key": "nj4CJ5nBY/HG1/TSuphZj57tMzNxZNGNrpln9k+ul9Y="
+    },
+    {
+     "keyid": "eb3783c5ce5d3ce3",
+     "key": "Rg98tHVvrnc+f01Lvk4mwCc6Wb095cPpHXeVnq6eFKg="
+    },
+    {
+     "keyid": "af9bd372a9eccb2a",
+     "key": "CaoSmZSDK4PpHRknjEzdG9xzZWjHIbhVBwBPWBoAjpc="
+    }
+   ],
+   "threshold": 2,
+   "online_keys": [
+    {
+     "keyid": "4ea434218abbe80f",
+     "key": "Q1Z8JjmJZt46/z9HNRyVnXBSSV2zu4ZIheOxK0x5f7I="
+    }
+   ]
+  },
+  "signatures": [
+   {
+    "keyid": "001759f3a01151f5",
+    "sig": "RlHagtuUu1arzXXmJH+3OYf+sccdX3DwU7j7ZserOxiQbSPyXbTrejh2XZCLAV/KZ5HEOYKXYn8isl9My/FAAQ=="
+   },
+   {
+    "keyid": "eb3783c5ce5d3ce3",
+    "sig": "EVMJR/RKO1D7+0JIOAqZt+PZChzhloi7sdVYYL3uC0sSxexRYWkepVbVrDZj51DkPkRZ7ZZNr3wJmI3uGH1+AQ=="
+   },
+   {
+    "keyid": "af9bd372a9eccb2a",
+    "sig": "M4K86kkqBh30FlH/UX3C31OSm60OCO00i2MhlWhxAdXoMshUSyVNNe9F1F2fuCSK7J/c23MmGhowIqUggJwhDw=="
+   }
+  ]
+ },
+ "manifest": {
+  "signed": {
+   "schema": "nexus.destinations.v1",
+   "org": "club-a",
+   "version": 1,
+   "root_version": 1,
+   "expires": "2031-01-01T00:00:00Z",
+   "destinations": [
+    {
+     "kind": "web",
+     "url": "https://club-a.example",
+     "role": "primary"
+    }
+   ]
+  },
+  "signatures": [
+   {
+    "keyid": "4ea434218abbe80f",
+    "sig": "L6Mfngi+PLbI+i6XXeoKurbY9IUqX/EuUUfZ6zBVwZ+DYiU7+YZj9Hsix49MOxENyZdoOxKqgwtomW59vx2nAQ=="
+   }
+  ]
+ },
+ "domains": [
+  {
+   "kind": "email",
+   "address": "Ann@Gmail.com",
+   "opts": {
+    "senders": [
+     "resend",
+     "postmark"
+    ]
+   },
+   "expect": [
+    "mail:google",
+    "org:google"
+   ]
+  },
+  {
+   "kind": "email",
+   "address": "me@family.example",
+   "opts": {
+    "mx": "aspmx.l.google.com.",
+    "senders": [
+     "resend"
+    ]
+   },
+   "expect": [
+    "mail:google",
+    "org:google",
+    "sender:resend"
+   ]
+  },
+  {
+   "kind": "email",
+   "address": "x@proton.me",
+   "opts": {
+    "senders": [
+     "resend"
+    ]
+   },
+   "expect": [
+    "mail:proton",
+    "sender:resend"
+   ]
+  },
+  {
+   "kind": "webpush",
+   "address": "https://fcm.googleapis.com/fcm/send/abc",
+   "opts": {},
+   "expect": [
+    "org:google",
+    "push:google"
+   ]
+  },
+  {
+   "kind": "webpush",
+   "address": "https://web.push.apple.com/QQ",
+   "opts": {},
+   "expect": [
+    "org:apple",
+    "push:apple"
+   ]
+  },
+  {
+   "kind": "ntfy",
+   "address": "https://ntfy.sh/tp_abc",
+   "opts": {},
+   "expect": [
+    "ntfy:ntfy.sh"
+   ]
+  },
+  {
+   "kind": "matrix",
+   "address": "@ann:matrix.org",
+   "opts": {
+    "matrixServer": "https://matrix.club.example"
+   },
+   "expect": [
+    "matrix:matrix.club.example",
+    "matrix:matrix.org"
+   ]
+  },
+  {
+   "kind": "sms",
+   "address": "+447700900123",
+   "opts": {},
+   "expect": [
+    "sms"
+   ]
+  },
+  {
+   "kind": "telegram",
+   "address": "",
+   "opts": {},
+   "expect": [
+    "telegram"
+   ]
+  }
+ ],
+ "registry": {
+  "ntfy:ntfy.club.example": [
+   "cloud:hetzner"
+  ],
+  "matrix:matrix.club.example": [
+   "cloud:hetzner"
+  ]
+ },
+ "independent": [
+  {
+   "heads": [
+    [
+     "mail:google",
+     "org:google"
+    ],
+    [
+     "mail:google",
+     "org:google"
+    ]
+   ],
+   "registry": {},
+   "expect": 1
+  },
+  {
+   "heads": [
+    [
+     "mail:google",
+     "org:google"
+    ],
+    [
+     "org:google",
+     "push:google"
+    ]
+   ],
+   "registry": {},
+   "expect": 1
+  },
+  {
+   "heads": [
+    [
+     "telegram"
+    ],
+    [
+     "mail:proton"
+    ],
+    [
+     "ntfy:ntfy.sh"
+    ]
+   ],
+   "registry": {},
+   "expect": 3
+  },
+  {
+   "heads": [
+    [
+     "ntfy:ntfy.club.example"
+    ],
+    [
+     "matrix:matrix.club.example"
+    ]
+   ],
+   "registry": {
+    "ntfy:ntfy.club.example": [
+     "cloud:hetzner"
+    ],
+    "matrix:matrix.club.example": [
+     "cloud:hetzner"
+    ]
+   },
+   "expect": 1
+  }
+ ],
+ "index": [
+  {
+   "graph": [
+    {
+     "id": "a",
+     "heads": [
+      [
+       "telegram"
+      ],
+      [
+       "mail:google",
+       "org:google"
+      ],
+      [
+       "ntfy:ntfy.sh"
+      ]
+     ]
+    },
+    {
+     "id": "b",
+     "heads": [
+      [
+       "telegram"
+      ],
+      [
+       "mail:proton"
+      ]
+     ]
+    },
+    {
+     "id": "c",
+     "heads": [
+      [
+       "telegram"
+      ]
+     ],
+     "buddies": [
+      "a"
+     ]
+    },
+    {
+     "id": "d",
+     "heads": [
+      [
+       "telegram"
+      ],
+      [
+       "ntfy:ntfy.sh"
+      ]
+     ]
+    }
+   ],
+   "expect": {
+    "index": 2,
+    "atLeast": false,
+    "worst": [
+     "telegram",
+     "ntfy:ntfy.sh"
+    ],
+    "cutOff": 1,
+    "people": 4
+   }
+  },
+  {
+   "graph": [
+    {
+     "id": "x",
+     "heads": [
+      [
+       "telegram"
+      ]
+     ]
+    }
+   ],
+   "expect": {
+    "index": 1,
+    "atLeast": false,
+    "worst": [
+     "telegram"
+    ],
+    "cutOff": 1,
+    "people": 1
+   }
+  },
+  {
+   "graph": [
+    {
+     "id": "x",
+     "heads": []
+    },
+    {
+     "id": "y",
+     "heads": [
+      [
+       "telegram"
+      ]
+     ]
+    }
+   ],
+   "expect": {
+    "index": 0,
+    "atLeast": false,
+    "worst": [],
+    "cutOff": 1,
+    "people": 2
+   }
+  }
+ ],
+ "notices": [
+  {
+   "note": "valid",
+   "doc": {
+    "signed": {
+     "schema": "nexus.notice.v1",
+     "org": "club-a",
+     "seq": 7,
+     "kind": "incident",
+     "title": "Telegram is unavailable for us",
+     "body": "Portal: https://club-a.example/portal",
+     "issued_at": "2030-01-02T00:00:00Z",
+     "manifest_version": 1,
+     "primary": "https://club-a.example"
+    },
+    "signatures": [
+     {
+      "keyid": "4ea434218abbe80f",
+      "sig": "7OwGLvkYsjCE+uCIAz0x0U8leVxjwTvCSUAEacM9ptmwGDrPIbwPlv7c7N+QOeMPdCHWUzNRuUkyCd7PbXFDBQ=="
+     }
+    ]
+   },
+   "expect": {
+    "ok": true
+   }
+  },
+  {
+   "note": "tampered body",
+   "doc": {
+    "signed": {
+     "schema": "nexus.notice.v1",
+     "org": "club-a",
+     "seq": 7,
+     "kind": "incident",
+     "title": "Telegram is unavailable for us",
+     "body": "Send money to ...",
+     "issued_at": "2030-01-02T00:00:00Z",
+     "manifest_version": 1,
+     "primary": "https://club-a.example"
+    },
+    "signatures": [
+     {
+      "keyid": "4ea434218abbe80f",
+      "sig": "7OwGLvkYsjCE+uCIAz0x0U8leVxjwTvCSUAEacM9ptmwGDrPIbwPlv7c7N+QOeMPdCHWUzNRuUkyCd7PbXFDBQ=="
+     }
+    ]
+   },
+   "expect": {
+    "ok": false,
+    "reason": "notice_signature"
+   }
+  },
+  {
+   "note": "unknown key",
+   "doc": {
+    "signed": {
+     "schema": "nexus.notice.v1",
+     "org": "club-a",
+     "seq": 7,
+     "kind": "incident",
+     "title": "Telegram is unavailable for us",
+     "body": "Portal: https://club-a.example/portal",
+     "issued_at": "2030-01-02T00:00:00Z",
+     "manifest_version": 1,
+     "primary": "https://club-a.example"
+    },
+    "signatures": [
+     {
+      "keyid": "27ade1feae83db42",
+      "sig": "EGe0YjkPOF3pZdpjsMMhzOFX+eI/BtdaB4ywDf94N6vmJyKy0tKJbeGv4WS+pPLV6nFl8Kle8N9hIYtv5pcBCQ=="
+     }
+    ]
+   },
+   "expect": {
+    "ok": false,
+    "reason": "notice_signature"
+   }
+  }
+ ],
+ "receipts": {
+  "valid": [
+   {
+    "signed": {
+     "schema": "nexus.follow-receipt.v1",
+     "org": "club-a",
+     "person_ref": "p1",
+     "seq": 1,
+     "op": "FOLLOW",
+     "topic": "critical",
+     "at": "2030-01-02T00:00:00Z",
+     "consent_version": 1
+    },
+    "signatures": [
+     {
+      "keyid": "4ea434218abbe80f",
+      "sig": "NFuzrpFZ+sLmgJ9dJoPYqXFsjHpAPXTLIkn2poQ6Q7atHNPoNOd1R0Uf6JuJJXONTCpjB89uzzwnD/39KFkNDg=="
+     }
+    ]
+   },
+   {
+    "signed": {
+     "schema": "nexus.follow-receipt.v1",
+     "org": "club-a",
+     "person_ref": "p1",
+     "seq": 2,
+     "op": "FOLLOW",
+     "topic": "events",
+     "at": "2030-01-02T00:00:00Z",
+     "consent_version": 1
+    },
+    "signatures": [
+     {
+      "keyid": "4ea434218abbe80f",
+      "sig": "BvTtkL6ppH+lS1SOGFYd5S3rxzaah61uLQPqCWmXnnNt76w/8T5iY3MMgPon31ZYmh9kWbkPFP6dT0Z59MFvBg=="
+     }
+    ]
+   },
+   {
+    "signed": {
+     "schema": "nexus.follow-receipt.v1",
+     "org": "club-a",
+     "person_ref": "p1",
+     "seq": 3,
+     "op": "UNFOLLOW",
+     "topic": "events",
+     "at": "2030-01-02T00:00:00Z",
+     "consent_version": 1
+    },
+    "signatures": [
+     {
+      "keyid": "4ea434218abbe80f",
+      "sig": "TjCbP8d2idnDTSFuUR4TNpqgXQxWG+5+bNs88tcIMEnb5VjwdduoOM/wFiVsoFpzpRKpPY8YzuyQIeog74esCA=="
+     }
+    ]
+   }
+  ],
+  "forged": {
+   "signed": {
+    "schema": "nexus.follow-receipt.v1",
+    "org": "club-a",
+    "person_ref": "p1",
+    "seq": 3,
+    "op": "FOLLOW",
+    "topic": "events",
+    "at": "2030-01-02T00:00:00Z",
+    "consent_version": 1
+   },
+   "signatures": [
+    {
+     "keyid": "4ea434218abbe80f",
+     "sig": "TjCbP8d2idnDTSFuUR4TNpqgXQxWG+5+bNs88tcIMEnb5VjwdduoOM/wFiVsoFpzpRKpPY8YzuyQIeog74esCA=="
+    }
+   ]
+  },
+  "forged_valid": false,
+  "state_from_all": {
+   "critical": "following",
+   "events": "unfollowed"
+  },
+  "state_from_old_only": {
+   "critical": "following",
+   "events": "following"
+  }
+ },
+ "heartbeat": {
+  "signed": {
+   "schema": "nexus.heartbeat.v1",
+   "org": "club-a",
+   "owners_seen": "2030-01-01",
+   "issued_at": "2030-01-02T00:00:00Z"
+  },
+  "signatures": [
+   {
+    "keyid": "4ea434218abbe80f",
+    "sig": "fiO+PPwwtWOyyyYeYEB3/nfDX8UlHAbrB496H6+DfTJgn5qvgUeITO/U87Rx0IHspNCPq0lPTgpuuUJEFXEBCA=="
+   }
+  ]
+ },
+ "anchor": {
+  "record": "nexus1 org=club-a root=1:001759f3a01151f5,af9bd372a9eccb2a,eb3783c5ce5d3ce3/2 man=1:4IWwaG9VFLOYxr0vUoC6iSM0UsijpLpDZcxcOe4_P7E primary=https://club-a.example",
+  "check": {
+   "ok": true
+  },
+  "wrong_manifest": {
+   "ok": false,
+   "reason": "anchor_manifest"
+  }
+ },
+ "best_manifest": {
+  "candidates": [
+   {
+    "root": {
+     "signed": {
+      "schema": "nexus.root.v1",
+      "org": "club-a",
+      "version": 1,
+      "expires": "2031-01-01T00:00:00Z",
+      "root_keys": [
+       {
+        "keyid": "001759f3a01151f5",
+        "key": "nj4CJ5nBY/HG1/TSuphZj57tMzNxZNGNrpln9k+ul9Y="
+       },
+       {
+        "keyid": "eb3783c5ce5d3ce3",
+        "key": "Rg98tHVvrnc+f01Lvk4mwCc6Wb095cPpHXeVnq6eFKg="
+       },
+       {
+        "keyid": "af9bd372a9eccb2a",
+        "key": "CaoSmZSDK4PpHRknjEzdG9xzZWjHIbhVBwBPWBoAjpc="
+       }
+      ],
+      "threshold": 2,
+      "online_keys": [
+       {
+        "keyid": "4ea434218abbe80f",
+        "key": "Q1Z8JjmJZt46/z9HNRyVnXBSSV2zu4ZIheOxK0x5f7I="
+       }
+      ]
+     },
+     "signatures": [
+      {
+       "keyid": "001759f3a01151f5",
+       "sig": "RlHagtuUu1arzXXmJH+3OYf+sccdX3DwU7j7ZserOxiQbSPyXbTrejh2XZCLAV/KZ5HEOYKXYn8isl9My/FAAQ=="
+      },
+      {
+       "keyid": "eb3783c5ce5d3ce3",
+       "sig": "EVMJR/RKO1D7+0JIOAqZt+PZChzhloi7sdVYYL3uC0sSxexRYWkepVbVrDZj51DkPkRZ7ZZNr3wJmI3uGH1+AQ=="
+      },
+      {
+       "keyid": "af9bd372a9eccb2a",
+       "sig": "M4K86kkqBh30FlH/UX3C31OSm60OCO00i2MhlWhxAdXoMshUSyVNNe9F1F2fuCSK7J/c23MmGhowIqUggJwhDw=="
+      }
+     ]
+    },
+    "destinations": {
+     "signed": {
+      "schema": "nexus.destinations.v1",
+      "org": "club-a",
+      "version": 1,
+      "root_version": 1,
+      "expires": "2031-01-01T00:00:00Z",
+      "destinations": [
+       {
+        "kind": "web",
+        "url": "https://club-a.example",
+        "role": "primary"
+       }
+      ]
+     },
+     "signatures": [
+      {
+       "keyid": "4ea434218abbe80f",
+       "sig": "L6Mfngi+PLbI+i6XXeoKurbY9IUqX/EuUUfZ6zBVwZ+DYiU7+YZj9Hsix49MOxENyZdoOxKqgwtomW59vx2nAQ=="
+      }
+     ]
+    }
+   },
+   {
+    "root": {
+     "signed": {
+      "schema": "nexus.root.v1",
+      "org": "club-a",
+      "version": 1,
+      "expires": "2031-01-01T00:00:00Z",
+      "root_keys": [
+       {
+        "keyid": "001759f3a01151f5",
+        "key": "nj4CJ5nBY/HG1/TSuphZj57tMzNxZNGNrpln9k+ul9Y="
+       },
+       {
+        "keyid": "eb3783c5ce5d3ce3",
+        "key": "Rg98tHVvrnc+f01Lvk4mwCc6Wb095cPpHXeVnq6eFKg="
+       },
+       {
+        "keyid": "af9bd372a9eccb2a",
+        "key": "CaoSmZSDK4PpHRknjEzdG9xzZWjHIbhVBwBPWBoAjpc="
+       }
+      ],
+      "threshold": 2,
+      "online_keys": [
+       {
+        "keyid": "4ea434218abbe80f",
+        "key": "Q1Z8JjmJZt46/z9HNRyVnXBSSV2zu4ZIheOxK0x5f7I="
+       }
+      ]
+     },
+     "signatures": [
+      {
+       "keyid": "001759f3a01151f5",
+       "sig": "RlHagtuUu1arzXXmJH+3OYf+sccdX3DwU7j7ZserOxiQbSPyXbTrejh2XZCLAV/KZ5HEOYKXYn8isl9My/FAAQ=="
+      },
+      {
+       "keyid": "eb3783c5ce5d3ce3",
+       "sig": "EVMJR/RKO1D7+0JIOAqZt+PZChzhloi7sdVYYL3uC0sSxexRYWkepVbVrDZj51DkPkRZ7ZZNr3wJmI3uGH1+AQ=="
+      },
+      {
+       "keyid": "af9bd372a9eccb2a",
+       "sig": "M4K86kkqBh30FlH/UX3C31OSm60OCO00i2MhlWhxAdXoMshUSyVNNe9F1F2fuCSK7J/c23MmGhowIqUggJwhDw=="
+      }
+     ]
+    },
+    "destinations": {
+     "signed": {
+      "schema": "nexus.destinations.v1",
+      "org": "club-a",
+      "version": 2,
+      "root_version": 1,
+      "expires": "2031-01-01T00:00:00Z",
+      "destinations": [
+       {
+        "kind": "web",
+        "url": "https://evil.example",
+        "role": "primary"
+       }
+      ],
+      "relocation": {
+       "from": "https://club-a.example",
+       "to": "https://evil.example",
+       "reason": "x"
+      }
+     },
+     "signatures": [
+      {
+       "keyid": "4ea434218abbe80f",
+       "sig": "rdpVLnTrasfdZABXLIOEI6xAjm28DWLjSwpUIdGkG5FP9n5rsKJHdb46k7r6NtJwtpwSFKswQf2BBz6rURgBBw=="
+      }
+     ]
+    }
+   },
+   {
+    "root": {
+     "signed": {
+      "schema": "nexus.root.v1",
+      "org": "club-a",
+      "version": 1,
+      "expires": "2031-01-01T00:00:00Z",
+      "root_keys": [
+       {
+        "keyid": "001759f3a01151f5",
+        "key": "nj4CJ5nBY/HG1/TSuphZj57tMzNxZNGNrpln9k+ul9Y="
+       },
+       {
+        "keyid": "eb3783c5ce5d3ce3",
+        "key": "Rg98tHVvrnc+f01Lvk4mwCc6Wb095cPpHXeVnq6eFKg="
+       },
+       {
+        "keyid": "af9bd372a9eccb2a",
+        "key": "CaoSmZSDK4PpHRknjEzdG9xzZWjHIbhVBwBPWBoAjpc="
+       }
+      ],
+      "threshold": 2,
+      "online_keys": [
+       {
+        "keyid": "4ea434218abbe80f",
+        "key": "Q1Z8JjmJZt46/z9HNRyVnXBSSV2zu4ZIheOxK0x5f7I="
+       }
+      ]
+     },
+     "signatures": [
+      {
+       "keyid": "001759f3a01151f5",
+       "sig": "RlHagtuUu1arzXXmJH+3OYf+sccdX3DwU7j7ZserOxiQbSPyXbTrejh2XZCLAV/KZ5HEOYKXYn8isl9My/FAAQ=="
+      },
+      {
+       "keyid": "eb3783c5ce5d3ce3",
+       "sig": "EVMJR/RKO1D7+0JIOAqZt+PZChzhloi7sdVYYL3uC0sSxexRYWkepVbVrDZj51DkPkRZ7ZZNr3wJmI3uGH1+AQ=="
+      },
+      {
+       "keyid": "af9bd372a9eccb2a",
+       "sig": "M4K86kkqBh30FlH/UX3C31OSm60OCO00i2MhlWhxAdXoMshUSyVNNe9F1F2fuCSK7J/c23MmGhowIqUggJwhDw=="
+      }
+     ]
+    },
+    "destinations": {
+     "signed": {
+      "schema": "nexus.destinations.v1",
+      "org": "club-a",
+      "version": 2,
+      "root_version": 1,
+      "expires": "2031-01-01T00:00:00Z",
+      "destinations": [
+       {
+        "kind": "web",
+        "url": "https://club-a-new.example",
+        "role": "primary"
+       }
+      ],
+      "relocation": {
+       "from": "https://club-a.example",
+       "to": "https://club-a-new.example",
+       "reason": "domain lost"
+      }
+     },
+     "signatures": [
+      {
+       "keyid": "001759f3a01151f5",
+       "sig": "9mHfbYbYk0lA/rJHki4rQmrSCrhky1X8oYC094MabGrxdjqKoA8i0IQY3kN+5/9DCOPaFhg0FA607765hUeSAw=="
+      },
+      {
+       "keyid": "eb3783c5ce5d3ce3",
+       "sig": "U57HqIQ6NB1D7tXNPWKGmFnHJk7XmjHe1fAeXhCLwgIGBBrvfwVmHUIwXiavINkwVFCRQERql6VtYXc/5zGlBg=="
+      }
+     ]
+    }
+   }
+  ],
+  "last": {
+   "signed": {
+    "schema": "nexus.destinations.v1",
+    "org": "club-a",
+    "version": 1,
+    "root_version": 1,
+    "expires": "2031-01-01T00:00:00Z",
+    "destinations": [
+     {
+      "kind": "web",
+      "url": "https://club-a.example",
+      "role": "primary"
+     }
+    ]
+   },
+   "signatures": [
+    {
+     "keyid": "4ea434218abbe80f",
+     "sig": "L6Mfngi+PLbI+i6XXeoKurbY9IUqX/EuUUfZ6zBVwZ+DYiU7+YZj9Hsix49MOxENyZdoOxKqgwtomW59vx2nAQ=="
+    }
+   ]
+  },
+  "expect_version": 2,
+  "expect_primary": "https://club-a-new.example"
+ },
+ "escrow": {
+  "envelope": {
+   "schema": "nexus.escrow.v1",
+   "org": "club-a",
+   "created_at": "2030-01-02T00:00:00Z",
+   "sha256": "e+qbN/jENbp0dYVvtnP6FwGfMFWc2ATwJeFNysTt5TY=",
+   "iv": "UNu/a7MWqkOoHuLg",
+   "ct": "v9JzE7QXQ49m+ooe8pBWTK28U9P0uSZLZ7wctwRPDx34wAKd05S95EItPokwEBlfuZOjHvIC2gAtmznVbOfG0o2HJ2FabnrvudB0Y82jZ65ziv98cCYoOOk=",
+   "recipients": [
+    {
+     "kid": "406960fd08b2425a",
+     "epk": "x41IpZndnhHffqk0edJHuQuNHn8SlAJjxucrY1B+XHI=",
+     "iv": "AukKzFMD0fQXUmAP",
+     "wrapped": "Byx5G3IKw71dOyMx27Lp+w/Bw75dAqMFZMYvM6MCwiPRsS6HaKwcec/F8BQEkSkY"
+    },
+    {
+     "kid": "5f4b85b75d487a98",
+     "epk": "pbXy7fQg0rDwZDHySGqS1qiAnPwG21gk3RxbVG22VTw=",
+     "iv": "buFyy0dHHpAZ1wzS",
+     "wrapped": "Cg1WgYDIMyDqFWGe82TBK4THdXKSxDlwnTn1vZvRHWsvr+VzWZpXQ5YDJFOn4Q3M"
+    }
+   ]
+  },
+  "recipients": [
+   {
+    "privateKey": "pbbH2On6CxwtPk9gcYKTpLXG1+j5ChssPU5fcIGSo7Q=",
+    "publicKey": "YQg/oogCxoCvXHBVa14WwuYleyilfFNYUW8RQ0nAhnE="
+   },
+   {
+    "privateKey": "wtPk9QYXKDlKW2x9jp+wwdLj9AUWJzhJWmt8jZ6vwNE=",
+    "publicKey": "VtMDGnLYiMgQbbcepkPknchyBXmTXNi+ONp4S7CBr34="
+   }
+  ],
+  "plaintext": "{\"schema\":\"example\",\"people\":[{\"ref\":\"p1\",\"emails\":[\"ann@example.com\"]}]}"
+ },
+ "standby": {
+  "envelope": {
+   "schema": "nexus.escrow.v1",
+   "org": "club-a",
+   "created_at": "2030-01-02T00:00:00Z",
+   "sha256": "OIkTjrO/usceUtO/qFzrK91nmVLUbCotuhKxbuZWkxs=",
+   "iv": "6+qkOFWjQ4qTsfUl",
+   "ct": "UG3CUUpEbyRFtCOKam8wmxmjAkDEbhJ05g/6jK7XWHBNUOHbFbgj/drBDwMYtk/2EqiuA1uSXm33Oo7OtGzrNi9bONanc5SsCk03Js8pZJo0ow9+KllAwnQeZgNfIcxLjKpRgL8iDiV4TmJrLMBMeXj67HQgmIjJYRW+JFzh9RpdoNDjUjFV59wF8k6raYimCKUKOpenzS+I8pZdL6sfWJkQ387K5cZ1KI3UN5ZobkGDK2BTbjtRDii7040X9jOPO91zrjLJcwTOnTR+ylWEiteMInj9YOKud4z2eQ36OlLsCecMeeuyZ7IJ/e7I12+RK17J6OgVeAJiyGNUzZQ0Yo9Mljyc6yi6D8cRIqR4SZ+rN2FFeJpI18fzKEnkKGV0Ai+4lTUXnBuxt/0uvUcoe+P0oZb/aSba7vOyFPl6MlO5vmFCUnTgL5aUJAH3aGGCraJejN/aa3GN6lnZm/tIaAriY9GtSlBTO2FEuayDYUbOJfDyiDEpGLKLn+PE605D4PsJM4YTv6g1N3e0HobeLCND/vgcLWTpFDY+THuN2CyM/0loR8gUj5F9rAhQG9bzZvo6ZD41ZiJV+/tt7aMcaGdaDKLwvpDPdj7MPUgiKOih8q5IhhGjxi5vo4br455Sb7Cj9YRV8ZSIkxYsb3LT8bkNs5XTKdF1bsH+jAZlkUItDlVZGH+Zdh+0kdGMy1d3CWeyamXqtcT2CPA1QPQK0iq2V5MfEgjzW5rsQ9krZ/3QndH09CCLqW7CeIN9rVG5VM6GtjUacRk2mkV83KcbyO742Lt2F+l2E7wI3CyFiFcyvn1qguVumYQOpt9KEThb0iiIVvkPNpsi/nKzpWS/nUktc8bm0rj43P3ZD0mQQIlFXLdRT/hKsjG/gzBTk0bYYCFgQ8VTYZSrAEkPr0RF1AzlysW8Oz3Rv0rB/jEZxAa23w5kuPA7SWu6Yvy4DbRX2atBwMkcIwEekx+YzWay3f3FFZNTvkbuvwZepa2jPzNaO2sFeDVV6uFm9UmRLqZhnnGppqG620YGrlz4FIWOvfGVswfh7N+omniHorvVMC/lJLconGnSSNJ/WIkeoNq6xCRL1s8wNWwz7mKWBRIZ6sjSA92YAQv2r63dGyjVFWNjuvaZOEwLm1bSO6acazIiT9FbBbX/ub4lg/LZt61gHKhtaA2C0ONV8ZSNjDdy767lB57BhOaudpdx8ngRwTYn2O7yxc/gbZvwAzR8cYVltG3zIR3lSQ4AxW6RcReDPKjxpaVtyJH0iT69Pp5/MSNXS1TjuOAHyUnDB2AgsZqrlXEJ/rwSIjj/mMxEcZttvYPmE3dGclyh/VP9JM0EwDC0LYg9QJxKDw5/JTDF4vVdZKQteCgq60C4OIZVPjmPl0o+5b0aCF8E4BVWmdgDwyOyCww0ePFC5SYePzZh0s706D8iYqvdFumtJvXwLI6GIOYWhr9VwPpJ8Q==",
+   "recipients": [
+    {
+     "kid": "406960fd08b2425a",
+     "epk": "HMP1BV4tjJFB+jsc+/nsGwr2X6T2y16PW0VW5naldjY=",
+     "iv": "s3Dv21zIVvYiy5F+",
+     "wrapped": "W2srPoOKpmVey769B8ZJcI6qbBkTiNfu098rt4HFObwjtGE7+cu7FtcLKndLRyl0"
+    }
+   ]
+  },
+  "key": "pbbH2On6CxwtPk9gcYKTpLXG1+j5ChssPU5fcIGSo7Q=",
+  "expect_targets": [
+   [
+    "email",
+    "ann@example.com"
+   ],
+   [
+    "ntfy",
+    "https://ntfy.sh/tp_ann_0123456789abcdef"
+   ],
+   [
+    "sms",
+    "+447700900123"
+   ]
+  ]
+ },
+ "shamir": {
+  "k": 3,
+  "secret": "CxIZICcuNTxDSlFYX2ZtdHuCiZCXnqWss7rByM/W3eQ=",
+  "shares": [
+   "s1-3-1-Bw491GN6qbA_5rUMG5JBaHe-7URT6hkgLxYlfIsC8Zg",
+   "s1-3-2-JboYigeI3MiQhHbUWeZCxkMKqBqXGKw4rRSGiam2kq0",
+   "s1-3-3-KaY8fkPcQETsKJKAHRJu2k82zM5TbBC0MbhiPe1ivtE",
+   "s1-3-4-jy8kEPFB-T5Sz-LLXar0FYtkQnvtKgT1e2QpgpZ3H4Q",
+   "s1-3-5-gzMA5LUVZbIuYwafGV7YCYdYJq8pXrh558jNNtKjM_g"
+  ],
+  "combos": [
+   [
+    0,
+    2,
+    4
+   ],
+   [
+    1,
+    2,
+    3
+   ],
+   [
+    4,
+    3,
+    0
+   ]
+  ]
+ },
+ "totp": {
+  "secret_ascii": "12345678901234567890",
+  "cases": [
+   {
+    "time": 59,
+    "step": 1,
+    "expect": "287082"
+   },
+   {
+    "time": 1111111109,
+    "step": 37037036,
+    "expect": "081804"
+   },
+   {
+    "time": 1111111111,
+    "step": 37037037,
+    "expect": "050471"
+   },
+   {
+    "time": 1234567890,
+    "step": 41152263,
+    "expect": "005924"
+   },
+   {
+    "time": 2000000000,
+    "step": 66666666,
+    "expect": "279037"
+   }
+  ]
+ }
+}

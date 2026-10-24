@@ -18,6 +18,8 @@ import { reconcile } from "./outbox";
 import { forgetMember } from "./rights";
 import { forgetPerson, personForMember } from "./continuity/people";
 import { cmdPassport, CONTINUITY_OWNER, ownerContinuity } from "./continuity/bot";
+import { hydraStatus } from "./hydra/bot";
+import { touchOwners } from "./hydra/notices";
 import { assistCallback, cmdHelpNeed, forgetMissions, listMissions, ownerAssistCommand, OWNER_COMMANDS } from "./assist/bot";
 import { answer, parseFilters, renderAnswer } from "./search";
 import type { Fetcher, InlineButton, Telegram } from "./telegram";
@@ -30,6 +32,8 @@ export interface App {
   tg: Telegram;
   /** Outbound HTTP for partner gateways (tests inject a fake). */
   net?: Fetcher;
+  /** Cron only: subrequests left in this run; loops stop before they would run out. */
+  budget?: { left(): number };
 }
 
 interface CallbackQuery {
@@ -411,6 +415,7 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
   if (OWNER_COMMANDS.has(cmd)) {
     if (!isOwner(app, from.id)) return [];
     const owner = await ensureMember(app.db, from.id, "owner", from.language_code);
+    await touchOwners(app.db);
     return ownerAssistCommand(app, chat, cmd, args, langOf(owner), owner.id);
   }
   const mem = await knownMember(app, msg);
@@ -680,6 +685,12 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
   };
   if (["m", "o", "r", "d", "x", "g"].includes(kind ?? "")) return assistCallback(app, cb, await memberByTg(app.db, cb.from.id), data);
   const pre = T(await langForUser(app, cb.from));
+  if (kind === "hy") {
+    // Hydra status button on incident notices (owners only).
+    await answerCb();
+    if (isOwner(app, cb.from.id) && cb.message && app.env.CONTINUITY_KEY) await app.tg.sendMessage(cb.message.chat.id, await hydraStatus(app));
+    return [];
+  }
   if (kind === "u") {
     if (!isOwner(app, cb.from.id)) {
       await answerCb();

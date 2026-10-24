@@ -12,16 +12,32 @@ import { liveCommitment, release } from "./assist/capacity";
 import { expireMissions, revokeGrants } from "./assist/missions";
 import { dispatchFed, expireExchanges, fedEnabled, partnerList, withdrawMission } from "./federation/gateway";
 import { refreshPartner } from "./federation/keys";
-import { dispatchAlertEmails } from "./continuity/alerts";
+import { dispatchAlerts } from "./continuity/alerts";
+import { classify, dispatchInvites, runCanaries } from "./hydra/regrow";
+import { dispatchAnnouncements } from "./hydra/notices";
+import { runEscrow } from "./hydra/escrow";
+import { watchSeals } from "./hydra/fed";
+import { remindDrills } from "./hydra/chaos";
 import { bucket, computeGaps, setGapStatus } from "./assist/gaps";
 import { b, notifyOwners } from "./assist/notify";
 import { escapeHtml } from "./text";
 import { localParts, nowIso } from "./util";
 
-export const SEND_BUDGET = 32; // Telegram calls per run; + partners (5) + emails (5) + key checks (3) stays under 50
+// Subrequests per run stay under the free plan's 50: Telegram 24 + partners 5 + alert heads 5 +
+// invites 3 + key checks 3 + canaries ≤4 + announcements ≤3 + one daily step (escrow ≤3 or seals ≤4).
+export const SEND_BUDGET = 24;
 
-export async function runCron(app: App, now = new Date()): Promise<Record<string, number>> {
+/** Free plan: 50 subrequests per invocation. Keep a margin for D1-adjacent and retry calls. */
+export const SUBREQUEST_LIMIT = 46;
+
+export async function runCron(base: App, now = new Date()): Promise<Record<string, number>> {
   const out: Record<string, number> = {};
+  // Count every outbound fetch (partners, email, push, ntfy, Matrix, escrow…) plus Telegram calls,
+  // so later steps stop before the platform limit instead of recording false failures.
+  let used = 0;
+  const raw = base.net ?? ((u: string, i: RequestInit) => fetch(u, i));
+  const app: App = { ...base, net: (u, i) => ((used += 1), raw(u, i)) };
+  app.budget = { left: () => SUBREQUEST_LIMIT - used - app.tg.calls };
   const step = async (name: string, fn: () => Promise<number>) => {
     try {
       out[name] = await fn();
@@ -84,7 +100,22 @@ export async function runCron(app: App, now = new Date()): Promise<Record<string
   });
   await step("exchanges_expired", () => expireExchanges(app.db, nowIso(now)));
   await step("fed_sent", () => dispatchFed(app));
-  await step("alert_emails", () => (app.env.CONTINUITY_KEY ? dispatchAlertEmails(app, 5) : Promise.resolve(0)));
-  await step("sent", () => dispatchPending(app.db, app.tg, SEND_BUDGET));
+  await step("alert_emails", () => (app.env.CONTINUITY_KEY ? dispatchAlerts(app, 5) : Promise.resolve(0)));
+  if (app.env.CONTINUITY_KEY) {
+    // Hydra: detect dead paths, invite regrowth, probe canaries, publish, and the daily duties.
+    await step("hydra_incidents", () => classify(app, now));
+    await step("hydra_invites", () => dispatchInvites(app, 3));
+    await step("hydra_canaries", () => runCanaries(app, 2, now));
+    await step("hydra_announce", () => dispatchAnnouncements(app, 1));
+    const today = localParts(now, timezone(app.env)).date;
+    const daily = (await app.db.prepare("SELECT value FROM settings WHERE key='hydra.day'").first<{ value: string }>())?.value;
+    if (daily !== today && app.budget!.left() >= 10) {
+      // Daily duties run on the first minute with room left; otherwise the next minute tries.
+      await app.db.prepare("INSERT INTO settings(key, value) VALUES ('hydra.day', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(today).run();
+      await step("hydra_escrow", () => runEscrow(app, now));
+      await step("hydra_drills_due", () => remindDrills(app, now));
+    } else await step("hydra_seals", () => watchSeals(app, now));
+  }
+  await step("sent", () => dispatchPending(app.db, app.tg, Math.min(SEND_BUDGET, app.tg.calls + Math.max(0, app.budget!.left()))));
   return out;
 }

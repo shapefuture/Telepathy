@@ -4,6 +4,7 @@
 // Off unless FEDERATION_ENABLED=true and a signing key is set. Partners without an endpoint use
 // the manual E0 mode: operators carry signed messages by hand (/desk shows them, /fed loads them).
 
+import { applyHydraNotice, gossip, gossipList } from "../hydra/fed";
 import type { App } from "../bot";
 import { liveCommitment, openOffers, release, reserve, deliver } from "../assist/capacity";
 import { getMission, grantFor, receipt, recordGrant, transition, type Mission } from "../assist/missions";
@@ -548,7 +549,7 @@ export async function handleFederation(req: Request, app: App): Promise<{ respon
   if (!fedEnabled(app.env)) return { response: new Response("not found", { status: 404 }), keys: [] };
   if (req.method === "GET" && url.pathname === "/.well-known/nexus-node.json") return { response: json(await nodeManifest(app)), keys: [] };
   if (req.method === "GET" && url.pathname === "/v1/capabilities") return { response: json({ categories: (await nodeManifest(app)).categories }), keys: [] };
-  if (req.method === "GET" && url.pathname === "/v1/relay") return { response: json({ notices: await relayList(app.db) }), keys: [] };
+  if (req.method === "GET" && url.pathname === "/v1/relay") return { response: json({ notices: await relayList(app.db), gossip: await gossipList(app.db) }), keys: [] };
   if (req.method !== "POST") return { response: new Response("not found", { status: 404 }), keys: [] };
   const routes: [RegExp, MessageType[]][] = [
     [/^\/v1\/opportunities\/inquiries$/, ["inquiry"]],
@@ -591,6 +592,7 @@ export async function expireExchanges(db: D1Database, now = nowIso()): Promise<n
  * No member data travels: the notice is the partner's public identity document.
  */
 async function applyNotice(app: App, p: Partner & { root_json?: string | null }, msg: FedMessage, now: Date): Promise<Received> {
+  if (typeof msg.body.kind === "string") return applyHydraNotice(app, p, msg, now); // gossip, sealed relocations
   const pinned = p.root_json ? (JSON.parse(p.root_json) as Signed<RootMeta>) : null;
   if (!pinned) return fail(403, "no_pinned_root");
   const c = msg.body.community as { root?: Signed<RootMeta>; destinations?: Signed<DestMeta> } | undefined;
@@ -612,6 +614,7 @@ async function applyNotice(app: App, p: Partner & { root_json?: string | null },
       .prepare("INSERT INTO relay_notices(partner_id, manifest_version, json, received_at) VALUES (?,?,?,?) ON CONFLICT(partner_id) DO UPDATE SET manifest_version=excluded.manifest_version, json=excluded.json, received_at=excluded.received_at WHERE excluded.manifest_version > relay_notices.manifest_version")
       .bind(p.id, c.destinations.signed.version, JSON.stringify({ root, destinations: c.destinations }), nowIso(now)),
   ]);
+  await gossip(app, { root, destinations: c.destinations }, 1, new Set([p.id]));
   const primary = c.destinations.signed.destinations.find((d) => d.role === "primary")!.url;
   return ok(await notifyOwners(app, `relay:${p.id}:${c.destinations.signed.version}`, () => ({ text: `🔁 <b>${escapeHtml(p.brand_label)}</b> moved (verified with their club key): ${escapeHtml(primary)}` })));
 }
@@ -630,6 +633,9 @@ export async function relayRelocation(app: App): Promise<number> {
   }
   return n;
 }
+
+/** Queue one signed notice to a partner (Hydra gossip and sealed relocations). */
+export const sendNotice = (app: App, partner: Partner, exchangeId: string, body: Record<string, unknown>, key: string) => enqueue(app, partner, "notice", exchangeId, body, key);
 
 export async function relayList(db: D1Database): Promise<unknown[]> {
   const { results } = await db.prepare("SELECT r.partner_id, r.manifest_version, r.json, o.brand_label FROM relay_notices r JOIN organizations o ON o.id=r.partner_id ORDER BY r.received_at DESC").all<{ partner_id: string; manifest_version: number; json: string; brand_label: string }>();

@@ -8,6 +8,9 @@ the people. This is the implementation of `docs/CONTINUITY_PLAN_RU.md` (CONT-0..
 right to email anyone. It doesn't get around platform rules. It isn't "100% protected": the
 dashboard only counts what was verified.
 
+Hydra (P16) adds more independent paths, logins and recovery on top of this: see
+[`HYDRA.md`](HYDRA.md).
+
 ## Pieces
 
 | Piece | Where | What it guarantees |

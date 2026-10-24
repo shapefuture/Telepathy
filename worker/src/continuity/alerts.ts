@@ -6,14 +6,15 @@
 import type { App } from "../bot";
 import { effectStatement } from "../outbox";
 import { audit, DAY, newId, nowIso } from "../util";
-import { hmacHex, open, randomToken } from "./crypto";
-import { sendEmail } from "./email";
+import { hmacHex, randomToken } from "./crypto";
+import { deliver, type RegRow } from "../hydra/deliver";
+import { buddyNote } from "../hydra/heads";
 import { currentManifest } from "./identity";
 import { suppressed } from "./people";
 
 export const ALERT_MIN_GAP_MS = DAY;
 export const RELOCATION_FRESH_MS = 7 * DAY;
-export const EMAIL_BUDGET = 5; // emails per cron run (subrequest budget)
+export const EMAIL_BUDGET = 5; // non-Telegram deliveries per cron run (subrequest budget)
 
 export type AlertKind = "relocation" | "incident" | "drill";
 export class AlertError extends Error {}
@@ -21,7 +22,12 @@ export class AlertError extends Error {}
 const origin = (app: App) => (app.env.PUBLIC_URL ?? "").replace(/\/$/, "");
 
 /** Create an alert and queue deliveries. Returns the alert id and how many deliveries were queued. */
-export async function createAlert(app: App, kind: AlertKind, note: string, by: string, now = new Date()): Promise<{ id: string; queued: number }> {
+/** `without`: a head-off drill switches one channel off for a cohort (H7). */
+export interface AlertOptions {
+  without?: { channel: string; people: Set<string> };
+}
+
+export async function createAlert(app: App, kind: AlertKind, note: string, by: string, now = new Date(), opts: AlertOptions = {}): Promise<{ id: string; queued: number }> {
   const m = await currentManifest(app.db);
   if (!m || m.signed.expires <= nowIso(now)) throw new AlertError("no_valid_manifest");
   const row = await app.db.prepare("SELECT relocation, published_at FROM destination_manifests WHERE version=?").bind(m.signed.version).first<{ relocation: number; published_at: string }>();
@@ -46,21 +52,24 @@ export async function createAlert(app: App, kind: AlertKind, note: string, by: s
     .all<{ person_id: string }>();
   let queued = 0;
   const ts = nowIso(now);
+  const off = (person: string, channel: string) => opts.without?.channel === channel && opts.without.people.has(person);
   for (const { person_id } of people) {
-    const emails = (await app.db.prepare("SELECT suppress_hash FROM delivery_registrations WHERE person_id=? AND channel='email' AND status='verified'").bind(person_id).all<{ suppress_hash: string }>()).results;
-    let usable = false;
-    for (const e of emails) if (!(await suppressed(app.db, e.suppress_hash, "critical"))) usable = true;
-    if (usable) {
-      await app.db.prepare("INSERT OR IGNORE INTO alert_deliveries(alert_id, person_id, channel, state, updated_at) VALUES (?,?, 'email', 'pending', ?)").bind(id, person_id, ts).run();
-      queued++;
+    // Every verified head, not just email: one row per channel, the best head is chosen at send time.
+    const regs = (await app.db.prepare("SELECT channel, suppress_hash FROM delivery_registrations WHERE person_id=? AND channel<>'telegram' AND status='verified' AND health<>'dead'").bind(person_id).all<{ channel: string; suppress_hash: string }>()).results;
+    const channels = new Set<string>();
+    for (const r of regs) if (!(await suppressed(app.db, r.suppress_hash, "critical"))) channels.add(r.channel);
+    for (const ch of channels) {
+      const state = off(person_id, ch) ? "suppressed" : "pending";
+      await app.db.prepare("INSERT OR IGNORE INTO alert_deliveries(alert_id, person_id, channel, state, updated_at) VALUES (?,?,?,?,?)").bind(id, person_id, ch, state, ts).run();
+      if (state === "pending") queued++;
     }
     // Telegram too, if it still works: through the same effect ledger (at-most-once).
     const tg = await app.db.prepare("SELECT m.tg_id FROM identity_links l JOIN members m ON m.id=l.account_id WHERE l.person_id=? AND l.platform='telegram' AND l.revoked_at IS NULL AND m.removed_at IS NULL").bind(person_id).first<{ tg_id: number }>();
-    if (tg) {
+    if (tg && !off(person_id, "telegram")) {
       const token = randomToken();
       await app.db.prepare("INSERT OR IGNORE INTO alert_deliveries(alert_id, person_id, channel, state, token_hash, updated_at) VALUES (?,?, 'telegram', 'sent', ?, ?)").bind(id, person_id, await hmacHex(app.env.CONTINUITY_KEY, "alert", token), ts).run();
       const confirm = kind === "drill" && origin(app) ? `\n\nConfirm you received this: ${origin(app)}/portal/confirm?t=${id}.${token}` : "";
-      await effectStatement(app.db, `cont:${id}:${person_id}`, tg.tg_id, { text: escape(message) + confirm }).run();
+      await effectStatement(app.db, `cont:${id}:${person_id}`, tg.tg_id, { text: escape(message + (await buddyNote(app, person_id))) + confirm }).run();
       queued++;
     }
   }
@@ -70,34 +79,57 @@ export async function createAlert(app: App, kind: AlertKind, note: string, by: s
 
 const escape = (s: string) => s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
-/** Send pending email deliveries (cron). Each row moves pending → sent|failed|suppressed once. */
-export async function dispatchAlertEmails(app: App, budget = EMAIL_BUDGET): Promise<number> {
+/**
+ * Send pending non-Telegram deliveries (cron). Each row moves pending → sent|failed|suppressed
+ * once. Within a channel, a failing head falls back to the person's next head of that channel.
+ */
+export async function dispatchAlerts(app: App, budget = EMAIL_BUDGET): Promise<number> {
   const { results } = await app.db
-    .prepare("SELECT d.alert_id, d.person_id, a.message, a.kind FROM alert_deliveries d JOIN continuity_alerts a ON a.id=d.alert_id WHERE d.channel='email' AND d.state='pending' ORDER BY a.created_at LIMIT ?")
+    .prepare("SELECT d.alert_id, d.person_id, d.channel, a.message, a.kind FROM alert_deliveries d JOIN continuity_alerts a ON a.id=d.alert_id WHERE d.channel<>'telegram' AND d.state='pending' ORDER BY a.created_at LIMIT ?")
     .bind(budget)
-    .all<{ alert_id: string; person_id: string; message: string; kind: string }>();
+    .all<{ alert_id: string; person_id: string; channel: string; message: string; kind: string }>();
   let sent = 0;
+  const mark = (r: { alert_id: string; person_id: string; channel: string }, state: string, from = "pending") =>
+    app.db.prepare("UPDATE alert_deliveries SET state=?, updated_at=? WHERE alert_id=? AND person_id=? AND channel=? AND state=? RETURNING alert_id").bind(state, nowIso(), r.alert_id, r.person_id, r.channel, from).all();
   for (const r of results) {
-    const reg = await app.db.prepare("SELECT id, address_enc, suppress_hash FROM delivery_registrations WHERE person_id=? AND channel='email' AND status='verified' ORDER BY verified_at LIMIT 1").bind(r.person_id).first<{ id: string; address_enc: string; suppress_hash: string }>();
+    if (app.budget && app.budget.left() < 5) break; // two heads × (failover or Matrix room) + margin
+    const all = (
+      await app.db
+        .prepare("SELECT id, person_id, channel, address_enc, meta_enc, domains, suppress_hash FROM delivery_registrations WHERE person_id=? AND channel=? AND status='verified' AND health<>'dead' ORDER BY (health='ok') DESC, verified_at")
+        .bind(r.person_id, r.channel)
+        .all<RegRow & { suppress_hash: string }>()
+    ).results;
+    const regs = [];
+    for (const g of all) if (!(await suppressed(app.db, g.suppress_hash, "critical"))) regs.push(g);
     // Re-check consent at send time: a later unsubscribe wins.
     const follow = await app.db.prepare("SELECT status FROM follow_state WHERE person_id=? AND topic='critical'").bind(r.person_id).first<{ status: string }>();
-    if (!reg || follow?.status !== "following" || (await suppressed(app.db, reg.suppress_hash, "critical"))) {
-      await app.db.prepare("UPDATE alert_deliveries SET state='suppressed', updated_at=? WHERE alert_id=? AND person_id=? AND channel='email' AND state='pending'").bind(nowIso(), r.alert_id, r.person_id).run();
+    if (!regs.length || follow?.status !== "following") {
+      await mark(r, "suppressed");
       continue;
     }
-    const claimed = await app.db.prepare("UPDATE alert_deliveries SET state='sent', updated_at=? WHERE alert_id=? AND person_id=? AND channel='email' AND state='pending' RETURNING alert_id").bind(nowIso(), r.alert_id, r.person_id).all();
-    if (!claimed.results.length) continue;
+    if (!(await mark(r, "sent")).results.length) continue;
     const token = randomToken();
-    await app.db.prepare("UPDATE alert_deliveries SET token_hash=? WHERE alert_id=? AND person_id=? AND channel='email'").bind(await hmacHex(app.env.CONTINUITY_KEY, "alert", token), r.alert_id, r.person_id).run();
+    await app.db.prepare("UPDATE alert_deliveries SET token_hash=? WHERE alert_id=? AND person_id=? AND channel=?").bind(await hmacHex(app.env.CONTINUITY_KEY, "alert", token), r.alert_id, r.person_id, r.channel).run();
     const o = origin(app);
-    const confirm = r.kind === "drill" && o ? `\n\nConfirm you received this: ${o}/portal/confirm?t=${r.alert_id}.${token}` : "";
-    const unsub = o ? `${o}/portal/unsub?t=${await unsubToken(app, reg.id, "critical")}` : undefined;
-    const res = await sendEmail(app, { to: await open(app.env.CONTINUITY_KEY, reg.address_enc), subject: r.message.split("\n")[0]!.slice(0, 120), text: r.message + confirm + (unsub ? `\n\nStop these notices: ${unsub}` : ""), unsubscribe: unsub });
-    if (res === "failed" || res === "disabled") await app.db.prepare("UPDATE alert_deliveries SET state='failed', updated_at=? WHERE alert_id=? AND person_id=? AND channel='email'").bind(nowIso(), r.alert_id, r.person_id).run();
-    else sent++;
+    const confirmUrl = r.kind === "drill" && o ? `${o}/portal/confirm?t=${r.alert_id}.${token}` : undefined;
+    const title = r.message.split("\n")[0]!;
+    const note = await buddyNote(app, r.person_id);
+    let ok = false;
+    for (const reg of regs.slice(0, 2)) {
+      const unsub = o ? `${o}/portal/unsub?t=${await unsubToken(app, reg.id, "critical")}` : undefined;
+      const res = await deliver(app, reg, { title: title.slice(0, 120), text: r.message + note + (confirmUrl ? `\n\nConfirm you received this: ${confirmUrl}` : ""), url: confirmUrl ?? (o ? `${o}/portal` : undefined), unsubscribe: unsub });
+      if (res === "sent" || res === "logged") {
+        ok = true;
+        break;
+      }
+    }
+    if (ok) sent++;
+    else await mark(r, "failed", "sent");
   }
   return sent;
 }
+/** Kept for callers and tests from before Hydra. */
+export const dispatchAlertEmails = dispatchAlerts;
 
 export async function unsubToken(app: App, registrationId: string, topic: string): Promise<string> {
   return `${registrationId}.${topic}.${(await hmacHex(app.env.CONTINUITY_KEY, "unsub", `${registrationId}:${topic}`)).slice(0, 32)}`;

@@ -10,6 +10,11 @@ import { attestationStatus } from "./continuity/passport";
 import { exportBundle, importBundle, PortableError } from "./continuity/portable";
 import { metrics as continuityMetrics } from "./continuity/alerts";
 import { runCron } from "./cron";
+import { anchorRecord, handleFeeds, publishNotice } from "./hydra/notices";
+import { handleMailEvent } from "./hydra/heads";
+import { hydraMetrics } from "./hydra/graph";
+import { buildEscrow } from "./hydra/escrow";
+import { sealRelocation } from "./hydra/fed";
 import type { Env } from "./env";
 import { MAX_CHUNKS, storeChunks } from "./ingest";
 import { dispatchPending } from "./outbox";
@@ -54,6 +59,15 @@ export async function handleFetch(req: Request, env: Env, fetcher?: Fetcher, net
   if (req.method === "GET" && url.pathname === "/.well-known/nexus-community.json") {
     const doc = await publicIdentity(env.DB);
     return doc ? new Response(JSON.stringify(doc), { headers: { "content-type": "application/json", "access-control-allow-origin": "*", "cache-control": "max-age=300" } }) : new Response("not found", { status: 404 });
+  }
+  // Hydra public heads: signed notice feeds, anchor record, owner heartbeat (public material only).
+  if (req.method === "GET" && (url.pathname === "/notices.json" || url.pathname === "/feed.xml" || url.pathname === "/notices.ics" || url.pathname === "/.well-known/nexus-anchor.txt" || url.pathname === "/.well-known/nexus-heartbeat.json")) {
+    return (await handleFeeds(req, makeApp(env, fetcher, net))) ?? new Response("not found", { status: 404 });
+  }
+  if (req.method === "POST" && url.pathname === "/hydra/mail-events") {
+    // Email provider delivery/bounce webhook; the secret is in the URL the operator registers.
+    if (!env.EMAIL_WEBHOOK_SECRET || !env.CONTINUITY_KEY || !safeEqual(url.searchParams.get("t") ?? "", env.EMAIL_WEBHOOK_SECRET)) return new Response("forbidden", { status: 403 });
+    return json({ ok: true, recorded: await handleMailEvent(makeApp(env, fetcher, net), await req.json().catch(() => null)) });
   }
   const att = /^\/v1\/attestations\/([0-9a-f]{32})\/status$/.exec(url.pathname);
   if (req.method === "GET" && att) return json({ status: await attestationStatus(env.DB, att[1]!) });
@@ -138,6 +152,8 @@ export async function handleFetch(req: Request, env: Env, fetcher?: Fetcher, net
     if (req.method === "POST" && url.pathname === "/admin/identity/manifest") {
       const v = await installManifest(env.DB, await req.json(), "admin");
       const relayed = v.ok && v.relocation ? await relayRelocation(app) : 0;
+      // Every new address list is anchored in the public feeds (and social/archive when set up).
+      if (v.ok) await publishNotice(app, v.relocation ? "relocation" : "anchor", v.relocation ? "We have moved" : "Address list updated", (await anchorRecord(env.DB)) ?? "", "admin");
       return json({ ...v, relayed });
     }
     if (req.method === "GET" && url.pathname === "/admin/continuity/export") {
@@ -157,6 +173,16 @@ export async function handleFetch(req: Request, env: Env, fetcher?: Fetcher, net
       }
     }
     if (req.method === "GET" && url.pathname === "/admin/continuity/metrics") return json(await continuityMetrics(env.DB));
+    // Hydra (P16): head graph numbers, an escrow copy for offline storage, sealed relocations.
+    if (req.method === "GET" && url.pathname === "/admin/hydra/metrics") return json(await hydraMetrics(app));
+    if (req.method === "GET" && url.pathname === "/admin/hydra/escrow") {
+      const e = await buildEscrow(app);
+      return e ? json(e) : json({ error: "escrow_not_configured" }, 409);
+    }
+    if (req.method === "POST" && url.pathname === "/admin/hydra/seal") {
+      const b = (await req.json()) as { manifest: never; quorum: number; silence_days: number; partners: string[] };
+      return json(await sealRelocation(app, b.manifest, { quorum: Number(b.quorum), silenceDays: Number(b.silence_days), partners: Array.isArray(b.partners) ? b.partners.map(String) : [] }));
+    }
   }
   return new Response("not found", { status: 404 });
 }

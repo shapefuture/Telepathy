@@ -25,3 +25,13 @@
 | Portal CSRF / session theft | SameSite=Strict HttpOnly cookie, x-portal header, 2 factors for alerts | continuity: portal tests |
 | Partner relays a fake relocation | verified against a pinned root, root-signed only | continuity: "forged or unpinned notices are refused" |
 | Member list leakage via passes | pairwise pseudonym, one audience, 7 days | continuity: "a pass proves membership to one partner" |
+| Correlated "independent" paths | failure domains + MX lookup + company parents + registry; index over joint failures | hydra: "two Gmail addresses are one head" |
+| Fake club notice on a new head | every notice/receipt/heartbeat signed by the online key; clients verify against the pinned root | hydra: "signed public notices", vectors |
+| Push endpoint as SSRF / spam cannon | only known push services and allowlisted ntfy servers; ≤10 heads per person; code rate limits | hydra: "arbitrary URLs are refused" |
+| TOTP brute force / replay | 6 digits, ±1 step, replay guard, 5 failures lock 15 min | hydra: "lock the factor" |
+| Device-key login replay | single-use 5-minute challenge; public JWK only stored | hydra: "one use" |
+| Guardian social engineering | k approvals, 24 h delay, cancel link sent to the person's own heads first | hydra: "guardians" |
+| Old receipt revives consent | sequence numbers; newest op wins; unfollow re-suppresses addresses | hydra: "an old receipt never overrides" |
+| Escrow leak | ciphertext only leaves the Worker; per-recipient key wrap; hash check on decrypt | hydra: "ciphertext only" |
+| One partner opens a sealed relocation early | Shamir k-of-n; each share released only after its holder sees silence + 3 down days | hydra: "only with k partners" |
+| Gossip poisoning | re-verified at every hop; root threshold required for relocations; ≤3 hops | hydra: "verified end to end" |

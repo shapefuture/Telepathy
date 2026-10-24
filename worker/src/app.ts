@@ -149,6 +149,7 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
       skillLabels: skills.map((c) => ({ code: c, label: jobLabel(c, lang) })),
       counts: { requests: n(req!), offers: n(offers!), invites: n(invites!) },
       startParam: user.startParam ?? null,
+      brand: app.env.BRAND_NAME || "Миндальная связь",
     });
   }
   if (key === "POST settings") {

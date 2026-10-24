@@ -40,3 +40,23 @@ describe("leaving a group revokes access (C06)", () => {
     expect((await access(41))?.revoked_at).not.toBeNull();
   });
 });
+
+describe("a Telegram failure in one part of an update doesn't skip the rest", () => {
+  it("a joiner gets read access even if the group welcome can't be posted", async () => {
+    const t = testApp();
+    await enableGroup(t.app);
+    await feed(t.app, groupMsg(42, "first message")); // known member, never opened the bot
+    await env.DB.prepare("UPDATE source_access SET revoked_at='2020-01-01T00:00:00Z' WHERE member_id=(SELECT id FROM members WHERE tg_id=42)").run();
+    // Private messages fail (never started the bot); the group refuses too (bot may not post there).
+    const fetcher = async (url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body ?? "{}"));
+      if (url.endsWith("/sendMessage") && (body.chat_id === 42 || body.chat_id === GROUP))
+        return Response.json({ ok: false, error_code: body.chat_id === 42 ? 403 : 400, description: body.chat_id === 42 ? "Forbidden: bot can't initiate conversation with a user" : "Bad Request: not enough rights to send text messages to the chat" });
+      return t.fetcher(url, init);
+    };
+    const app = makeApp(env, fetcher);
+    await handleUpdate(app, memberUpdate(42, { status: "left" }, { status: "member" }) as any).catch(() => undefined); // the webhook answers "ok" to a DefiniteFailure
+    expect((await access(42))?.revoked_at).toBeNull();
+  });
+
+});

@@ -805,11 +805,13 @@ const IN = ["member", "administrator", "creator", "restricted"];
 const inChat = (cm?: { status: string; is_member?: boolean }) => !!cm && IN.includes(cm.status) && !(cm.status === "restricted" && cm.is_member === false);
 async function onChatMember(app: App, ev: ChatMemberUpdated): Promise<string[]> {
   // Newly joined (not a promotion or restriction change): a short welcome, privately when possible.
-  if (inChat(ev.new_chat_member) && !inChat(ev.old_chat_member)) await welcomeJoiner(app, ev.chat.id, ev.new_chat_member.user);
   const src = await enabledSource(app.db, ev.chat.id);
   const m = src ? await memberByTg(app.db, ev.new_chat_member.user.id) : null;
-  if (!src || !m) return [];
-  if (!inChat(ev.new_chat_member)) await revoke(app.db, src.id, m.id);
-  else await grantStatement(app.db, src.id, m.id).run();
+  if (src && m) {
+    if (!inChat(ev.new_chat_member)) await revoke(app.db, src.id, m.id);
+    else await grantStatement(app.db, src.id, m.id).run();
+  }
+  // After the access change: a welcome Telegram refuses (400/403) must not skip it.
+  if (inChat(ev.new_chat_member) && !inChat(ev.old_chat_member)) await welcomeJoiner(app, ev.chat.id, ev.new_chat_member.user);
   return [];
 }

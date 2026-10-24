@@ -3,6 +3,7 @@
 // requester confirms -> only then both receive each other's contact. Decline or expiry moves
 // on to the next candidate (max 3). Every send goes through the effect ledger.
 
+import { defaultLang } from "./i18n";
 import { eligibleCandidates, labelsFor, matchSkills } from "./experts";
 import { T, type Lang } from "./i18n";
 import { effectStatement } from "./outbox";
@@ -56,7 +57,7 @@ interface IntroRow {
 async function contact(db: D1Database, memberId: string): Promise<{ tg: number; lang: Lang }> {
   const r = await db.prepare("SELECT tg_id, lang FROM members WHERE id=?").bind(memberId).first<{ tg_id: number; lang: Lang | null }>();
   if (!r) throw new IntroError("member not found");
-  return { tg: r.tg_id, lang: r.lang ?? "en" };
+  return { tg: r.tg_id, lang: r.lang ?? defaultLang() };
 }
 
 const btn = (text: string, data: string) => ({ text, callback_data: data });
@@ -138,7 +139,7 @@ async function nextCandidate(db: D1Database, needId: string, now: string, notify
 /** Apply a button press. Returns a short reply and the effect keys to dispatch. */
 export async function act(db: D1Database, introId: string, memberId: string, action: string, now = nowIso()): Promise<{ reply: string; keys: string[] }> {
   const event = (["accept", "decline", "confirm", "cancel", "helpful", "noresp"].includes(action) ? (action === "helpful" || action === "noresp" ? "complete" : action) : null) as Event | null;
-  const me = T((await db.prepare("SELECT lang FROM members WHERE id=?").bind(memberId).first<{ lang: Lang | null }>())?.lang ?? "en");
+  const me = T((await db.prepare("SELECT lang FROM members WHERE id=?").bind(memberId).first<{ lang: Lang | null }>())?.lang ?? defaultLang());
   if (!event) return { reply: me.unknownAction, keys: [] };
   const intro = await db.prepare("SELECT * FROM intros WHERE id=?").bind(introId).first<IntroRow>();
   if (!intro) return { reply: me.introGone, keys: [] };
@@ -254,8 +255,8 @@ export async function sendReminders(db: D1Database, now = nowIso()): Promise<str
     const [upd] = await db.batch([
       db.prepare("UPDATE intros SET reminder_sent_at=? WHERE id=? AND reminder_sent_at IS NULL AND status='invited'").bind(now, r.id),
       effectStatement(db, key, r.tg_id, {
-        text: T(r.lang ?? "en").introReminder,
-        buttons: [[btn(T(r.lang ?? "en").bAccept, `i:${r.id}:accept`), btn(T(r.lang ?? "en").bDecline, `i:${r.id}:decline`)]],
+        text: T(r.lang ?? defaultLang()).introReminder,
+        buttons: [[btn(T(r.lang ?? defaultLang()).bAccept, `i:${r.id}:accept`), btn(T(r.lang ?? defaultLang()).bDecline, `i:${r.id}:decline`)]],
       }),
     ]);
     if (upd!.meta.changes) keys.push(key);

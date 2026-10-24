@@ -21,6 +21,8 @@
   "triggers": { "crons": ["* * * * *"] },
   "vars": {
     "COMMUNITY_LABEL": "Community",
+    // Interface language until a member picks one (/language or the Mini App): "ru" or "en".
+    "DEFAULT_LANG": "ru",
     "TIMEZONE": "Asia/Jerusalem",
     "DIGEST_HOUR": "9",
     "ASK_RATE_PER_MINUTE": "10",

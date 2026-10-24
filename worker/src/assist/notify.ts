@@ -5,6 +5,7 @@ import { ownerIds } from "../env";
 import { effectStatement } from "../outbox";
 import type { InlineButton } from "../telegram";
 import { A, type AssistMessages } from "./i18n";
+import { defaultLang } from "../i18n";
 
 export const b = (text: string, data: string): InlineButton => ({ text, callback_data: data });
 
@@ -15,8 +16,8 @@ export async function notifyOwners(app: App, key: string, build: Build): Promise
   const ids = [...ownerIds(app.env)];
   if (!ids.length) return [];
   const { results } = await app.db.prepare("SELECT tg_id, lang FROM members WHERE tg_id IN (SELECT value FROM json_each(?))").bind(JSON.stringify(ids)).all<{ tg_id: number; lang: string | null }>();
-  const langs = new Map(results.map((r) => [r.tg_id, r.lang === "ru" ? "ru" : "en"] as const));
-  await app.db.batch(ids.map((tg) => effectStatement(app.db, `${key}:${tg}`, tg, build(A(langs.get(tg) ?? "en")))));
+  const langs = new Map(results.map((r) => [r.tg_id, r.lang === "en" || r.lang === "ru" ? r.lang : defaultLang()] as const));
+  await app.db.batch(ids.map((tg) => effectStatement(app.db, `${key}:${tg}`, tg, build(A(langs.get(tg) ?? defaultLang())))));
   return ids.map((tg) => `${key}:${tg}`);
 }
 

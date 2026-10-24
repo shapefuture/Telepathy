@@ -15,6 +15,7 @@ export default defineConfig(async () => {
             WEBHOOK_SECRET: "test-webhook-secret",
             ADMIN_TOKEN: "test-admin-token",
             OWNER_IDS: "1000",
+            DEFAULT_LANG: "en", // tests assert English text; production default is "ru"
           },
         },
       }),

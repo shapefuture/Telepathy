@@ -4,9 +4,17 @@
 export type Lang = "en" | "ru";
 
 /** Pick a language from Telegram's language_code (e.g. "ru", "uk", "en-US"). */
-export function langFromCode(code?: string): Lang {
-  const c = (code ?? "").toLowerCase();
-  return c.startsWith("ru") || c.startsWith("uk") || c.startsWith("be") || c.startsWith("kk") ? "ru" : "en";
+// Interface language for anyone who hasn't chosen one (/language or the Mini App). Set once per
+// deployment from the defaultLang() var ("ru" in wrangler.jsonc); the Telegram app language is ignored.
+let defaultLanguage: Lang = "ru";
+export const defaultLang = (): Lang => defaultLanguage;
+export function setDefaultLang(v?: string): void {
+  if (v === "en" || v === "ru") defaultLanguage = v;
+}
+
+/** Language for someone who hasn't chosen one. */
+export function langFromCode(_code?: string): Lang {
+  return defaultLanguage;
 }
 
 const EN = {

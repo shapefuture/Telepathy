@@ -1,7 +1,7 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { ensureMember } from "../src/acl";
-import { langFromCode, MESSAGES } from "../src/i18n";
+import { langFromCode, MESSAGES, setDefaultLang } from "../src/i18n";
 import { answer } from "../src/search";
 import { GROUP, OWNER, dm, enableGroup, feed, groupCmd, groupMsg, press, testApp } from "./helpers";
 
@@ -17,12 +17,13 @@ describe("P13-04 Russian / English interface", () => {
     expect(same).toEqual([]); // no untranslated copies
   });
 
-  it("picks the language from Telegram and honours /language", async () => {
-    expect([langFromCode("ru"), langFromCode("uk-UA"), langFromCode("en-US"), langFromCode(undefined)]).toEqual(["ru", "ru", "en", "en"]);
-    const { app, texts } = testApp();
+  it("uses the deployment's default language (not Telegram's) and honours /language", async () => {
+    setDefaultLang("ru");
+    expect([langFromCode("ru"), langFromCode("en-US"), langFromCode(undefined)]).toEqual(["ru", "ru", "ru"]);
+    const { app, texts } = testApp({}, "ru");
     await enableGroup(app);
-    await feed(app, groupMsg(5, "привет"));
-    await feed(app, dm(5, "/help", "ru"));
+    await feed(app, groupMsg(5, "hello"));
+    await feed(app, dm(5, "/help", "en")); // an English Telegram app still gets the Russian default
     expect(texts(5).at(-1)).toContain("<b>Поиск</b>");
     await feed(app, dm(5, "/language en", "ru"));
     expect(texts(5).at(-1)).toBe("Language set to English.");
@@ -36,7 +37,8 @@ describe("P13-04 Russian / English interface", () => {
     const { app, sent } = testApp();
     await enableGroup(app);
     await feed(app, groupMsg(5, "hi"));
-    await feed(app, groupMsg(6, "hey", { from: { id: 6, is_bot: false, language_code: "ru" } }));
+    await feed(app, groupMsg(6, "hey"));
+    await feed(app, dm(6, "/language ru"));
     await feed(app, dm(6, "/optin", "ru"));
     await feed(app, dm(6, "/skills add accounting", "ru"));
     await feed(app, dm(5, "/intro need an accountant for my startup", "en"));
@@ -185,9 +187,9 @@ describe("P13-02 already-answered hints", () => {
   });
 });
 
-it("member rows from group posts remember the Telegram language", async () => {
-  const { app } = testApp();
+it("member rows from group posts get the default language, whatever Telegram's is", async () => {
+  const { app } = testApp({}, "ru");
   await enableGroup(app);
-  await feed(app, groupMsg(9, "привет", { from: { id: 9, is_bot: false, language_code: "ru" } }));
+  await feed(app, groupMsg(9, "hello", { from: { id: 9, is_bot: false, language_code: "en" } }));
   expect((await ensureMember(env.DB, 9)).lang).toBe("ru");
 });

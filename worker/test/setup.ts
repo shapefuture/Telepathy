@@ -1,6 +1,7 @@
 import { applyD1Migrations, env } from "cloudflare:test";
 import { beforeEach } from "vitest";
 import { resetRateLimits } from "../src/bot";
+import { setDefaultLang } from "../src/i18n";
 
 await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
 
@@ -10,4 +11,5 @@ const TABLES = ["seal_shares", "sealed_held", "gossip_notices", "escrow_runs", "
 beforeEach(async () => {
   await env.DB.batch([...TABLES.map((t) => env.DB.prepare(`DELETE FROM ${t}`)), env.DB.prepare("DELETE FROM organizations WHERE kind='partner'")]);
   resetRateLimits();
+  setDefaultLang((env as { DEFAULT_LANG?: string }).DEFAULT_LANG); // tests start in English
 });

@@ -52,9 +52,10 @@ export function fakeTelegram(opts: { admins?: number[]; files?: Record<string, s
   return { fetcher, calls, sent: (chatId?: number) => calls.filter((c) => c.method === "sendMessage" && (chatId === undefined || c.params.chat_id === chatId)) };
 }
 
-export function testApp(opts?: Parameters<typeof fakeTelegram>[0]) {
+/** `lang` overrides the deployment's DEFAULT_LANG (tests default to English). */
+export function testApp(opts?: Parameters<typeof fakeTelegram>[0], lang?: "en" | "ru") {
   const t = fakeTelegram(opts);
-  const app: App = makeApp(env, t.fetcher);
+  const app: App = makeApp(lang ? { ...env, DEFAULT_LANG: lang } : env, t.fetcher);
   return { app, ...t, texts: (chatId?: number) => t.sent(chatId).map((c) => c.params.text as string) };
 }
 

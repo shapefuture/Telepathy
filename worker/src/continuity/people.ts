@@ -133,8 +133,9 @@ export async function checkCode(app: App, registrationId: string, code: string, 
     .first<{ id: string; code_hash: string; attempts: number }>();
   if (!row || row.attempts >= CODE_MAX_ATTEMPTS) return null;
   const ok = row.code_hash === (await hmacHex(app.env.CONTINUITY_KEY, "code", `${registrationId}:${code.trim()}`));
-  await app.db.prepare(`UPDATE login_codes SET attempts=attempts+1${ok ? ", used_at=?" : ""} WHERE id=?`).bind(...(ok ? [nowIso(now), row.id] : [row.id])).run();
-  if (!ok) return null;
+  // Atomic: parallel requests can't each pass the checks above and all use the same code.
+  const won = await app.db.prepare(`UPDATE login_codes SET attempts=attempts+1${ok ? ", used_at=?" : ""} WHERE id=? AND used_at IS NULL AND attempts<? RETURNING id`).bind(...(ok ? [nowIso(now), row.id] : [row.id]), CODE_MAX_ATTEMPTS).first();
+  if (!ok || !won) return null;
   const reg = await app.db
     .prepare("UPDATE delivery_registrations SET status='verified', verified_at=COALESCE(verified_at, ?) WHERE id=? AND status<>'revoked' RETURNING person_id, suppress_hash")
     .bind(nowIso(now), registrationId)

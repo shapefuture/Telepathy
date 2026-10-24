@@ -859,3 +859,16 @@ describe("audit: login enumeration", () => {
     for (let i = 0; i < 8; i++) expect((await n.http("POST", "/portal/api/login", { email: `nobody${i}@proton.me` }, P)).json.ticket).toMatch(uuidish);
   });
 });
+
+describe("audit: one-time login codes", () => {
+  it("an email login code logs in once, even when sent in parallel", async () => {
+    const n = node();
+    await setup(n, 91);
+    await member(n, 91, "m91@proton.me");
+    const ticket = (await n.http("POST", "/portal/api/login", { email: "m91@proton.me" }, P)).json.ticket;
+    const code = codeIn(n.mails.at(-1)!.text);
+    const tries = await Promise.all(Array.from({ length: 4 }, () => n.http("POST", "/portal/api/verify", { ticket, code }, P)));
+    expect(tries.filter((r) => r.json?.ok).length).toBe(1);
+  });
+
+});

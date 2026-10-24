@@ -926,3 +926,15 @@ describe("audit: verifying an address", () => {
     expect(await q("SELECT status FROM delivery_registrations WHERE id=?", reg)).toEqual({ status: "pending" });
   });
 });
+
+describe("audit: malformed receipts", () => {
+  it("receipts with broken signature lists are rejected, not a crash", async () => {
+    const n = node();
+    await setup(n, 97);
+    const portal = await member(n, 97, "m97@proton.me");
+    const signed = { schema: "nexus.follow-receipt.v1", org: ORG, person_ref: "x", seq: 1, op: "FOLLOW", topic: "critical", at: iso(Date.now()), consent_version: 1 };
+    const r = await portal("POST", "receipts", { receipts: [{ signed, signatures: [null] }, { signed, signatures: 7 }, { signed, signatures: [{ keyid: 1, sig: {} }] }] });
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ applied: 0, rejected: 3 });
+  });
+});

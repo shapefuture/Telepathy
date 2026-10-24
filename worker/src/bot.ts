@@ -364,7 +364,8 @@ async function cmdForgetMessage(app: App, msg: TgMessage): Promise<string[]> {
   const target = msg.reply_to_message;
   const src = await enabledSource(app.db, msg.chat.id);
   if (!target || !src || !msg.from) return [];
-  const isAuthor = target.from?.id === msg.from.id;
+  // Messages sent as a channel or an anonymous admin all share one fake `from`; compare the chat then.
+  const isAuthor = msg.sender_chat || target.sender_chat ? msg.sender_chat?.id === target.sender_chat?.id : target.from?.id === msg.from.id;
   if (!isAuthor && !(await ownerInGroup(app, msg))) return [];
   const m = T(await langForUser(app, msg.from));
   const ok = await removeMessage(app.db, src.id, target.message_id);

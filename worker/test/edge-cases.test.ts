@@ -41,6 +41,24 @@ describe("leaving a group revokes access (C06)", () => {
   });
 });
 
+describe("/forget by the author", () => {
+  it("does not treat two different channels (same fake sender @Channel_Bot) as the same author", async () => {
+    const { app } = testApp();
+    await enableGroup(app);
+    const CHANNEL_BOT = { id: 136817688, is_bot: true, first_name: "Channel" };
+    const victim = nextMsg();
+    await feed(app, { message: { message_id: victim, date: Math.floor(Date.now() / 1000), chat: { id: GROUP, type: "supergroup", title: "G" }, from: CHANNEL_BOT, sender_chat: { id: -1009001, type: "channel" }, text: "Official schedule for the spring meetup" } } as any);
+    const cmd = groupCmd(0, "/forget", { from: CHANNEL_BOT, sender_chat: { id: -1009002, type: "channel" }, reply_to_message: { message_id: victim, from: CHANNEL_BOT, sender_chat: { id: -1009001, type: "channel" } } });
+    await feed(app, cmd as any);
+    const row = await env.DB.prepare("SELECT body, removed_at FROM passages WHERE msg_id=?").bind(victim).first<{ body: string | null; removed_at: string | null }>();
+    expect(row?.removed_at).toBeNull();
+    expect(row?.body).toContain("spring meetup");
+    // The channel that posted it can still remove it.
+    await feed(app, groupCmd(0, "/forget", { from: CHANNEL_BOT, sender_chat: { id: -1009001, type: "channel" }, reply_to_message: { message_id: victim, from: CHANNEL_BOT, sender_chat: { id: -1009001, type: "channel" } } }) as any);
+    expect((await env.DB.prepare("SELECT removed_at FROM passages WHERE msg_id=?").bind(victim).first<{ removed_at: string | null }>())?.removed_at).not.toBeNull();
+  });
+});
+
 describe("a Telegram failure in one part of an update doesn't skip the rest", () => {
   it("a joiner gets read access even if the group welcome can't be posted", async () => {
     const t = testApp();

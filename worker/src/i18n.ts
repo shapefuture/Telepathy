@@ -54,6 +54,21 @@ const EN = {
 
   // owner commands in groups
   visibilityMust: (list: string) => `Visibility must be one of: ${list}`,
+  whereMember:
+    "<b>Where commands work</b>\n" +
+    "<b>Here, in this private chat:</b> /ask, /app, /profile, /language, /digest, /catchup, /events, /skills, /optin, /optout, /expert, /intro, /requests, /pings, /passport, /forget_me, /help, /privacy.\n" +
+    "<b>In a group:</b> /ask (answers only from that group), or mention me with a question; reply /forget to your own message to delete it.",
+  whereOwner:
+    "\n\n<b>Owner, here:</b> /status, /sources, /uncertain, /desk, /offer, /partner, /fed, /ledger, /continuity, /destinations, /alert, /drill, /hydra.\n" +
+    "<b>Owner, in a group (you must be its admin):</b> /enable, /disable, /retention, /hints, /routing, /canonical and /notevent (as a reply).",
+  adminGuide: (title: string) =>
+    `<b>Group “${title}” is on.</b> Only you see this.\n\n` +
+    "<b>In that group (as its admin):</b>\n" +
+    "/disable — stop saving it\n/retention N — delete messages older than N days (0 = keep all)\n" +
+    "/hints on|off — point to earlier answers to repeated questions\n/routing on|off — unanswered questions go to opted-in experts after 4 h\n" +
+    "/canonical (reply) — mark the best answer · /notevent (reply) — hide a wrong event\n\n" +
+    "<b>Members there:</b> /ask or @mention for answers from that group; /forget (reply) to delete their own message.\n" +
+    "<b>Everything else works here, in private:</b> /status, /sources, /desk, /app and the rest (/help).",
   enabled: (vis: string) =>
     `Telepathy is now <b>collecting</b> this chat (visibility: ${vis}, full history kept). ` +
     "Members can search it with /ask, here or in a DM with the bot. DM the bot /privacy for details or /forget_me to delete your data.",
@@ -265,6 +280,21 @@ const RU: Messages = {
   languageUsage: "Использование: <code>/language ru</code> или <code>/language en</code>",
 
   visibilityMust: (list: string) => `Видимость должна быть одной из: ${list}`,
+  whereMember:
+    "<b>Где работают команды</b>\n" +
+    "<b>Здесь, в личном чате:</b> /ask, /app, /profile, /language, /digest, /catchup, /events, /skills, /optin, /optout, /expert, /intro, /requests, /pings, /passport, /forget_me, /help, /privacy.\n" +
+    "<b>В группе:</b> /ask (ответ только из этой группы) или упомяните меня с вопросом; ответьте /forget на своё сообщение, чтобы удалить его.",
+  whereOwner:
+    "\n\n<b>Владельцу, здесь:</b> /status, /sources, /uncertain, /desk, /offer, /partner, /fed, /ledger, /continuity, /destinations, /alert, /drill, /hydra.\n" +
+    "<b>Владельцу, в группе (нужно быть её админом):</b> /enable, /disable, /retention, /hints, /routing, /canonical и /notevent (ответом на сообщение).",
+  adminGuide: (title: string) =>
+    `<b>Группа «${title}» подключена.</b> Это видите только вы.\n\n` +
+    "<b>В этой группе (как её админ):</b>\n" +
+    "/disable — перестать сохранять\n/retention N — удалять сообщения старше N дней (0 — хранить всё)\n" +
+    "/hints on|off — подсказывать прошлые ответы на повторные вопросы\n/routing on|off — вопросы без ответа через 4 ч уходят экспертам\n" +
+    "/canonical (ответом) — отметить лучший ответ · /notevent (ответом) — скрыть ошибочное событие\n\n" +
+    "<b>Участникам там:</b> /ask или упоминание бота — ответы из этой группы; /forget (ответом) — удалить своё сообщение.\n" +
+    "<b>Всё остальное — здесь, в личном чате:</b> /status, /sources, /desk, /app и другие (/help).",
   enabled: (vis: string) =>
     `Telepathy теперь <b>сохраняет</b> этот чат (видимость: ${vis}, история хранится полностью). ` +
     "Участники могут искать по нему через /ask здесь или в личке с ботом. Подробности — /privacy в личке с ботом, удалить свои данные — /forget_me.",

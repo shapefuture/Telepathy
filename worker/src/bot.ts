@@ -23,6 +23,7 @@ import { touchOwners } from "./hydra/notices";
 import { assistCallback, cmdHelpNeed, forgetMissions, listMissions, ownerAssistCommand, OWNER_COMMANDS } from "./assist/bot";
 import { answer, parseFilters, renderAnswer } from "./search";
 import type { Fetcher, InlineButton, Telegram } from "./telegram";
+import { DefiniteFailure } from "./telegram";
 import { escapeHtml } from "./text";
 import { audit, DAY, HOUR, localParts, newId, nowIso, tzOffsetMinutes } from "./util";
 
@@ -262,6 +263,12 @@ async function cmdEnable(app: App, msg: TgMessage, args: string): Promise<string
   ]);
   await audit(app.db, "source.enable", owner.id, id, { visibility: vis });
   await reply(app, msg.chat.id, m.enabled(vis));
+  // The command guide goes to the admin privately, not to the whole group.
+  try {
+    await app.tg.sendMessage(msg.from!.id, m.adminGuide(escapeHtml(msg.chat.title ?? "")));
+  } catch (e) {
+    if (!(e instanceof DefiniteFailure)) throw e; // they never opened the bot privately: nothing to do
+  }
   return [];
 }
 
@@ -393,6 +400,8 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
   switch (cmd) {
     case "start":
       await reply(app, chat, pre.start + pre.help);
+      // Private chat, so only this person sees which commands work where.
+      await reply(app, chat, pre.whereMember + (isOwner(app, from.id) ? pre.whereOwner : ""));
       return [];
     case "help":
       if (args.trim()) break; // "/help <need>" opens a mission below

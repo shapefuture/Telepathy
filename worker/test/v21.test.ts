@@ -193,3 +193,15 @@ it("member rows from group posts get the default language, whatever Telegram's i
   await feed(app, groupMsg(9, "hello", { from: { id: 9, is_bot: false, language_code: "en" } }));
   expect((await ensureMember(env.DB, 9)).lang).toBe("ru");
 });
+
+it("command guides go only to the person: /start in private, /enable's admin guide by DM", async () => {
+  const { app, texts } = testApp();
+  await enableGroup(app);
+  expect(texts(OWNER).some((t) => t.includes("Only you see this") && t.includes("/retention"))).toBe(true);
+  expect(texts(GROUP).some((t) => t.includes("Only you see this"))).toBe(false);
+  await feed(app, dm(7, "/start"));
+  expect(texts(7).at(-1)).toContain("<b>In a group:</b>");
+  expect(texts(7).at(-1)).not.toContain("Owner");
+  await feed(app, dm(OWNER, "/start"));
+  expect(texts(OWNER).at(-1)).toContain("/enable");
+});

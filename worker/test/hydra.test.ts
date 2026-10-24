@@ -518,6 +518,24 @@ describe("H2 login heads", () => {
   });
 });
 
+describe("Mini App", () => {
+  it("reaches the same Hydra routes through signed initData: summary, ntfy head, buddy code", async () => {
+    const n = node();
+    await setup(n, 88);
+    await member(n, 88, "m88@proton.me");
+    const api = miniApp(n, 88);
+    const y = (await api("GET", "passport/h/hydra")).json;
+    expect(y).toMatchObject({ telegram: true, independent: 2 });
+    expect(y.handle).toMatch(/^TP-/);
+    const topic = (await api("GET", "passport/h/ntfy-topic")).json.topic;
+    const r = (await api("POST", "passport/h/head", { kind: "ntfy", address: topic })).json;
+    expect((await api("POST", "passport/h/head/verify", { registration: r.registration, code: ntfyCode(n, topic) })).json.ok).toBe(true);
+    expect((await api("GET", "passport/h/hydra")).json.independent).toBe(3);
+    expect((await api("POST", "passport/h/buddy/invite", { label: "Ann" })).json.code).toBeTruthy();
+    expect((await api("GET", "passport/h/nope")).status).toBe(404);
+  });
+});
+
 describe("portal page", () => {
   it("the page script parses, the service worker is scoped, and CSP allows only what it needs", async () => {
     const n = node();

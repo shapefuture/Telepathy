@@ -53,7 +53,7 @@ export interface Update {
 /** Kept for tests and docs: the English privacy notice. */
 export const PRIVACY_NOTICE = T("en").privacy;
 
-const PRIVATE_ONLY = new Set(["intro", "expert", "profile", "optin", "optout", "skills", "forget_me", "digest", "requests", "language", "catchup", "events", "pings", "app", "cancel", "desk", "offer", "partner", "fed"]);
+const PRIVATE_ONLY = new Set(["intro", "expert", "profile", "optin", "optout", "skills", "forget_me", "digest", "requests", "language", "catchup", "events", "pings", "app", "cancel", "desk", "offer", "partner", "fed", "ledger"]);
 const GROUP_TYPES = new Set(["group", "supergroup"]);
 const btn = (text: string, data: string): InlineButton => ({ text, callback_data: data });
 
@@ -670,7 +670,7 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
       await app.tg.call("editMessageReplyMarkup", { chat_id: cb.message.chat.id, message_id: cb.message.message_id, reply_markup: { inline_keyboard: [] } }).catch(() => undefined);
     }
   };
-  if (["m", "o", "r", "d", "x"].includes(kind ?? "")) return assistCallback(app, cb, await memberByTg(app.db, cb.from.id), data);
+  if (["m", "o", "r", "d", "x", "g"].includes(kind ?? "")) return assistCallback(app, cb, await memberByTg(app.db, cb.from.id), data);
   const pre = T(await langForUser(app, cb.from));
   if (kind === "u") {
     if (!isOwner(app, cb.from.id)) {

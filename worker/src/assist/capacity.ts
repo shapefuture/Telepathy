@@ -17,15 +17,21 @@ export interface Offer {
   commitment_mode: CommitmentMode;
   status: string;
   expires_at: string;
+  price_minor: number | null;
+  currency: string | null;
 }
 
-export async function addOffer(db: D1Database, o: { job: string; capacity: number; mode: CommitmentMode; description: string; by: string }, now = new Date()): Promise<string> {
+export async function addOffer(
+  db: D1Database,
+  o: { job: string; capacity: number; mode: CommitmentMode; description: string; by: string; price?: { amount_minor: number; currency: string } },
+  now = new Date(),
+): Promise<string> {
   const id = newId().slice(0, 8); // short: it travels in callback data (64-byte limit)
   await db
     .prepare(
-      "INSERT INTO capability_offers(id, job_code, description, capacity_total, commitment_mode, created_by, created_at, expires_at) VALUES (?,?,?,?,?,?,?,?)",
+      "INSERT INTO capability_offers(id, job_code, description, capacity_total, commitment_mode, created_by, created_at, expires_at, price_minor, currency) VALUES (?,?,?,?,?,?,?,?,?,?)",
     )
-    .bind(id, o.job, o.description.slice(0, 200), o.capacity, o.mode, o.by, nowIso(now), nowIso(new Date(now.getTime() + OFFER_TTL_DAYS * DAY)))
+    .bind(id, o.job, o.description.slice(0, 200), o.capacity, o.mode, o.by, nowIso(now), nowIso(new Date(now.getTime() + OFFER_TTL_DAYS * DAY)), o.price?.amount_minor ?? null, o.price?.currency ?? null)
     .run();
   return id;
 }

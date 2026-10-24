@@ -14,6 +14,8 @@ import { notifyMember, notifyOwners } from "../assist/notify";
 import { b } from "../assist/notify";
 import { escapeHtml } from "../text";
 import { audit, DAY, newId, nowIso } from "../util";
+import { postDelivery, type Terms } from "../assist/ledger";
+import { partnerKeys, refreshPartner } from "./keys";
 import { checkShape, SCHEMA, sha256, sign, verifySignature, MAX_BODY_BYTES, type FedMessage, type InquiryBody, type MessageType } from "./envelope";
 
 export const INQUIRY_TTL_DAYS = 14;
@@ -28,6 +30,9 @@ export interface Partner {
   endpoint: string | null;
   public_key: string | null;
   categories: string;
+  prev_public_key?: string | null;
+  prev_valid_until?: string | null;
+  manifest_checked_at?: string | null;
 }
 
 export interface Exchange {
@@ -305,7 +310,8 @@ export async function offerInbound(app: App, exId: string, offerId: string): Pro
   if (!offer || !p) return { ok: false, keys: [] };
   const u = await app.db.prepare("UPDATE federation_exchanges SET state='offered', capability_offer_id=?, updated_at=? WHERE id=? AND state='received' RETURNING id").bind(offerId, nowIso(), exId).all();
   if (!u.results.length) return { ok: false, keys: [] };
-  const keys = await enqueue(app, p, "offer", ex.remote_id!, { offer_ref: ex.id, summary: offer.description, terms: { mode: offer.commitment_mode } }, `off:${ex.id}`, ex.expires_at);
+  const terms: Terms = { mode: offer.commitment_mode, ...(offer.commitment_mode === "paid" && offer.price_minor && offer.currency ? { price: { amount_minor: offer.price_minor, currency: offer.currency } } : {}) };
+  const keys = await enqueue(app, p, "offer", ex.remote_id!, { offer_ref: ex.id, summary: offer.description, terms: terms as Record<string, unknown> }, `off:${ex.id}`, ex.expires_at);
   return { ok: true, keys };
 }
 
@@ -325,6 +331,10 @@ export async function finishInbound(app: App, exId: string, how: "delivered" | "
   if (!ex || !p || !c) return { ok: false, keys: [] };
   const ok = how === "delivered" ? await deliver(app.db, c.id) : await release(app.db, c.id);
   if (!ok) return { ok: false, keys: [] };
+  if (how === "delivered" && c.capability_offer_id) {
+    const o = await app.db.prepare("SELECT commitment_mode AS mode, price_minor, currency FROM capability_offers WHERE id=?").bind(c.capability_offer_id).first<{ mode: string; price_minor: number | null; currency: string | null }>();
+    if (o) await postDelivery(app.db, p.id, ex.id, { mode: o.mode, ...(o.price_minor && o.currency ? { price: { amount_minor: o.price_minor, currency: o.currency } } : {}) }, true);
+  }
   // The contact is no longer needed once the service ends (minimization).
   await app.db.prepare("UPDATE federation_exchanges SET state=?, contact=NULL, updated_at=? WHERE id=?").bind(how === "delivered" ? "delivered" : "declined", nowIso(), ex.id).run();
   return { ok: true, keys: await enqueue(app, p, "commitment", ex.remote_id!, { status: how }, `cm:${how}:${ex.id}`, ex.expires_at) };
@@ -351,7 +361,7 @@ export async function receive(app: App, raw: unknown, route: { types: MessageTyp
   const p = await getPartner(app.db, msg.issuer_org);
   if (!p || !p.public_key) return fail(401, "unknown_issuer");
   if (p.status !== "active") return fail(403, "partner_suspended");
-  if (!(await verifySignature(msg, p.public_key))) return fail(401, "signature");
+  if (!(await signedByPartner(app, p, msg, now))) return fail(401, "signature");
   const fresh = await app.db.prepare("INSERT INTO fed_nonces(issuer, nonce, expires_at) VALUES (?,?,?) ON CONFLICT DO NOTHING RETURNING nonce").bind(p.id, msg.nonce, msg.expires_at).all();
   if (!fresh.results.length) return { status: 200, body: { ok: true, duplicate: true }, keys: [] };
   try {
@@ -362,6 +372,14 @@ export async function receive(app: App, raw: unknown, route: { types: MessageTyp
     await app.db.prepare("DELETE FROM fed_nonces WHERE issuer=? AND nonce=?").bind(p.id, msg.nonce).run();
     throw e;
   }
+}
+
+/** Current key, previous key in its grace period, then one manifest refresh (key rotation). */
+async function signedByPartner(app: App, p: Partner, msg: FedMessage, now: Date): Promise<boolean> {
+  for (const k of partnerKeys(p, nowIso(now))) if (await verifySignature(msg, k)) return true;
+  if ((await refreshPartner(app, p, now)) !== "rotated") return false;
+  const fresh = await getPartner(app.db, p.id);
+  return !!fresh?.public_key && (await verifySignature(msg, fresh.public_key));
 }
 
 async function apply(app: App, p: Partner, msg: FedMessage, now: Date): Promise<Received> {
@@ -399,16 +417,18 @@ async function apply(app: App, p: Partner, msg: FedMessage, now: Date): Promise<
     if (!m) return fail(404, "unknown_exchange");
     if (msg.type === "offer") {
       const summary = String(msg.body.summary ?? "").slice(0, 300);
-      const mode = String((msg.body.terms as { mode?: string } | undefined)?.mode ?? "volunteer").slice(0, 30);
+      const t = (msg.body.terms ?? {}) as Terms;
+      const mode = String(t.mode ?? "volunteer").slice(0, 30);
+      const price = t.price && Number.isSafeInteger(t.price.amount_minor) && t.price.amount_minor > 0 && /^[A-Z]{3}$/.test(String(t.price.currency)) ? { amount_minor: t.price.amount_minor, currency: t.price.currency } : undefined;
       if (!summary || ex.state !== "sent" || !["routed", "offers_available"].includes(m.status)) return fail(409, "state");
       const oid = newId().slice(0, 8);
       await app.db.batch([
-        app.db.prepare("INSERT OR IGNORE INTO exchange_offers(id, exchange_id, summary, terms, created_at) VALUES (?,?,?,?,?)").bind(oid, ex.id, summary, JSON.stringify({ mode }), ts),
+        app.db.prepare("INSERT OR IGNORE INTO exchange_offers(id, exchange_id, summary, terms, created_at) VALUES (?,?,?,?,?)").bind(oid, ex.id, summary, JSON.stringify({ mode, ...(price ? { price } : {}) }), ts),
         app.db.prepare("UPDATE federation_exchanges SET state='offered', updated_at=? WHERE id=?").bind(ts, ex.id),
       ]);
       await transition(app.db, m.id, "offers_available", "partner", { handler: "member" });
       const keys = await notifyMember(app, m.member_id, `fedoffer:${oid}`, (a) => ({
-        text: a.offer(brand, escapeHtml(summary), escapeHtml(mode)),
+        text: a.offer(brand, escapeHtml(summary), escapeHtml(price ? `${mode} · ${(price.amount_minor / 100).toFixed(2)} ${price.currency}` : mode)),
         buttons: [[b(a.bChoose, `o:${oid}:y`), b(a.bNoThanks, `o:${oid}:n`)]],
       }));
       return ok(keys);
@@ -439,6 +459,8 @@ async function apply(app: App, p: Partner, msg: FedMessage, now: Date): Promise<
       if (!u.results.length) return ok([], 200);
       await transition(app.db, m.id, "delivered", "partner", { handler: "member" });
       await receipt(app.db, m.id, { service: "partner_service", provider: true });
+      const sel = await app.db.prepare("SELECT terms FROM exchange_offers WHERE exchange_id=? AND status='selected'").bind(ex.id).first<{ terms: string }>();
+      if (sel) await postDelivery(app.db, p.id, ex.id, JSON.parse(sel.terms) as Terms, false);
       return ok(await notifyMember(app, m.member_id, `feddv:${ex.id}`, (a) => ({ text: a.deliveredQ, buttons: [[b(a.bUseful, `r:${m.id}:1`), b(a.bNotUseful, `r:${m.id}:0`)]] })));
     }
     if (status === "released" || status === "cancelled") {
@@ -494,6 +516,12 @@ async function apply(app: App, p: Partner, msg: FedMessage, now: Date): Promise<
 
 export async function nodeManifest(app: App): Promise<Record<string, unknown>> {
   const pub = app.env.FEDERATION_PUBLIC_KEY ?? null;
+  let rotation: unknown;
+  try {
+    rotation = app.env.FEDERATION_ROTATION ? JSON.parse(app.env.FEDERATION_ROTATION) : undefined;
+  } catch {
+    rotation = undefined;
+  }
   // Categories only: no people, no counts, no capacity (I13 anti-enumeration).
   const { results } = await app.db.prepare("SELECT DISTINCT job_code FROM capability_offers WHERE org_id='home' AND status='published' AND expires_at>?").bind(nowIso()).all<{ job_code: string }>();
   return {
@@ -501,6 +529,7 @@ export async function nodeManifest(app: App): Promise<Record<string, unknown>> {
     node_id: nodeId(app.env),
     protocol_versions: [SCHEMA],
     public_keys: pub ? [{ alg: "Ed25519", key: pub }] : [],
+    ...(rotation ? { key_rotation: rotation } : {}),
     categories: results.map((r) => r.job_code).sort(),
     policies: { forwarding: "prohibited", max_hops: 1, contact_reveal: "requester_consent_only", inbound_per_partner_day: INBOUND_PER_PARTNER_DAY },
     routes: ["/v1/opportunities/inquiries", "/v1/opportunities/{id}/offers", "/v1/opportunities/{id}/approvals", "/v1/commitments/{id}/events", "/v1/exchanges/{id}/withdraw"],

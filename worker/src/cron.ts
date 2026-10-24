@@ -10,7 +10,11 @@ import { dispatchPending, recoverStuck } from "./outbox";
 import { applyRetention } from "./rights";
 import { liveCommitment, release } from "./assist/capacity";
 import { expireMissions, revokeGrants } from "./assist/missions";
-import { dispatchFed, expireExchanges, withdrawMission } from "./federation/gateway";
+import { dispatchFed, expireExchanges, fedEnabled, partnerList, withdrawMission } from "./federation/gateway";
+import { refreshPartner } from "./federation/keys";
+import { bucket, computeGaps, setGapStatus } from "./assist/gaps";
+import { b, notifyOwners } from "./assist/notify";
+import { escapeHtml } from "./text";
 import { localParts, nowIso } from "./util";
 
 export const SEND_BUDGET = 36; // Telegram calls per run; with FED_BUDGET (5) stays under the 50-subrequest free limit
@@ -55,6 +59,27 @@ export async function runCron(app: App, now = new Date()): Promise<Record<string
       await withdrawMission(app, id);
     }
     return ids.length;
+  });
+  await step("gaps", async () => {
+    const today = localParts(now, timezone(app.env)).date;
+    const last = await app.db.prepare("SELECT value FROM settings WHERE key='gaps.day'").first<{ value: string }>();
+    if (last?.value === today) return 0;
+    await app.db.prepare("INSERT INTO settings(key, value) VALUES ('gaps.day', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(today).run();
+    const fresh = await computeGaps(app.db, now);
+    for (const job of fresh) {
+      const g = await app.db.prepare("SELECT members FROM gap_signals WHERE job_code=?").bind(job).first<{ members: number }>();
+      await notifyOwners(app, `gap:${job}:${today}`, (a) => ({ text: a.gap(escapeHtml(job), bucket(g?.members ?? 0)), buttons: [[b(a.bGapOffer, `g:${job}:off`), b(a.bGapDismiss, `g:${job}:dis`)]] }));
+      await setGapStatus(app.db, job, "notified");
+    }
+    return fresh.length;
+  });
+  await step("keys_checked", async () => {
+    // Daily manifest check picks up proven key rotations (at most 3 partners per day per run).
+    if (!fedEnabled(app.env)) return 0;
+    const today = localParts(now, timezone(app.env)).date;
+    const due = (await partnerList(app.db)).filter((p) => p.endpoint && p.status === "active" && (!p.manifest_checked_at || p.manifest_checked_at.slice(0, 10) < today)).slice(0, 3);
+    for (const p of due) await refreshPartner(app, p, now, true);
+    return due.length;
   });
   await step("exchanges_expired", () => expireExchanges(app.db, nowIso(now)));
   await step("fed_sent", () => dispatchFed(app));

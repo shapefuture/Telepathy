@@ -15,3 +15,7 @@
 | Disputed outcome | receipts with evidence level; unverified ≠ success | assist: receipts |
 | SSRF via partner endpoint | https origin only, no IPs/ports/internal names | federation: "SSRF" |
 | Stale consent | grants bound to mission + policy version | assist: "consent grants" |
+| Key substitution via manifest | new key accepted only with a proof signed by the trusted key; 7-day grace for the old key | slices: "refuses a key change not signed by the trusted key" |
+| A2A as a bypass | A2A only carries signed nexus messages through the same `receive` | slices: "A2A transport" |
+| Ledger tampering / double posting | balanced entries only, one txn per business key, one reversal | slices: "ledger" |
+| Gap signals identifying people | ≥ 5 distinct members, coarse buckets, no ids | slices: "gap signals" |

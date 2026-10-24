@@ -23,6 +23,8 @@ export interface Env {
   FEDERATION_PUBLIC_KEY?: string;
   /** Secret: Ed25519 private key (base64 pkcs8). `npm run fed:keys` makes a pair. */
   FEDERATION_PRIVATE_KEY?: string;
+  /** JSON rotation proof from `npm run fed:rotate`, published in the manifest after a key change. */
+  FEDERATION_ROTATION?: string;
 }
 
 export function ownerIds(env: Env): Set<number> {

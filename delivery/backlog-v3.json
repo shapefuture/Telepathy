@@ -62,7 +62,7 @@
     {
       "id": "P14-08",
       "title": "Protocol contract + conformance",
-      "implementation": "partial",
+      "implementation": "built",
       "status": "open",
       "github_issue": 164,
       "evidence": []
@@ -70,7 +70,7 @@
     {
       "id": "P14-09",
       "title": "Clearing ledger + paid programs",
-      "implementation": "not_started",
+      "implementation": "built",
       "status": "open",
       "github_issue": 165,
       "evidence": []
@@ -78,7 +78,7 @@
     {
       "id": "P14-10",
       "title": "Gap signals -> new capacity",
-      "implementation": "not_started",
+      "implementation": "built",
       "status": "open",
       "github_issue": 166,
       "evidence": []
@@ -86,7 +86,7 @@
     {
       "id": "P14-11",
       "title": "Owner: job research, partner commitment, first exchange",
-      "implementation": "owner_task",
+      "implementation": "tooling_built_owner_task_open",
       "status": "open",
       "github_issue": 167,
       "evidence": []
@@ -94,7 +94,7 @@
     {
       "id": "P14-12",
       "title": "Federation maturity: key rotation, A2A, trust registry",
-      "implementation": "not_started",
+      "implementation": "built",
       "status": "open",
       "github_issue": 168,
       "evidence": []

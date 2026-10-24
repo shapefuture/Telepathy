@@ -55,6 +55,10 @@ reach you. Cancelling a request (or `/forget_me`) tells partners to delete what 
 we can't make a person forget what they already read. Requests expire after 30 days and
 permissions after 14.
 
+**Unserved needs.** Operators see when 5 or more different members needed the same kind of help
+and nobody could provide it, as a rough count ("5+", "10+") without names, so they can arrange
+new help. It never shows who asked.
+
 **Your controls.**
 - `/profile`: see and change everything stored about your discoverability and your digest.
 - `/optout`: stop being discoverable.

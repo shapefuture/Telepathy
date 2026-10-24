@@ -2,7 +2,8 @@
 
 import { handleUpdate, status, type App, type Update } from "./bot";
 import { handleApp } from "./app";
-import { handleFederation } from "./federation/gateway";
+import { agentCard, handleA2A } from "./federation/a2a";
+import { fedEnabled, handleFederation } from "./federation/gateway";
 import { runCron } from "./cron";
 import type { Env } from "./env";
 import { MAX_CHUNKS, storeChunks } from "./ingest";
@@ -43,6 +44,24 @@ function bearerOk(req: Request, env: Env): boolean {
 export async function handleFetch(req: Request, env: Env, fetcher?: Fetcher, net?: Fetcher): Promise<Response> {
   const url = new URL(req.url);
   if (req.method === "GET" && url.pathname === "/health") return new Response("ok");
+  if (url.pathname === "/a2a" || url.pathname === "/.well-known/agent-card.json" || url.pathname === "/.well-known/agent.json") {
+    // A2A transport for the same signed messages (off unless federation is on).
+    if (!fedEnabled(env)) return new Response("not found", { status: 404 });
+    const app = makeApp(env, fetcher, net);
+    if (req.method === "GET" && url.pathname !== "/a2a") return json(agentCard(app));
+    if (req.method !== "POST" || url.pathname !== "/a2a") return new Response("not found", { status: 404 });
+    let body: unknown;
+    try {
+      const text = await req.text();
+      if (text.length > 16 * 1024) return json({ jsonrpc: "2.0", id: null, error: { code: -32600, message: "too large" } });
+      body = JSON.parse(text);
+    } catch {
+      return json({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "parse error" } });
+    }
+    const r = await handleA2A(app, body);
+    if (r.keys.length) await dispatchPending(app.db, app.tg, 10, r.keys).catch((e) => console.warn("a2a notify", String(e)));
+    return json(r.body);
+  }
   if (url.pathname.startsWith("/v1/") || url.pathname === "/.well-known/nexus-node.json") {
     // Partner gateway (off unless FEDERATION_ENABLED=true). Signed messages only.
     const app = makeApp(env, fetcher, net);

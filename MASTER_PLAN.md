@@ -279,11 +279,11 @@ Each item below is deliberately specific. Checkbox markers start empty, do not m
 - [ ] **P14-05 Manual partner gateway E0.** _built · issue #161. Evidence: tests, independent review, commit SHA._
 - [ ] **P14-06 Signed federation transport.** _built · issue #162. Evidence: tests, independent review, commit SHA._
 - [ ] **P14-07 Outcome receipts + operator report.** _built · issue #163. Evidence: tests, independent review, commit SHA._
-- [ ] **P14-08 Protocol contract + conformance.** _partial · issue #164. Evidence: tests, independent review, commit SHA._
-- [ ] **P14-09 Clearing ledger + paid programs.** _not started · issue #165. Evidence: tests, independent review, commit SHA._
-- [ ] **P14-10 Gap signals -> new capacity.** _not started · issue #166. Evidence: tests, independent review, commit SHA._
-- [ ] **P14-11 Owner: job research, partner commitment, first exchange.** _owner task · issue #167. Evidence: tests, independent review, commit SHA._
-- [ ] **P14-12 Federation maturity: key rotation, A2A, trust registry.** _not started · issue #168. Evidence: tests, independent review, commit SHA._
+- [ ] **P14-08 Protocol contract + conformance.** _built · issue #164. Evidence: tests, independent review, commit SHA._
+- [ ] **P14-09 Clearing ledger + paid programs.** _built · issue #165. Evidence: tests, independent review, commit SHA._
+- [ ] **P14-10 Gap signals -> new capacity.** _built · issue #166. Evidence: tests, independent review, commit SHA._
+- [ ] **P14-11 Owner: job research, partner commitment, first exchange.** _tooling built; owner task open · issue #167. Evidence: tests, independent review, commit SHA._
+- [ ] **P14-12 Federation maturity: key rotation, A2A, trust registry.** _built · issue #168. Evidence: tests, independent review, commit SHA._
 
 ## Hard quality gates (release-blocking)
 

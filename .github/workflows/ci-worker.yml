@@ -2,10 +2,10 @@ name: CI worker
 
 on:
   pull_request:
-    paths: ["worker/**", ".github/workflows/ci-worker.yml"]
+    paths: ["worker/**", "contracts/**", ".github/workflows/ci-worker.yml"]
   push:
     branches: [main]
-    paths: ["worker/**", ".github/workflows/ci-worker.yml"]
+    paths: ["worker/**", "contracts/**", ".github/workflows/ci-worker.yml"]
   workflow_dispatch:
 
 permissions:

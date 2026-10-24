@@ -35,6 +35,9 @@ import { addOffer, deliver, listOffers, liveCommitment, MODES, openOffers, relea
 import { A, type AssistMessages } from "./i18n";
 import { createDraft, getMission, grantFor, isTerminal, MissionError, openMissions, receipt, recordGrant, report, revokeGrants, transition, type Mission } from "./missions";
 import { b, notifyMember, notifyOwners } from "./notify";
+import { balances, formatAmount, parsePrice, recent, reverse } from "./ledger";
+import { bucket, openGaps, setGapStatus } from "./gaps";
+import { applyRotation, refreshPartner, verifyRotation, type RotationProof } from "../federation/keys";
 
 const short = (id: string) => id.slice(0, 6);
 const jobLabel = (code: string, lang: Lang) => (TAXONOMY.get(code) ? labelIn(TAXONOMY.get(code)!, lang) : code);
@@ -42,7 +45,8 @@ const send = (app: App, chat: number, text: string, buttons?: InlineButton[][]) 
 const isOwner = (app: App, tgId: number) => ownerIds(app.env).has(tgId);
 
 export const MEMBER_COMMANDS = new Set(["requests", "cancel"]);
-export const OWNER_COMMANDS = new Set(["desk", "offer", "partner", "fed"]);
+export const OWNER_COMMANDS = new Set(["desk", "offer", "partner", "fed", "ledger"]);
+export const CASE_TYPES = ["knowledge_answer", "qualified_expert_review", "warm_intro", "reserved_office_hour", "small_panel", "commercial_project"];
 
 // ---- member side ---------------------------------------------------------------------------
 
@@ -127,6 +131,17 @@ export async function assistCallback(app: App, cb: Cb, mem: Member | null, data:
   };
   const chat = cb.from.id;
 
+  if (kind === "g") {
+    if (!isOwner(app, cb.from.id)) {
+      await toast();
+      return [];
+    }
+    const ok = await setGapStatus(app.db, id, act === "off" ? "actioned" : "dismissed");
+    await toast(ok ? a.done : a.notOpen);
+    await clear();
+    if (ok && act === "off") await send(app, chat, a.gapOfferHint(escapeHtml(id)));
+    return [];
+  }
   if (kind === "d" || kind === "x") {
     if (!isOwner(app, cb.from.id)) {
       await toast();
@@ -365,9 +380,22 @@ export async function ownerAssistCommand(app: App, chat: number, cmd: string, ar
   const a = A(lang);
   const words = args.trim().split(/\s+/).filter(Boolean);
   if (cmd === "desk") {
+    if (words[0] === "gaps") {
+      const gs = await openGaps(app.db);
+      await send(app, chat, gs.length ? [a.gapsTitle, ...gs.map((g) => a.gap(escapeHtml(jobLabel(g.job_code, lang)), bucket(g.members)))].join("\n\n") : a.gapsNone);
+      return [];
+    }
+    if (words[0] === "tag") {
+      const sid = (words[1] ?? "").replace(/^#/, "");
+      const ct = words[2] ?? "";
+      const r = sid.length >= 6 && CASE_TYPES.includes(ct) ? await app.db.prepare("UPDATE missions SET case_type=? WHERE substr(id,1,?)=? RETURNING id").bind(ct, sid.length, sid).all() : null;
+      await send(app, chat, r?.results.length === 1 ? a.done : a.tagUsage);
+      return [];
+    }
     if (words[0] === "report") {
       const r = await report(app.db);
-      const lines = [a.reportTitle, ...r.stages.map(([k, n]) => `${escapeHtml(a.status(k))}: <b>${n}</b>`), "", ...r.receipts.map(([k, n]) => `${escapeHtml(k)}: <b>${n}</b>`), `useful / not useful: <b>${r.useful} / ${r.notUseful}</b>`];
+      const cases = (await app.db.prepare("SELECT COALESCE(case_type,'untagged') AS k, COUNT(*) AS n FROM missions WHERE status<>'draft' GROUP BY k ORDER BY n DESC").all<{ k: string; n: number }>()).results;
+      const lines = [a.reportTitle, ...r.stages.map(([k, n]) => `${escapeHtml(a.status(k))}: <b>${n}</b>`), "", ...r.receipts.map(([k, n]) => `${escapeHtml(k)}: <b>${n}</b>`), `useful / not useful: <b>${r.useful} / ${r.notUseful}</b>`, "", ...cases.map((c) => `${escapeHtml(c.k)}: <b>${c.n}</b>`)];
       await send(app, chat, lines.join("\n"));
       return [];
     }
@@ -399,10 +427,13 @@ export async function ownerAssistCommand(app: App, chat: number, cmd: string, ar
     if (words[0] === "add" && words.length >= 4) {
       const job = words[1] === "general" ? "general" : resolveSkill(words[1]!);
       const slots = Number(words[2]);
-      const hasMode = MODES.includes(words[3] as CommitmentMode);
+      const price = parsePrice(words[3]!);
+      const hasMode = MODES.includes(words[3] as CommitmentMode) || !!price;
+      const mode: CommitmentMode = price ? "paid" : hasMode ? (words[3] as CommitmentMode) : "volunteer";
       const desc = words.slice(hasMode ? 4 : 3).join(" ");
-      if (job && Number.isInteger(slots) && slots >= 1 && slots <= 1000 && desc.length >= 3) {
-        const id = await addOffer(app.db, { job, capacity: slots, mode: hasMode ? (words[3] as CommitmentMode) : "volunteer", description: desc, by: ownerMemberId });
+      // "paid" needs a price so the ledger and the partner see the same terms.
+      if (job && Number.isInteger(slots) && slots >= 1 && slots <= 1000 && desc.length >= 3 && (mode !== "paid" || price)) {
+        const id = await addOffer(app.db, { job, capacity: slots, mode, description: desc, by: ownerMemberId, price: price ?? undefined });
         await audit(app.db, "offer.add", ownerMemberId, id, { job, slots });
         await send(app, chat, a.offerAdded(id));
         return [];
@@ -445,6 +476,25 @@ export async function ownerAssistCommand(app: App, chat: number, cmd: string, ar
       await send(app, chat, a.partnerSaved(escapeHtml(id)));
       return [];
     }
+    if (words[0] === "refresh" && words[1]) {
+      const p = await app.db.prepare("SELECT * FROM organizations WHERE id=? AND kind='partner'").bind(words[1]).first<Parameters<typeof refreshPartner>[1]>();
+      await send(app, chat, a.rotated(p ? await refreshPartner(app, p, new Date(), true) : "unknown"));
+      return [];
+    }
+    if (words[0] === "rotate" && words[1] && words[2]) {
+      // Manual partners: paste the rotation proof they sent; it must be signed by the key we trust.
+      const p = await app.db.prepare("SELECT id, public_key FROM organizations WHERE id=? AND kind='partner'").bind(words[1]).first<{ id: string; public_key: string | null }>();
+      let proof: RotationProof | null = null;
+      try {
+        proof = JSON.parse(words.slice(2).join(" "));
+      } catch {
+        proof = null;
+      }
+      const ok = !!p?.public_key && !!proof && (await verifyRotation(proof, p.public_key, p.id));
+      if (ok) await applyRotation(app.db, p!.id, proof!, ownerMemberId);
+      await send(app, chat, a.rotated(ok ? "rotated" : "rejected"));
+      return [];
+    }
     if (words[0] === "suspend" && words[1]) {
       const r = await app.db.prepare("UPDATE organizations SET status='suspended' WHERE id=? AND kind='partner' RETURNING id").bind(words[1]).all();
       if (r.results.length) await audit(app.db, "partner.suspend", ownerMemberId, words[1]);
@@ -457,6 +507,23 @@ export async function ownerAssistCommand(app: App, chat: number, cmd: string, ar
       return [];
     }
     await send(app, chat, a.partnerUsage);
+    return [];
+  }
+
+  if (cmd === "ledger") {
+    if (words[0] === "reverse" && words[1]) {
+      await send(app, chat, (await reverse(app.db, words[1], ownerMemberId)) ? a.done : a.notOpen);
+      return [];
+    }
+    if (words.length) {
+      await send(app, chat, a.ledgerUsage);
+      return [];
+    }
+    const bs = await balances(app.db);
+    const rs = await recent(app.db);
+    const lines = [a.ledgerTitle, ...(bs.length ? bs.map((x) => `${escapeHtml(x.account.replace(/^partner:/, ""))}: <b>${formatAmount(x.amount, x.unit)}</b>`) : [a.ledgerEmpty])];
+    if (rs.length) lines.push("", a.ledgerRecent, ...rs.map((t) => `<code>${t.id}</code> · ${t.kind} · ${escapeHtml(t.memo)}`));
+    await send(app, chat, lines.join("\n"));
     return [];
   }
 

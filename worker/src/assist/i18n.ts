@@ -115,19 +115,31 @@ const EN = {
   fedOff: "Federation is off. Set FEDERATION_ENABLED=true, PUBLIC_URL and the FEDERATION_PRIVATE_KEY secret.",
   routed: (n: number) => `Asked ${n} partner(s).`,
   offerUsage:
-    "<code>/offer add &lt;skill&gt; &lt;slots&gt; [volunteer|paid|reciprocal|member_benefit] &lt;description&gt;</code>\n<code>/offer withdraw &lt;id&gt;</code> · <code>/offer</code> lists offers",
+    "<code>/offer add &lt;skill&gt; &lt;slots&gt; [volunteer|paid:49.90EUR|reciprocal|member_benefit] &lt;description&gt;</code>\n<code>/offer withdraw &lt;id&gt;</code> · <code>/offer</code> lists offers",
   offerAdded: (id: string) => `Offer <code>${id}</code> published.`,
   offerLine: (id: string, job: string, desc: string, reserved: number, total: number, mode: string, status: string) =>
     `<code>${id}</code> · <i>${job}</i> · ${desc} · ${reserved}/${total} used · ${mode} · ${status}`,
   noOffers: "No offers yet.",
   partnerUsage:
-    "<code>/partner add &lt;https origin&gt; &lt;public key&gt; &lt;skills,…|*&gt; &lt;name&gt;</code>\n<code>/partner manual &lt;id&gt; &lt;public key&gt; &lt;skills|*&gt; &lt;name&gt;</code>\n<code>/partner suspend &lt;id&gt;</code> · <code>/partner</code> lists",
+    "<code>/partner add &lt;https origin&gt; &lt;public key&gt; &lt;skills,…|*&gt; &lt;name&gt;</code>\n<code>/partner manual &lt;id&gt; &lt;public key&gt; &lt;skills|*&gt; &lt;name&gt;</code>\n<code>/partner suspend|refresh &lt;id&gt;</code> · <code>/partner rotate &lt;id&gt; &lt;proof json&gt;</code> · <code>/partner</code> lists",
   partnerSaved: (id: string) => `Partner <code>${id}</code> saved.`,
   partnerBadUrl: "The endpoint must be a public https origin.",
   partnerLine: (id: string, label: string, status: string, cats: string, manual: boolean) => `<code>${id}</code> · ${label} · ${status} · ${cats}${manual ? " · manual" : ""}`,
   noPartnersYet: "No partners yet.",
   fedResult: (r: string) => `Result: <code>${r}</code>`,
   reportTitle: "<b>Assistance report</b> (missions by stage; unverified outcomes are not counted as success)",
+  ledgerTitle: "<b>Ledger</b> (+ = the partner owes you; records agreements, moves no money)",
+  ledgerEmpty: "No balances.",
+  ledgerRecent: "<b>Recent</b>",
+  ledgerUsage: "<code>/ledger</code> · <code>/ledger reverse &lt;id&gt;</code>",
+  gapsTitle: "<b>Unserved needs</b> (shown from 5 different members)",
+  gapsNone: "No repeated unserved needs.",
+  gap: (job: string, n: string) => `<b>${n}</b> members needed <i>${job}</i> and no provider was found. One office hour or clinic may serve them better than more pings.`,
+  bGapOffer: "Create capacity",
+  bGapDismiss: "Dismiss",
+  gapOfferHint: (job: string) => `Publish it, for example:\n<code>/offer add ${job} 4 volunteer Monthly office hour</code>`,
+  tagUsage: "<code>/desk tag &lt;#id&gt; knowledge_answer|qualified_expert_review|warm_intro|reserved_office_hour|small_panel|commercial_project</code>",
+  rotated: (r: string) => `Key check: <code>${r}</code>`,
 };
 export type AssistMessages = typeof EN;
 
@@ -202,19 +214,31 @@ const RU: AssistMessages = {
   fedOff: "Федерация выключена. Задайте FEDERATION_ENABLED=true, PUBLIC_URL и секрет FEDERATION_PRIVATE_KEY.",
   routed: (n: number) => `Отправлено партнёрам: ${n}.`,
   offerUsage:
-    "<code>/offer add &lt;навык&gt; &lt;мест&gt; [volunteer|paid|reciprocal|member_benefit] &lt;описание&gt;</code>\n<code>/offer withdraw &lt;id&gt;</code> · <code>/offer</code> — список",
+    "<code>/offer add &lt;навык&gt; &lt;мест&gt; [volunteer|paid:49.90EUR|reciprocal|member_benefit] &lt;описание&gt;</code>\n<code>/offer withdraw &lt;id&gt;</code> · <code>/offer</code> — список",
   offerAdded: (id: string) => `Предложение <code>${id}</code> опубликовано.`,
   offerLine: (id: string, job: string, desc: string, reserved: number, total: number, mode: string, status: string) =>
     `<code>${id}</code> · <i>${job}</i> · ${desc} · занято ${reserved}/${total} · ${mode} · ${status}`,
   noOffers: "Предложений пока нет.",
   partnerUsage:
-    "<code>/partner add &lt;https-адрес&gt; &lt;ключ&gt; &lt;навыки,…|*&gt; &lt;название&gt;</code>\n<code>/partner manual &lt;id&gt; &lt;ключ&gt; &lt;навыки|*&gt; &lt;название&gt;</code>\n<code>/partner suspend &lt;id&gt;</code> · <code>/partner</code> — список",
+    "<code>/partner add &lt;https-адрес&gt; &lt;ключ&gt; &lt;навыки,…|*&gt; &lt;название&gt;</code>\n<code>/partner manual &lt;id&gt; &lt;ключ&gt; &lt;навыки|*&gt; &lt;название&gt;</code>\n<code>/partner suspend|refresh &lt;id&gt;</code> · <code>/partner rotate &lt;id&gt; &lt;json&gt;</code> · <code>/partner</code> — список",
   partnerSaved: (id: string) => `Партнёр <code>${id}</code> сохранён.`,
   partnerBadUrl: "Адрес должен быть публичным https-адресом.",
   partnerLine: (id: string, label: string, status: string, cats: string, manual: boolean) => `<code>${id}</code> · ${label} · ${status} · ${cats}${manual ? " · вручную" : ""}`,
   noPartnersYet: "Партнёров пока нет.",
   fedResult: (r: string) => `Результат: <code>${r}</code>`,
   reportTitle: "<b>Отчёт о помощи</b> (запросы по этапам; неподтверждённые результаты не считаются успехом)",
+  ledgerTitle: "<b>Учёт</b> (+ = партнёр должен вам; это учёт договорённостей, деньги не переводятся)",
+  ledgerEmpty: "Балансов нет.",
+  ledgerRecent: "<b>Последние записи</b>",
+  ledgerUsage: "<code>/ledger</code> · <code>/ledger reverse &lt;id&gt;</code>",
+  gapsTitle: "<b>Неудовлетворённые запросы</b> (от 5 разных участников)",
+  gapsNone: "Повторяющихся неудовлетворённых запросов нет.",
+  gap: (job: string, n: string) => `<b>${n}</b> участникам нужна была помощь по теме <i>${job}</i>, исполнителя не нашлось. Приёмные часы или клиника помогут лучше, чем новые рассылки.`,
+  bGapOffer: "Создать предложение",
+  bGapDismiss: "Скрыть",
+  gapOfferHint: (job: string) => `Опубликуйте, например:\n<code>/offer add ${job} 4 volunteer Ежемесячные приёмные часы</code>`,
+  tagUsage: "<code>/desk tag &lt;#id&gt; knowledge_answer|qualified_expert_review|warm_intro|reserved_office_hour|small_panel|commercial_project</code>",
+  rotated: (r: string) => `Проверка ключа: <code>${r}</code>`,
 };
 
 export const A = (lang: Lang): AssistMessages => (lang === "ru" ? RU : EN);

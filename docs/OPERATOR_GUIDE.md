@@ -31,6 +31,10 @@ Everything here is DM-only and for owners listed in `OWNER_IDS`.
 | `/partner manual <id> <public key> <skills\|*> <name>` | partner without an endpoint (E0: you carry messages) |
 | `/partner` · `/partner suspend <id>` | list · stop talking to a partner (their messages are refused at once) |
 | `/fed <signed json>` | load a message a manual partner sent you |
+| `/desk gaps` | needs that 5+ different members had and nobody served (also sent to you once a day when new) |
+| `/desk tag #<id> <case type>` | classify a request for the research report (`JOB_RESEARCH_KIT.md`) |
+| `/ledger` · `/ledger reverse <id>` | reciprocal credits and agreed fees per partner (records only; moves no money) |
+| `/partner refresh <id>` · `/partner rotate <id> <proof>` | pick up a partner's new key (proof must be signed by the old key) |
 
 ## Connecting a partner
 
@@ -45,6 +49,27 @@ Everything here is DM-only and for owners listed in `OWNER_IDS`.
 **Manual mode** needs no endpoint: when you route to a manual partner, `/desk` shows a signed
 JSON message. Send it to their operator (they load it with `/fed`), press **Marked sent**, and
 load their replies with `/fed`.
+
+## Prices, credits and the ledger
+
+Offers have terms: `volunteer` (default), `reciprocal` (one credit per delivered service),
+`member_benefit`, or `paid:49.90EUR`. When a cross-community service is delivered, the ledger
+records it once: reciprocal → 1 credit, paid → the agreed fee. `/ledger` shows who owes whom.
+Payment itself happens outside Telepathy. Fees tied to capital raised are not allowed.
+
+## Rotating your key
+
+`OLD_PRIVATE_KEY=<current> npm run fed:rotate -- <your node id>` prints a new key pair and a proof.
+Store the new private key as the secret, set the new `FEDERATION_PUBLIC_KEY` and the
+`FEDERATION_ROTATION` proof in vars, deploy. Partners with endpoints pick it up automatically
+(daily, or when a message with the new key arrives); manual partners run `/partner rotate`.
+Your old key keeps working for them for 7 days.
+
+## Other platforms
+
+Platforms that aren't Telepathy can connect with `contracts/` (SDK, schema, OpenAPI, test
+vectors), or over A2A at `/a2a` (the same signed messages; agent card at
+`/.well-known/agent-card.json`).
 
 ## When a partner asks you
 

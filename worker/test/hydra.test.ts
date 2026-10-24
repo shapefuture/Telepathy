@@ -947,3 +947,20 @@ describe("audit: malformed input", () => {
     }
   });
 });
+
+describe("audit: forgetting", () => {
+  it("forgetting one person removes their login codes and nobody else's", async () => {
+    const n = node();
+    await setup(n, 99, 100);
+    const a = await member(n, 99, "m99@proton.me");
+    const b = await member(n, 100, "m100@proton.me");
+    const hb = (await b("GET", "hydra")).json.handle as string;
+    const ha = (await a("GET", "hydra")).json.handle as string;
+    const ta = (await n.http("POST", "/portal/api/login/handle", { handle: ha }, P)).json.ticket;
+    const tb = (await n.http("POST", "/portal/api/login/handle", { handle: hb }, P)).json.ticket;
+    const code = codeIn(n.mails.at(-1)!.text);
+    expect((await a("POST", "forget", { confirm: "forget" })).json.ok).toBe(true);
+    expect(await q("SELECT COUNT(*) AS n FROM login_codes WHERE id=?", ta)).toEqual({ n: 0 });
+    expect((await n.http("POST", "/portal/api/login/handle/verify", { ticket: tb, code }, P)).json.ok).toBe(true);
+  });
+});

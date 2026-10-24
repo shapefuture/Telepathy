@@ -292,8 +292,9 @@ export async function forgetPerson(db: D1Database, personId: string): Promise<vo
   const now = nowIso();
   await db.batch([
     db.prepare("INSERT OR IGNORE INTO suppressions(address_hash, scope, created_at) SELECT suppress_hash, '*', ? FROM delivery_registrations WHERE person_id=?").bind(now, personId),
+    // This person's codes only: their heads' codes and their passport-id login codes ('h:<person>').
+    db.prepare("DELETE FROM login_codes WHERE registration_id IN (SELECT id FROM delivery_registrations WHERE person_id=?) OR registration_id=?").bind(personId, `h:${personId}`),
     db.prepare("DELETE FROM delivery_registrations WHERE person_id=?").bind(personId),
-    db.prepare("DELETE FROM login_codes WHERE registration_id NOT IN (SELECT id FROM delivery_registrations)"),
     db.prepare("DELETE FROM recovery_codes WHERE person_id=?").bind(personId),
     db.prepare("UPDATE login_factors SET status='revoked', secret_enc=NULL WHERE person_id=?").bind(personId),
     db.prepare("UPDATE guardians SET status='removed' WHERE person_id=? OR guardian_id=?").bind(personId, personId),

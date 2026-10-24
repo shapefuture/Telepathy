@@ -65,6 +65,7 @@ Checkboxes and issue status are unchanged; completion still requires recorded ev
 | K20 | GitHub Actions minutes | Cron moves to **every minute on Cloudflare** (free), replacing the hourly Actions queue drain (now manual only). Document parsing runs every 4 h. CI is split by path and cancels superseded runs. Every job has a no-Actions path: `scripts/check.sh`, Cloudflare Workers Builds, `scripts/backup-local.sh`, `scripts/offload-local.sh` (files then skip GitHub entirely). Public repos don't use quota on standard runners. See `docs/GITHUB_ACTIONS.md`. |
 | K21 | Opportunity Internet (owner request 2026-10-24) | Telepathy stays the local kernel; adds the **Assistance OS** (missions, desk, offers, receipts) and a **partner gateway** (`nexus.v1` signed envelopes, E0 manual + E2 HTTP). One Worker per organization (ADR-001); disclosure stages and consent records (ADR-002); trust model (ADR-003). Phase **P14** below, tracked in `delivery/backlog-v3.json`. Source plan: `docs/OPPORTUNITY_INTERNET_PLAN.md`. Federation is off by default; real cross-community use waits for gates G0–G3. |
 | K22 | Continuity / community sovereignty (owner request 2026-10-24) | Members can opt in to an independent link (verified email, recovery codes, per-purpose follows) and the club gets a TUF-style verifiable identity whose primary address moves only with root-threshold signatures. Signed export restores without Telepathy (Python verifier). Alerts, drills and metrics count only verified routes. Nothing is enabled for anyone automatically. Phase **P15**, `delivery/backlog-v4.json`; runbook `docs/CONTINUITY.md`; ADR-005. |
+| K23 | Hydra: antifragile reach (owner request 2026-10-24) | No single path (Telegram, email, domain, host, key, operator, Telepathy) may cut the link, and every lost path triggers growth of ≥ 2 independent replacements. Redundancy is counted by failure domain; main metrics are k-path coverage, hydra index and regrowth ratio. Phase **P16** (planned), `delivery/backlog-v5.json`, `docs/HYDRA_PLAN.md`. |
 
 ## Phase sequence and dependency gates
 
@@ -301,6 +302,20 @@ Each item below is deliberately specific. Checkbox markers start empty, do not m
 - [ ] **CONT-8 Rescue relay among partner clubs.** _built · issue #172. Evidence: tests, independent review, commit SHA._
 - [ ] **CONT-9 Recovery drills and metrics (IER, VAR, RE, RDS, PI).** _built; drills owner task · issue #171. Evidence: tests, independent review, commit SHA._
 - [ ] **CONT-10 Continuity SDK, vectors, independent Python implementation.** _built · issue #172. Evidence: tests, independent review, commit SHA._
+
+
+### P16 — Hydra: antifragile reach (K23, planned)
+**Depends on:** P15. **Order:** H0 → H1 → H3 → H2 → H4 → H5 → H6 → H7 → H8. **Decisive test:** three drills on three failure domains, each with ≥ 90% still reached, regrowth ratio ≥ 2, verified reroute < 1 h.
+
+- [ ] **H0 Head model: failure domains, k-path coverage, hydra index, regrowth ratio.** _planned. Evidence: tests, drill results, independent review, commit SHA._
+- [ ] **H1 More delivery heads: Web Push, ntfy, signed RSS/iCal, Matrix, second email provider.** _planned. Evidence: tests, drill results, independent review, commit SHA._
+- [ ] **H2 More login heads: TOTP, magic link over any head, device key, passkeys later.** _planned. Evidence: tests, drill results, independent review, commit SHA._
+- [ ] **H3 Regrowth engine + canaries: reroute, add-two-heads invitations, playbooks.** _planned. Evidence: tests, drill results, independent review, commit SHA._
+- [ ] **H4 Hosting and data multi-homing: second account, non-Cloudflare node, mirrors, 3-2-1 escrow, Shamir.** _planned. Evidence: tests, drill results, independent review, commit SHA._
+- [ ] **H5 Member-held proof: countersigned follow receipts, social recovery.** _planned. Evidence: tests, drill results, independent review, commit SHA._
+- [ ] **H6 Anchors and gossip: DNS/Nostr/AT/public repo/Archive, partner gossip, recovery cards.** _planned. Evidence: tests, drill results, independent review, commit SHA._
+- [ ] **H7 Sealed relocation (k-of-n dead man's switch) + chaos calendar.** _planned. Evidence: tests, drill results, independent review, commit SHA._
+- [ ] **H8 Conformance: SDK and vectors for heads, receipts, anchors, gossip.** _planned. Evidence: tests, drill results, independent review, commit SHA._
 
 ## Hard quality gates (release-blocking)
 

@@ -1,0 +1,1149 @@
+{
+ "version": 1,
+ "skills": [
+  {
+   "code": "accounting",
+   "en": "Accounting",
+   "ru": "Бухгалтерия",
+   "synonyms": [
+    "accountant",
+    "bookkeeping",
+    "бухгалтер",
+    "бухучет",
+    "учет"
+   ]
+  },
+  {
+   "code": "tax",
+   "en": "Tax advice",
+   "ru": "Налоги",
+   "synonyms": [
+    "taxes",
+    "tax return",
+    "налоговая",
+    "налог",
+    "ндс",
+    "vat"
+   ]
+  },
+  {
+   "code": "legal_corporate",
+   "en": "Corporate law",
+   "ru": "Корпоративное право",
+   "synonyms": [
+    "lawyer",
+    "company law",
+    "юрист",
+    "юрлицо",
+    "устав"
+   ]
+  },
+  {
+   "code": "legal_immigration",
+   "en": "Immigration & visas",
+   "ru": "Иммиграция и визы",
+   "synonyms": [
+    "visa",
+    "immigration",
+    "виза",
+    "визы",
+    "гражданство",
+    "репатриация",
+    "aliyah",
+    "алия"
+   ]
+  },
+  {
+   "code": "legal_contracts",
+   "en": "Contracts",
+   "ru": "Договоры",
+   "synonyms": [
+    "contract",
+    "agreement",
+    "договор",
+    "оферта"
+   ]
+  },
+  {
+   "code": "legal_ip",
+   "en": "Intellectual property",
+   "ru": "Интеллектуальная собственность",
+   "synonyms": [
+    "patent",
+    "trademark",
+    "патент",
+    "товарный знак"
+   ]
+  },
+  {
+   "code": "real_estate",
+   "en": "Real estate",
+   "ru": "Недвижимость",
+   "synonyms": [
+    "rent",
+    "apartment",
+    "аренда",
+    "квартира",
+    "ипотека",
+    "mortgage"
+   ]
+  },
+  {
+   "code": "banking",
+   "en": "Banking",
+   "ru": "Банки",
+   "synonyms": [
+    "bank account",
+    "банк",
+    "счет",
+    "transfer",
+    "перевод"
+   ]
+  },
+  {
+   "code": "insurance",
+   "en": "Insurance",
+   "ru": "Страхование",
+   "synonyms": [
+    "страховка",
+    "polis",
+    "полис"
+   ]
+  },
+  {
+   "code": "fundraising",
+   "en": "Fundraising",
+   "ru": "Привлечение инвестиций",
+   "synonyms": [
+    "investors",
+    "vc",
+    "venture",
+    "инвестиции",
+    "инвестор",
+    "раунд",
+    "seed"
+   ]
+  },
+  {
+   "code": "startup_strategy",
+   "en": "Startup strategy",
+   "ru": "Стратегия стартапа",
+   "synonyms": [
+    "startup",
+    "mvp",
+    "стартап",
+    "стратегия"
+   ]
+  },
+  {
+   "code": "product_management",
+   "en": "Product management",
+   "ru": "Продакт-менеджмент",
+   "synonyms": [
+    "product manager",
+    "pm",
+    "продакт",
+    "продукт",
+    "roadmap"
+   ]
+  },
+  {
+   "code": "project_management",
+   "en": "Project management",
+   "ru": "Управление проектами",
+   "synonyms": [
+    "scrum",
+    "agile",
+    "jira",
+    "проджект",
+    "проекты"
+   ]
+  },
+  {
+   "code": "marketing",
+   "en": "Marketing",
+   "ru": "Маркетинг",
+   "synonyms": [
+    "маркетолог",
+    "promotion",
+    "продвижение"
+   ]
+  },
+  {
+   "code": "smm",
+   "en": "Social media",
+   "ru": "SMM",
+   "synonyms": [
+    "instagram",
+    "tiktok",
+    "соцсети",
+    "смм"
+   ]
+  },
+  {
+   "code": "seo",
+   "en": "SEO",
+   "ru": "SEO",
+   "synonyms": [
+    "search engine optimization",
+    "сео",
+    "поисковая оптимизация"
+   ]
+  },
+  {
+   "code": "content_writing",
+   "en": "Copywriting",
+   "ru": "Копирайтинг",
+   "synonyms": [
+    "copywriter",
+    "content",
+    "копирайтер",
+    "тексты",
+    "контент"
+   ]
+  },
+  {
+   "code": "sales",
+   "en": "Sales",
+   "ru": "Продажи",
+   "synonyms": [
+    "b2b sales",
+    "продажник",
+    "продажи",
+    "лиды",
+    "leads"
+   ]
+  },
+  {
+   "code": "customer_success",
+   "en": "Customer success",
+   "ru": "Работа с клиентами",
+   "synonyms": [
+    "support",
+    "поддержка",
+    "клиенты"
+   ]
+  },
+  {
+   "code": "hr_recruiting",
+   "en": "Recruiting",
+   "ru": "Рекрутинг",
+   "synonyms": [
+    "hiring",
+    "hr",
+    "рекрутер",
+    "найм",
+    "вакансия"
+   ]
+  },
+  {
+   "code": "career_coaching",
+   "en": "Career coaching",
+   "ru": "Карьерный коучинг",
+   "synonyms": [
+    "career",
+    "cv",
+    "resume",
+    "резюме",
+    "карьера",
+    "собеседование",
+    "interview"
+   ]
+  },
+  {
+   "code": "leadership",
+   "en": "Leadership",
+   "ru": "Лидерство",
+   "synonyms": [
+    "management",
+    "менеджмент",
+    "руководитель",
+    "team lead"
+   ]
+  },
+  {
+   "code": "finance_personal",
+   "en": "Personal finance",
+   "ru": "Личные финансы",
+   "synonyms": [
+    "budget",
+    "savings",
+    "бюджет",
+    "накопления"
+   ]
+  },
+  {
+   "code": "investing",
+   "en": "Investing",
+   "ru": "Инвестирование",
+   "synonyms": [
+    "stocks",
+    "etf",
+    "акции",
+    "брокер",
+    "broker"
+   ]
+  },
+  {
+   "code": "crypto",
+   "en": "Crypto",
+   "ru": "Криптовалюты",
+   "synonyms": [
+    "bitcoin",
+    "blockchain",
+    "web3",
+    "крипта",
+    "блокчейн"
+   ]
+  },
+  {
+   "code": "financial_modeling",
+   "en": "Financial modeling",
+   "ru": "Финансовое моделирование",
+   "synonyms": [
+    "excel model",
+    "unit economics",
+    "юнит-экономика",
+    "финмодель"
+   ]
+  },
+  {
+   "code": "software_backend",
+   "en": "Backend development",
+   "ru": "Бэкенд-разработка",
+   "synonyms": [
+    "backend",
+    "бэкенд",
+    "api",
+    "server"
+   ]
+  },
+  {
+   "code": "software_frontend",
+   "en": "Frontend development",
+   "ru": "Фронтенд-разработка",
+   "synonyms": [
+    "frontend",
+    "фронтенд",
+    "react",
+    "vue",
+    "javascript",
+    "typescript"
+   ]
+  },
+  {
+   "code": "mobile_dev",
+   "en": "Mobile development",
+   "ru": "Мобильная разработка",
+   "synonyms": [
+    "ios",
+    "android",
+    "swift",
+    "kotlin",
+    "flutter",
+    "мобильная"
+   ]
+  },
+  {
+   "code": "python",
+   "en": "Python",
+   "ru": "Python",
+   "synonyms": [
+    "питон",
+    "django",
+    "fastapi",
+    "flask"
+   ]
+  },
+  {
+   "code": "java",
+   "en": "Java",
+   "ru": "Java",
+   "synonyms": [
+    "джава",
+    "spring"
+   ]
+  },
+  {
+   "code": "golang",
+   "en": "Go",
+   "ru": "Go",
+   "synonyms": [
+    "golang",
+    "го"
+   ]
+  },
+  {
+   "code": "dotnet",
+   "en": ".NET / C#",
+   "ru": ".NET / C#",
+   "synonyms": [
+    "csharp",
+    "c#",
+    "dotnet"
+   ]
+  },
+  {
+   "code": "devops",
+   "en": "DevOps",
+   "ru": "DevOps",
+   "synonyms": [
+    "девопс",
+    "ci/cd",
+    "deploy",
+    "деплой",
+    "kubernetes",
+    "k8s",
+    "docker",
+    "докер"
+   ]
+  },
+  {
+   "code": "cloud",
+   "en": "Cloud infrastructure",
+   "ru": "Облачная инфраструктура",
+   "synonyms": [
+    "aws",
+    "gcp",
+    "azure",
+    "облако"
+   ]
+  },
+  {
+   "code": "security",
+   "en": "Information security",
+   "ru": "Информационная безопасность",
+   "synonyms": [
+    "cybersecurity",
+    "infosec",
+    "безопасность",
+    "пентест",
+    "pentest"
+   ]
+  },
+  {
+   "code": "data_engineering",
+   "en": "Data engineering",
+   "ru": "Дата-инжиниринг",
+   "synonyms": [
+    "etl",
+    "data pipeline",
+    "airflow",
+    "spark"
+   ]
+  },
+  {
+   "code": "data_science",
+   "en": "Data science",
+   "ru": "Data Science",
+   "synonyms": [
+    "data scientist",
+    "аналитика данных",
+    "статистика",
+    "statistics"
+   ]
+  },
+  {
+   "code": "machine_learning",
+   "en": "Machine learning",
+   "ru": "Машинное обучение",
+   "synonyms": [
+    "ml",
+    "ai",
+    "нейросети",
+    "llm",
+    "ии",
+    "deep learning"
+   ]
+  },
+  {
+   "code": "analytics",
+   "en": "Product analytics",
+   "ru": "Продуктовая аналитика",
+   "synonyms": [
+    "analyst",
+    "аналитик",
+    "sql",
+    "dashboards",
+    "дашборды"
+   ]
+  },
+  {
+   "code": "qa_testing",
+   "en": "QA & testing",
+   "ru": "Тестирование",
+   "synonyms": [
+    "qa",
+    "tester",
+    "тестировщик",
+    "autotests",
+    "автотесты"
+   ]
+  },
+  {
+   "code": "databases",
+   "en": "Databases",
+   "ru": "Базы данных",
+   "synonyms": [
+    "postgres",
+    "mysql",
+    "sqlite",
+    "бд",
+    "database"
+   ]
+  },
+  {
+   "code": "blockchain_dev",
+   "en": "Smart contracts",
+   "ru": "Смарт-контракты",
+   "synonyms": [
+    "solidity",
+    "ethereum",
+    "смарт-контракт"
+   ]
+  },
+  {
+   "code": "it_support",
+   "en": "IT support",
+   "ru": "IT-поддержка",
+   "synonyms": [
+    "sysadmin",
+    "сисадмин",
+    "компьютер",
+    "ноутбук",
+    "laptop"
+   ]
+  },
+  {
+   "code": "no_code",
+   "en": "No-code tools",
+   "ru": "No-code",
+   "synonyms": [
+    "zapier",
+    "notion",
+    "airtable",
+    "tilda",
+    "тильда",
+    "ноукод"
+   ]
+  },
+  {
+   "code": "ux_design",
+   "en": "UX design",
+   "ru": "UX-дизайн",
+   "synonyms": [
+    "ux",
+    "user research",
+    "исследования пользователей",
+    "юзабилити"
+   ]
+  },
+  {
+   "code": "ui_design",
+   "en": "UI design",
+   "ru": "UI-дизайн",
+   "synonyms": [
+    "figma",
+    "фигма",
+    "interface",
+    "интерфейс",
+    "дизайнер"
+   ]
+  },
+  {
+   "code": "graphic_design",
+   "en": "Graphic design",
+   "ru": "Графический дизайн",
+   "synonyms": [
+    "logo",
+    "логотип",
+    "branding",
+    "брендинг",
+    "illustrator"
+   ]
+  },
+  {
+   "code": "video_production",
+   "en": "Video production",
+   "ru": "Видеопродакшн",
+   "synonyms": [
+    "video editing",
+    "монтаж",
+    "видео",
+    "videographer"
+   ]
+  },
+  {
+   "code": "photography",
+   "en": "Photography",
+   "ru": "Фотография",
+   "synonyms": [
+    "photographer",
+    "фотограф",
+    "фото"
+   ]
+  },
+  {
+   "code": "music",
+   "en": "Music",
+   "ru": "Музыка",
+   "synonyms": [
+    "musician",
+    "музыкант",
+    "звук",
+    "sound"
+   ]
+  },
+  {
+   "code": "translation",
+   "en": "Translation",
+   "ru": "Переводы",
+   "synonyms": [
+    "translator",
+    "переводчик",
+    "перевод"
+   ]
+  },
+  {
+   "code": "hebrew",
+   "en": "Hebrew",
+   "ru": "Иврит",
+   "synonyms": [
+    "ulpan",
+    "ульпан",
+    "иврит"
+   ]
+  },
+  {
+   "code": "english_lang",
+   "en": "English language",
+   "ru": "Английский язык",
+   "synonyms": [
+    "english",
+    "английский",
+    "ielts",
+    "toefl"
+   ]
+  },
+  {
+   "code": "russian_lang",
+   "en": "Russian language",
+   "ru": "Русский язык",
+   "synonyms": [
+    "russian",
+    "русский"
+   ]
+  },
+  {
+   "code": "teaching",
+   "en": "Teaching & tutoring",
+   "ru": "Преподавание",
+   "synonyms": [
+    "tutor",
+    "teacher",
+    "репетитор",
+    "учитель",
+    "преподаватель"
+   ]
+  },
+  {
+   "code": "education_kids",
+   "en": "Kids education",
+   "ru": "Образование детей",
+   "synonyms": [
+    "school",
+    "kindergarten",
+    "школа",
+    "садик",
+    "детский сад",
+    "гимназия"
+   ]
+  },
+  {
+   "code": "psychology",
+   "en": "Psychology",
+   "ru": "Психология",
+   "synonyms": [
+    "therapist",
+    "psychologist",
+    "психолог",
+    "терапевт",
+    "therapy",
+    "терапия"
+   ]
+  },
+  {
+   "code": "coaching",
+   "en": "Coaching",
+   "ru": "Коучинг",
+   "synonyms": [
+    "coach",
+    "коуч"
+   ]
+  },
+  {
+   "code": "medicine_general",
+   "en": "General medicine",
+   "ru": "Медицина",
+   "synonyms": [
+    "doctor",
+    "врач",
+    "клиника",
+    "clinic",
+    "kupat holim",
+    "больничная касса"
+   ]
+  },
+  {
+   "code": "dentistry",
+   "en": "Dentistry",
+   "ru": "Стоматология",
+   "synonyms": [
+    "dentist",
+    "стоматолог",
+    "зубы"
+   ]
+  },
+  {
+   "code": "pediatrics",
+   "en": "Pediatrics",
+   "ru": "Педиатрия",
+   "synonyms": [
+    "pediatrician",
+    "педиатр"
+   ]
+  },
+  {
+   "code": "nutrition",
+   "en": "Nutrition",
+   "ru": "Питание",
+   "synonyms": [
+    "nutritionist",
+    "диетолог",
+    "нутрициолог",
+    "diet"
+   ]
+  },
+  {
+   "code": "fitness",
+   "en": "Fitness",
+   "ru": "Фитнес",
+   "synonyms": [
+    "trainer",
+    "тренер",
+    "gym",
+    "спортзал"
+   ]
+  },
+  {
+   "code": "yoga",
+   "en": "Yoga",
+   "ru": "Йога",
+   "synonyms": [
+    "йога",
+    "meditation",
+    "медитация"
+   ]
+  },
+  {
+   "code": "parenting",
+   "en": "Parenting",
+   "ru": "Воспитание детей",
+   "synonyms": [
+    "parents",
+    "родители",
+    "дети",
+    "kids"
+   ]
+  },
+  {
+   "code": "relocation",
+   "en": "Relocation",
+   "ru": "Релокация",
+   "synonyms": [
+    "moving",
+    "переезд",
+    "релокация",
+    "relocate"
+   ]
+  },
+  {
+   "code": "logistics",
+   "en": "Logistics",
+   "ru": "Логистика",
+   "synonyms": [
+    "shipping",
+    "доставка",
+    "delivery",
+    "грузоперевозки"
+   ]
+  },
+  {
+   "code": "ecommerce",
+   "en": "E-commerce",
+   "ru": "Электронная коммерция",
+   "synonyms": [
+    "online store",
+    "shopify",
+    "интернет-магазин",
+    "маркетплейс",
+    "marketplace"
+   ]
+  },
+  {
+   "code": "retail",
+   "en": "Retail",
+   "ru": "Розничная торговля",
+   "synonyms": [
+    "shop",
+    "магазин",
+    "розница"
+   ]
+  },
+  {
+   "code": "hospitality",
+   "en": "Hospitality",
+   "ru": "Гостиничный бизнес",
+   "synonyms": [
+    "hotel",
+    "отель",
+    "restaurant",
+    "ресторан"
+   ]
+  },
+  {
+   "code": "cooking",
+   "en": "Cooking",
+   "ru": "Кулинария",
+   "synonyms": [
+    "chef",
+    "повар",
+    "recipes",
+    "рецепты",
+    "кейтеринг",
+    "catering"
+   ]
+  },
+  {
+   "code": "events",
+   "en": "Event organization",
+   "ru": "Организация мероприятий",
+   "synonyms": [
+    "event",
+    "ивент",
+    "мероприятие",
+    "meetup",
+    "митап",
+    "конференция"
+   ]
+  },
+  {
+   "code": "public_speaking",
+   "en": "Public speaking",
+   "ru": "Публичные выступления",
+   "synonyms": [
+    "speaker",
+    "спикер",
+    "выступление",
+    "presentation",
+    "презентация"
+   ]
+  },
+  {
+   "code": "pr",
+   "en": "Public relations",
+   "ru": "PR",
+   "synonyms": [
+    "media",
+    "сми",
+    "пресса",
+    "press",
+    "пиар"
+   ]
+  },
+  {
+   "code": "journalism",
+   "en": "Journalism",
+   "ru": "Журналистика",
+   "synonyms": [
+    "journalist",
+    "журналист",
+    "редактор",
+    "editor"
+   ]
+  },
+  {
+   "code": "writing_books",
+   "en": "Book writing",
+   "ru": "Писательство",
+   "synonyms": [
+    "author",
+    "writer",
+    "книга",
+    "писатель"
+   ]
+  },
+  {
+   "code": "nonprofit",
+   "en": "Nonprofits",
+   "ru": "НКО",
+   "synonyms": [
+    "ngo",
+    "charity",
+    "благотворительность",
+    "волонтеры",
+    "volunteering",
+    "амута",
+    "amuta"
+   ]
+  },
+  {
+   "code": "grants",
+   "en": "Grant writing",
+   "ru": "Гранты",
+   "synonyms": [
+    "grant",
+    "грант",
+    "фонд"
+   ]
+  },
+  {
+   "code": "government_services",
+   "en": "Government services",
+   "ru": "Госуслуги",
+   "synonyms": [
+    "bureaucracy",
+    "бюрократия",
+    "documents",
+    "документы",
+    "мисрад",
+    "misrad"
+   ]
+  },
+  {
+   "code": "architecture",
+   "en": "Architecture",
+   "ru": "Архитектура",
+   "synonyms": [
+    "architect",
+    "архитектор"
+   ]
+  },
+  {
+   "code": "interior_design",
+   "en": "Interior design",
+   "ru": "Дизайн интерьера",
+   "synonyms": [
+    "interior",
+    "интерьер",
+    "ремонт"
+   ]
+  },
+  {
+   "code": "construction",
+   "en": "Construction & renovation",
+   "ru": "Строительство и ремонт",
+   "synonyms": [
+    "renovation",
+    "стройка",
+    "строитель",
+    "electrician",
+    "электрик",
+    "plumber",
+    "сантехник"
+   ]
+  },
+  {
+   "code": "automotive",
+   "en": "Cars",
+   "ru": "Автомобили",
+   "synonyms": [
+    "car",
+    "машина",
+    "авто",
+    "mechanic",
+    "механик",
+    "driving license",
+    "права"
+   ]
+  },
+  {
+   "code": "hardware",
+   "en": "Hardware & electronics",
+   "ru": "Электроника",
+   "synonyms": [
+    "electronics",
+    "arduino",
+    "embedded",
+    "микроконтроллеры"
+   ]
+  },
+  {
+   "code": "manufacturing",
+   "en": "Manufacturing",
+   "ru": "Производство",
+   "synonyms": [
+    "factory",
+    "завод",
+    "производство"
+   ]
+  },
+  {
+   "code": "agriculture",
+   "en": "Agriculture",
+   "ru": "Сельское хозяйство",
+   "synonyms": [
+    "farming",
+    "ферма",
+    "агро"
+   ]
+  },
+  {
+   "code": "environment",
+   "en": "Sustainability",
+   "ru": "Экология",
+   "synonyms": [
+    "climate",
+    "климат",
+    "экология",
+    "esg"
+   ]
+  },
+  {
+   "code": "research_science",
+   "en": "Scientific research",
+   "ru": "Научные исследования",
+   "synonyms": [
+    "phd",
+    "research",
+    "наука",
+    "исследования",
+    "science"
+   ]
+  },
+  {
+   "code": "biotech",
+   "en": "Biotech",
+   "ru": "Биотех",
+   "synonyms": [
+    "biology",
+    "биология",
+    "pharma",
+    "фарма"
+   ]
+  },
+  {
+   "code": "gamedev",
+   "en": "Game development",
+   "ru": "Геймдев",
+   "synonyms": [
+    "games",
+    "игры",
+    "unity",
+    "unreal"
+   ]
+  },
+  {
+   "code": "community_building",
+   "en": "Community building",
+   "ru": "Комьюнити-менеджмент",
+   "synonyms": [
+    "community manager",
+    "комьюнити",
+    "сообщество",
+    "moderation",
+    "модерация"
+   ]
+  },
+  {
+   "code": "open_source",
+   "en": "Open source",
+   "ru": "Open source",
+   "synonyms": [
+    "github",
+    "опенсорс"
+   ]
+  },
+  {
+   "code": "pets",
+   "en": "Pets",
+   "ru": "Домашние животные",
+   "synonyms": [
+    "vet",
+    "ветеринар",
+    "собака",
+    "кошка",
+    "dog",
+    "cat"
+   ]
+  },
+  {
+   "code": "travel",
+   "en": "Travel",
+   "ru": "Путешествия",
+   "synonyms": [
+    "trip",
+    "поездка",
+    "туризм",
+    "tickets",
+    "билеты"
+   ]
+  },
+  {
+   "code": "mentoring",
+   "en": "Mentoring",
+   "ru": "Менторство",
+   "synonyms": [
+    "mentor",
+    "ментор",
+    "наставник"
+   ]
+  },
+  {
+   "code": "spreadsheets",
+   "en": "Spreadsheets",
+   "ru": "Таблицы",
+   "synonyms": [
+    "excel",
+    "google sheets",
+    "эксель",
+    "таблицы",
+    "формулы"
+   ]
+  },
+  {
+   "code": "erp_1c",
+   "en": "ERP / 1C",
+   "ru": "ERP / 1С",
+   "synonyms": [
+    "1c",
+    "1с",
+    "erp",
+    "sap",
+    "priority"
+   ]
+  },
+  {
+   "code": "notary",
+   "en": "Notary services",
+   "ru": "Нотариат",
+   "synonyms": [
+    "notary",
+    "нотариус",
+    "доверенность",
+    "apostille",
+    "апостиль"
+   ]
+  },
+  {
+   "code": "negotiation",
+   "en": "Negotiation",
+   "ru": "Переговоры",
+   "synonyms": [
+    "переговоры",
+    "negotiations",
+    "deal"
+   ]
+  }
+ ]
+}

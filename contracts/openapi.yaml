@@ -1,0 +1,76 @@
+openapi: 3.1.0
+info:
+  title: nexus.v1 community node
+  version: "1.0.0"
+  description: |
+    Partner gateway of a Telepathy community node. Every POST body is a signed nexus.v1 message
+    (contracts/nexus-v1.schema.json). Receivers deduplicate by (issuer, nonce): resending the same
+    signed message is safe and returns 200 with `duplicate: true`. All routes return 404 while the
+    node has federation off.
+servers:
+  - url: https://{node}
+    variables: { node: { default: club-a.example } }
+components:
+  schemas:
+    Message: { $ref: "./nexus-v1.schema.json" }
+    Result:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+        duplicate: { type: boolean }
+        reason:
+          type: string
+          description: "schema | type | field:* | body | time | future | expired | ttl | forwarding | purpose | job | summary | mission_ref | allowed_fields | criteria | inquiry_field:* | route | audience | unknown_issuer | partner_suspended | signature | category | rate | unknown_exchange | state | consent | contact | status | too_large | json | disabled"
+  responses:
+    Accepted: { description: Applied, content: { application/json: { schema: { $ref: "#/components/schemas/Result" } } } }
+    Duplicate: { description: Already applied (or nothing to change), content: { application/json: { schema: { $ref: "#/components/schemas/Result" } } } }
+    Bad: { description: Malformed or wrong route (400), wrong signature or unknown issuer (401), policy refusal (403), unknown exchange (404), wrong state (409), too large (413), rate limited (429), content: { application/json: { schema: { $ref: "#/components/schemas/Result" } } } }
+  parameters:
+    exchangeId: { name: exchange_id, in: path, required: true, schema: { type: string, maxLength: 64 }, description: The requester node's exchange id; must equal the message's exchange_id. }
+paths:
+  /.well-known/nexus-node.json:
+    get:
+      summary: Node manifest (id, protocol versions, public key, categories, policies, optional key_rotation proof). No people, counts or capacity.
+      responses: { "200": { description: Manifest } }
+  /v1/capabilities:
+    get:
+      summary: Accepted job categories only
+      responses: { "200": { description: Categories } }
+  /v1/opportunities/inquiries:
+    post:
+      summary: "type=inquiry: a member-approved request (job, summary, criteria only)"
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Message" } } } }
+      responses: { "202": { $ref: "#/components/responses/Accepted" }, "200": { $ref: "#/components/responses/Duplicate" }, "4XX": { $ref: "#/components/responses/Bad" } }
+  /v1/opportunities/{exchange_id}/offers:
+    parameters: [{ $ref: "#/components/parameters/exchangeId" }]
+    post:
+      summary: "type=offer | decline, from the provider node"
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Message" } } } }
+      responses: { "202": { $ref: "#/components/responses/Accepted" }, "200": { $ref: "#/components/responses/Duplicate" }, "4XX": { $ref: "#/components/responses/Bad" } }
+  /v1/opportunities/{exchange_id}/approvals:
+    parameters: [{ $ref: "#/components/parameters/exchangeId" }]
+    post:
+      summary: "type=approval: requester chose the offer; carries a reveal consent and the contact"
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Message" } } } }
+      responses: { "202": { $ref: "#/components/responses/Accepted" }, "200": { $ref: "#/components/responses/Duplicate" }, "4XX": { $ref: "#/components/responses/Bad" } }
+  /v1/commitments/{exchange_id}/events:
+    parameters: [{ $ref: "#/components/parameters/exchangeId" }]
+    post:
+      summary: "type=commitment: committed | delivered | released | cancelled"
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Message" } } } }
+      responses: { "202": { $ref: "#/components/responses/Accepted" }, "200": { $ref: "#/components/responses/Duplicate" }, "4XX": { $ref: "#/components/responses/Bad" } }
+  /v1/exchanges/{exchange_id}/withdraw:
+    parameters: [{ $ref: "#/components/parameters/exchangeId" }]
+    post:
+      summary: "type=withdraw: stop; the receiver deletes summary and contact and frees the slot"
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Message" } } } }
+      responses: { "202": { $ref: "#/components/responses/Accepted" }, "200": { $ref: "#/components/responses/Duplicate" }, "4XX": { $ref: "#/components/responses/Bad" } }
+  /.well-known/agent-card.json:
+    get:
+      summary: A2A agent card (transport only; same signed messages)
+      responses: { "200": { description: Agent card } }
+  /a2a:
+    post:
+      summary: "A2A JSON-RPC 2.0 `message/send`; the first data part must be a signed nexus.v1 message"
+      responses: { "200": { description: JSON-RPC result or error } }

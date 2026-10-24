@@ -1,0 +1,10 @@
+services:
+  telepathy:
+    build: ..
+    restart: unless-stopped
+    env_file: ../.env
+    volumes:
+      - telepathy-data:/data
+    stop_grace_period: 30s
+volumes:
+  telepathy-data:

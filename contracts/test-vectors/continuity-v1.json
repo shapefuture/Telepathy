@@ -1,0 +1,633 @@
+{
+  "description": "nexus continuity conformance vectors (CONT-10). Test keys only.",
+  "now": "2030-01-02T00:00:00Z",
+  "canonical_root": "{\"expires\":\"2031-01-01T00:00:00Z\",\"online_keys\":[{\"key\":\"S0Q5+/UzVm8hf85APiTueH3hYFAOEfBWDq0pw6L7TZY=\",\"keyid\":\"72fba1b1b5d7184d\"}],\"org\":\"club-a\",\"root_keys\":[{\"key\":\"6984ykRh+XvgtYU6IBGJ0ldTwL7XRDi9GzZnJv0p44c=\",\"keyid\":\"0ae642ff88430248\"},{\"key\":\"C7p8/vR/Ac2m8CnZkPLJHPXpfmsqTA9JY90iBnQVaog=\",\"keyid\":\"dbbf75b8ee146586\"},{\"key\":\"CaR2tlhuQstc9bqkYvhJrLRY5pkB23RHYpwNWx0v+tk=\",\"keyid\":\"c7237c5ccdb8b043\"}],\"schema\":\"nexus.root.v1\",\"threshold\":2,\"version\":1}",
+  "root": {
+    "signed": {
+      "schema": "nexus.root.v1",
+      "org": "club-a",
+      "version": 1,
+      "expires": "2031-01-01T00:00:00Z",
+      "root_keys": [
+        {
+          "keyid": "0ae642ff88430248",
+          "key": "6984ykRh+XvgtYU6IBGJ0ldTwL7XRDi9GzZnJv0p44c="
+        },
+        {
+          "keyid": "dbbf75b8ee146586",
+          "key": "C7p8/vR/Ac2m8CnZkPLJHPXpfmsqTA9JY90iBnQVaog="
+        },
+        {
+          "keyid": "c7237c5ccdb8b043",
+          "key": "CaR2tlhuQstc9bqkYvhJrLRY5pkB23RHYpwNWx0v+tk="
+        }
+      ],
+      "threshold": 2,
+      "online_keys": [
+        {
+          "keyid": "72fba1b1b5d7184d",
+          "key": "S0Q5+/UzVm8hf85APiTueH3hYFAOEfBWDq0pw6L7TZY="
+        }
+      ]
+    },
+    "signatures": [
+      {
+        "keyid": "0ae642ff88430248",
+        "sig": "/YsgRI92zD4VG4/fPR71JSlJ1bGA/j1NkD0o2Ds/QvPQZlFCFWGDMX4P8Y60KFsXCqK6ZEgG37WCKbYnl9ohBw=="
+      },
+      {
+        "keyid": "dbbf75b8ee146586",
+        "sig": "7rCXbren9LE9rHVc8YEAZD4fgvXr7HI4mDPE0yVJ+8px6Igw7PzVWCZ28HrT2LUfKRoyHO1OxJ+bma6bCGxDAA=="
+      },
+      {
+        "keyid": "c7237c5ccdb8b043",
+        "sig": "yLrjkVAWiMhD8liKRpjb578w76VxHe94Uy5Gnhvlh3Shoj7zhdDJlfykg4U9dScTKcOGlkCZ9elJvVtS5I2LDg=="
+      }
+    ]
+  },
+  "cases": {
+    "root": [
+      {
+        "note": "valid, 3 of 3",
+        "doc": {
+          "signed": {
+            "schema": "nexus.root.v1",
+            "org": "club-a",
+            "version": 1,
+            "expires": "2031-01-01T00:00:00Z",
+            "root_keys": [
+              {
+                "keyid": "0ae642ff88430248",
+                "key": "6984ykRh+XvgtYU6IBGJ0ldTwL7XRDi9GzZnJv0p44c="
+              },
+              {
+                "keyid": "dbbf75b8ee146586",
+                "key": "C7p8/vR/Ac2m8CnZkPLJHPXpfmsqTA9JY90iBnQVaog="
+              },
+              {
+                "keyid": "c7237c5ccdb8b043",
+                "key": "CaR2tlhuQstc9bqkYvhJrLRY5pkB23RHYpwNWx0v+tk="
+              }
+            ],
+            "threshold": 2,
+            "online_keys": [
+              {
+                "keyid": "72fba1b1b5d7184d",
+                "key": "S0Q5+/UzVm8hf85APiTueH3hYFAOEfBWDq0pw6L7TZY="
+              }
+            ]
+          },
+          "signatures": [
+            {
+              "keyid": "0ae642ff88430248",
+              "sig": "/YsgRI92zD4VG4/fPR71JSlJ1bGA/j1NkD0o2Ds/QvPQZlFCFWGDMX4P8Y60KFsXCqK6ZEgG37WCKbYnl9ohBw=="
+            },
+            {
+              "keyid": "dbbf75b8ee146586",
+              "sig": "7rCXbren9LE9rHVc8YEAZD4fgvXr7HI4mDPE0yVJ+8px6Igw7PzVWCZ28HrT2LUfKRoyHO1OxJ+bma6bCGxDAA=="
+            },
+            {
+              "keyid": "c7237c5ccdb8b043",
+              "sig": "yLrjkVAWiMhD8liKRpjb578w76VxHe94Uy5Gnhvlh3Shoj7zhdDJlfykg4U9dScTKcOGlkCZ9elJvVtS5I2LDg=="
+            }
+          ]
+        },
+        "trusted": null,
+        "expect": {
+          "ok": true
+        }
+      },
+      {
+        "note": "below threshold",
+        "doc": {
+          "signed": {
+            "schema": "nexus.root.v1",
+            "org": "club-a",
+            "version": 1,
+            "expires": "2031-01-01T00:00:00Z",
+            "root_keys": [
+              {
+                "keyid": "0ae642ff88430248",
+                "key": "6984ykRh+XvgtYU6IBGJ0ldTwL7XRDi9GzZnJv0p44c="
+              },
+              {
+                "keyid": "dbbf75b8ee146586",
+                "key": "C7p8/vR/Ac2m8CnZkPLJHPXpfmsqTA9JY90iBnQVaog="
+              },
+              {
+                "keyid": "c7237c5ccdb8b043",
+                "key": "CaR2tlhuQstc9bqkYvhJrLRY5pkB23RHYpwNWx0v+tk="
+              }
+            ],
+            "threshold": 2,
+            "online_keys": [
+              {
+                "keyid": "72fba1b1b5d7184d",
+                "key": "S0Q5+/UzVm8hf85APiTueH3hYFAOEfBWDq0pw6L7TZY="
+              }
+            ]
+          },
+          "signatures": [
+            {
+              "keyid": "0ae642ff88430248",
+              "sig": "/YsgRI92zD4VG4/fPR71JSlJ1bGA/j1NkD0o2Ds/QvPQZlFCFWGDMX4P8Y60KFsXCqK6ZEgG37WCKbYnl9ohBw=="
+            }
+          ]
+        },
+        "trusted": null,
+        "expect": {
+          "ok": false,
+          "reason": "root_threshold"
+        }
+      }
+    ],
+    "destinations": [
+      {
+        "note": "online key, first list",
+        "doc": {
+          "signed": {
+            "schema": "nexus.destinations.v1",
+            "org": "club-a",
+            "version": 1,
+            "root_version": 1,
+            "expires": "2031-01-01T00:00:00Z",
+            "destinations": [
+              {
+                "kind": "telegram",
+                "url": "https://t.me/club_a",
+                "role": "primary"
+              },
+              {
+                "kind": "web",
+                "url": "https://club-a.example",
+                "role": "backup"
+              }
+            ]
+          },
+          "signatures": [
+            {
+              "keyid": "72fba1b1b5d7184d",
+              "sig": "TQAJOGdJPLi0/xzyKInnDI9IE+AdhVXEEqPyR1HouxlBDmIFd1i6zF8Di/bqIbDQzyyE9OX3aAZ6w0o9ckSuCg=="
+            }
+          ]
+        },
+        "last": null,
+        "expect": {
+          "ok": true,
+          "relocation": false
+        }
+      },
+      {
+        "note": "root-signed relocation",
+        "doc": {
+          "signed": {
+            "schema": "nexus.destinations.v1",
+            "org": "club-a",
+            "version": 2,
+            "root_version": 1,
+            "expires": "2031-01-01T00:00:00Z",
+            "destinations": [
+              {
+                "kind": "web",
+                "url": "https://club-a.example",
+                "role": "primary"
+              },
+              {
+                "kind": "telegram",
+                "url": "https://t.me/club_a",
+                "role": "backup"
+              }
+            ],
+            "relocation": {
+              "from": "https://t.me/club_a",
+              "to": "https://club-a.example",
+              "reason": "group deleted"
+            }
+          },
+          "signatures": [
+            {
+              "keyid": "0ae642ff88430248",
+              "sig": "h4asmL5LMo4BSGv/ZXlg0FKq069X/Cu4lE1UgWAxM3Zm8VqPSeUX5MSJNQsZH0cMCqS3e7jbFd7EoPaYjG5uCA=="
+            },
+            {
+              "keyid": "c7237c5ccdb8b043",
+              "sig": "E68LSaifNm3ZzLNNW8XwQojJ5bK7ALIyWZiZBrLg9muYR99GvySSdDKeduryUb2QfzIeSG813l+pqqS03Rz4Cg=="
+            }
+          ]
+        },
+        "last": {
+          "signed": {
+            "schema": "nexus.destinations.v1",
+            "org": "club-a",
+            "version": 1,
+            "root_version": 1,
+            "expires": "2031-01-01T00:00:00Z",
+            "destinations": [
+              {
+                "kind": "telegram",
+                "url": "https://t.me/club_a",
+                "role": "primary"
+              },
+              {
+                "kind": "web",
+                "url": "https://club-a.example",
+                "role": "backup"
+              }
+            ]
+          },
+          "signatures": [
+            {
+              "keyid": "72fba1b1b5d7184d",
+              "sig": "TQAJOGdJPLi0/xzyKInnDI9IE+AdhVXEEqPyR1HouxlBDmIFd1i6zF8Di/bqIbDQzyyE9OX3aAZ6w0o9ckSuCg=="
+            }
+          ]
+        },
+        "expect": {
+          "ok": true,
+          "relocation": true
+        }
+      },
+      {
+        "note": "relocation signed by online key only",
+        "doc": {
+          "signed": {
+            "schema": "nexus.destinations.v1",
+            "org": "club-a",
+            "version": 2,
+            "root_version": 1,
+            "expires": "2031-01-01T00:00:00Z",
+            "destinations": [
+              {
+                "kind": "web",
+                "url": "https://club-a.example",
+                "role": "primary"
+              },
+              {
+                "kind": "telegram",
+                "url": "https://t.me/club_a",
+                "role": "backup"
+              }
+            ],
+            "relocation": {
+              "from": "https://t.me/club_a",
+              "to": "https://club-a.example",
+              "reason": "group deleted"
+            }
+          },
+          "signatures": [
+            {
+              "keyid": "72fba1b1b5d7184d",
+              "sig": "wKCZD0MBIXSgbFGvg1shvIKu6H/TuTb3aON4gf7jQt3rNY5Eu2cZqPdkhH/vLMLaL9qLkX2uJP5cv4T5DxQ+Bg=="
+            }
+          ]
+        },
+        "last": {
+          "signed": {
+            "schema": "nexus.destinations.v1",
+            "org": "club-a",
+            "version": 1,
+            "root_version": 1,
+            "expires": "2031-01-01T00:00:00Z",
+            "destinations": [
+              {
+                "kind": "telegram",
+                "url": "https://t.me/club_a",
+                "role": "primary"
+              },
+              {
+                "kind": "web",
+                "url": "https://club-a.example",
+                "role": "backup"
+              }
+            ]
+          },
+          "signatures": [
+            {
+              "keyid": "72fba1b1b5d7184d",
+              "sig": "TQAJOGdJPLi0/xzyKInnDI9IE+AdhVXEEqPyR1HouxlBDmIFd1i6zF8Di/bqIbDQzyyE9OX3aAZ6w0o9ckSuCg=="
+            }
+          ]
+        },
+        "expect": {
+          "ok": false,
+          "reason": "relocation_needs_root"
+        }
+      },
+      {
+        "note": "replay of older list",
+        "doc": {
+          "signed": {
+            "schema": "nexus.destinations.v1",
+            "org": "club-a",
+            "version": 1,
+            "root_version": 1,
+            "expires": "2031-01-01T00:00:00Z",
+            "destinations": [
+              {
+                "kind": "telegram",
+                "url": "https://t.me/club_a",
+                "role": "primary"
+              },
+              {
+                "kind": "web",
+                "url": "https://club-a.example",
+                "role": "backup"
+              }
+            ]
+          },
+          "signatures": [
+            {
+              "keyid": "72fba1b1b5d7184d",
+              "sig": "TQAJOGdJPLi0/xzyKInnDI9IE+AdhVXEEqPyR1HouxlBDmIFd1i6zF8Di/bqIbDQzyyE9OX3aAZ6w0o9ckSuCg=="
+            }
+          ]
+        },
+        "last": {
+          "signed": {
+            "schema": "nexus.destinations.v1",
+            "org": "club-a",
+            "version": 2,
+            "root_version": 1,
+            "expires": "2031-01-01T00:00:00Z",
+            "destinations": [
+              {
+                "kind": "web",
+                "url": "https://club-a.example",
+                "role": "primary"
+              },
+              {
+                "kind": "telegram",
+                "url": "https://t.me/club_a",
+                "role": "backup"
+              }
+            ],
+            "relocation": {
+              "from": "https://t.me/club_a",
+              "to": "https://club-a.example",
+              "reason": "group deleted"
+            }
+          },
+          "signatures": [
+            {
+              "keyid": "0ae642ff88430248",
+              "sig": "h4asmL5LMo4BSGv/ZXlg0FKq069X/Cu4lE1UgWAxM3Zm8VqPSeUX5MSJNQsZH0cMCqS3e7jbFd7EoPaYjG5uCA=="
+            },
+            {
+              "keyid": "c7237c5ccdb8b043",
+              "sig": "E68LSaifNm3ZzLNNW8XwQojJ5bK7ALIyWZiZBrLg9muYR99GvySSdDKeduryUb2QfzIeSG813l+pqqS03Rz4Cg=="
+            }
+          ]
+        },
+        "expect": {
+          "ok": false,
+          "reason": "dest_rollback"
+        }
+      },
+      {
+        "note": "same version, different content",
+        "doc": {
+          "signed": {
+            "schema": "nexus.destinations.v1",
+            "org": "club-a",
+            "version": 2,
+            "root_version": 1,
+            "expires": "2031-01-01T00:00:00Z",
+            "destinations": [
+              {
+                "kind": "web",
+                "url": "https://club-a.example",
+                "role": "primary"
+              },
+              {
+                "kind": "telegram",
+                "url": "https://t.me/club_a",
+                "role": "backup"
+              }
+            ],
+            "relocation": {
+              "from": "https://t.me/club_a",
+              "to": "https://club-a.example",
+              "reason": "other"
+            }
+          },
+          "signatures": [
+            {
+              "keyid": "0ae642ff88430248",
+              "sig": "SRXmLpSkzxTGpGQK0zTLn9hnJAx4iIY2+CnsvFVzCNnxyVXp/U4bWUutrJAHUctGYxsnsloWVN1RybVDzJhKBg=="
+            },
+            {
+              "keyid": "dbbf75b8ee146586",
+              "sig": "GYAmqdn/XIeDBnitP3qLm6oUF7etrvr1/sjJY2xHeMFxYhz2Xhaf96odqHKMESC0wpPN+WFyfyo7Vc3LqwrcBg=="
+            }
+          ]
+        },
+        "last": {
+          "signed": {
+            "schema": "nexus.destinations.v1",
+            "org": "club-a",
+            "version": 2,
+            "root_version": 1,
+            "expires": "2031-01-01T00:00:00Z",
+            "destinations": [
+              {
+                "kind": "web",
+                "url": "https://club-a.example",
+                "role": "primary"
+              },
+              {
+                "kind": "telegram",
+                "url": "https://t.me/club_a",
+                "role": "backup"
+              }
+            ],
+            "relocation": {
+              "from": "https://t.me/club_a",
+              "to": "https://club-a.example",
+              "reason": "group deleted"
+            }
+          },
+          "signatures": [
+            {
+              "keyid": "0ae642ff88430248",
+              "sig": "h4asmL5LMo4BSGv/ZXlg0FKq069X/Cu4lE1UgWAxM3Zm8VqPSeUX5MSJNQsZH0cMCqS3e7jbFd7EoPaYjG5uCA=="
+            },
+            {
+              "keyid": "c7237c5ccdb8b043",
+              "sig": "E68LSaifNm3ZzLNNW8XwQojJ5bK7ALIyWZiZBrLg9muYR99GvySSdDKeduryUb2QfzIeSG813l+pqqS03Rz4Cg=="
+            }
+          ]
+        },
+        "expect": {
+          "ok": false,
+          "reason": "dest_fork"
+        }
+      }
+    ],
+    "pass": [
+      {
+        "note": "valid for club-b",
+        "doc": {
+          "signed": {
+            "schema": "nexus.attestation.v1",
+            "id": "0123456789abcdef0123456789abcdef",
+            "org": "club-a",
+            "audience": "https://club-b.example",
+            "subject": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tier": "member",
+            "scope": "community",
+            "issued_at": "2030-01-01T00:00:00Z",
+            "expires_at": "2030-01-08T00:00:00Z"
+          },
+          "signatures": [
+            {
+              "keyid": "72fba1b1b5d7184d",
+              "sig": "N/7x/mkHnc40L49R0zdQCT1585VsxzHBpNyQZvOfVmUS3LzR5qFwr/JRvH8AEuCn8tI/9J6e0aW4lYFlUydaCw=="
+            }
+          ]
+        },
+        "me": "https://club-b.example",
+        "expect": true
+      },
+      {
+        "note": "wrong audience",
+        "doc": {
+          "signed": {
+            "schema": "nexus.attestation.v1",
+            "id": "0123456789abcdef0123456789abcdef",
+            "org": "club-a",
+            "audience": "https://club-b.example",
+            "subject": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tier": "member",
+            "scope": "community",
+            "issued_at": "2030-01-01T00:00:00Z",
+            "expires_at": "2030-01-08T00:00:00Z"
+          },
+          "signatures": [
+            {
+              "keyid": "72fba1b1b5d7184d",
+              "sig": "N/7x/mkHnc40L49R0zdQCT1585VsxzHBpNyQZvOfVmUS3LzR5qFwr/JRvH8AEuCn8tI/9J6e0aW4lYFlUydaCw=="
+            }
+          ]
+        },
+        "me": "https://club-c.example",
+        "expect": false
+      },
+      {
+        "note": "tier changed",
+        "doc": {
+          "signed": {
+            "schema": "nexus.attestation.v1",
+            "id": "0123456789abcdef0123456789abcdef",
+            "org": "club-a",
+            "audience": "https://club-b.example",
+            "subject": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tier": "vip",
+            "scope": "community",
+            "issued_at": "2030-01-01T00:00:00Z",
+            "expires_at": "2030-01-08T00:00:00Z"
+          },
+          "signatures": [
+            {
+              "keyid": "72fba1b1b5d7184d",
+              "sig": "N/7x/mkHnc40L49R0zdQCT1585VsxzHBpNyQZvOfVmUS3LzR5qFwr/JRvH8AEuCn8tI/9J6e0aW4lYFlUydaCw=="
+            }
+          ]
+        },
+        "me": "https://club-b.example",
+        "expect": false
+      }
+    ],
+    "restore": {
+      "exports": [
+        {
+          "signed": {
+            "schema": "nexus.continuity-export.v1",
+            "org": "club-a",
+            "generated_at": "2030-01-01T00:00:00Z",
+            "root_version": 1,
+            "manifest_version": 1,
+            "people": [
+              {
+                "ref": "p1",
+                "emails": [
+                  "ann@example.com"
+                ],
+                "ops": [
+                  {
+                    "seq": 1,
+                    "op": "FOLLOW",
+                    "topic": "critical",
+                    "at": "2030-01-01T00:00:00Z"
+                  },
+                  {
+                    "seq": 2,
+                    "op": "FOLLOW",
+                    "topic": "news",
+                    "at": "2030-01-01T00:00:00Z"
+                  }
+                ],
+                "memberships": []
+              }
+            ],
+            "suppressions": []
+          },
+          "signatures": [
+            {
+              "keyid": "72fba1b1b5d7184d",
+              "sig": "1ewwgFO7HID5haGx7iL5+pJkgA+nO1F2+iEbJFuAJIGWZ8sn4Gkrz4s1frPNQTRmZ240DMAvLfWTnj1W2PXpAw=="
+            }
+          ]
+        },
+        {
+          "signed": {
+            "schema": "nexus.continuity-export.v1",
+            "org": "club-a",
+            "generated_at": "2030-01-01T00:00:00Z",
+            "root_version": 1,
+            "manifest_version": 1,
+            "people": [
+              {
+                "ref": "p1",
+                "emails": [
+                  "ann@example.com"
+                ],
+                "ops": [
+                  {
+                    "seq": 1,
+                    "op": "FOLLOW",
+                    "topic": "critical",
+                    "at": "2030-01-01T00:00:00Z"
+                  },
+                  {
+                    "seq": 2,
+                    "op": "FOLLOW",
+                    "topic": "news",
+                    "at": "2030-01-01T00:00:00Z"
+                  },
+                  {
+                    "seq": 3,
+                    "op": "UNFOLLOW",
+                    "topic": "news",
+                    "at": "2030-01-01T00:00:00Z"
+                  }
+                ],
+                "memberships": []
+              }
+            ],
+            "suppressions": []
+          },
+          "signatures": [
+            {
+              "keyid": "72fba1b1b5d7184d",
+              "sig": "Lulv1Y/0AzdJDtetw2xCQmZOLQqvfWJzLAPwN9Sgfm0eFAeKPA3c7zPWsC4K11zP7osf44OlMCrfXV6rvgQDCw=="
+            }
+          ]
+        }
+      ],
+      "expect_any_order": {
+        "ann@example.com|critical": "following",
+        "ann@example.com|news": "unfollowed"
+      }
+    }
+  }
+}

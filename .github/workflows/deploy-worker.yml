@@ -1,0 +1,47 @@
+# Deploy the Cloudflare Worker when worker/ changes on main.
+# Enable: repository variables CLOUDFLARE_DEPLOY=true and D1_DATABASE_ID=<id>;
+#         secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID;
+#         an environment named "production" (add required reviewers there for a manual gate).
+# No community data passes through this workflow.
+name: Deploy worker
+
+on:
+  push:
+    branches: [main]
+    paths: ["worker/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-worker
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: vars.CLOUDFLARE_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: worker
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Point wrangler.jsonc at the real D1 database
+        run: sed -i "s/00000000-0000-0000-0000-000000000000/${{ vars.D1_DATABASE_ID }}/" wrangler.jsonc
+      - name: Apply D1 migrations (forward-only)
+        run: npx wrangler d1 migrations apply telepathy --remote
+      - name: Deploy
+        run: npx wrangler deploy

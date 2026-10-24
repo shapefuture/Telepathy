@@ -1,0 +1,128 @@
+{
+  "version": "2.1",
+  "status": "backlog",
+  "tracked_in": "MASTER_PLAN.md phase P13",
+  "tasks": [
+    {
+      "id": "P13-01",
+      "title": "Answers inside groups",
+      "priority": 1,
+      "acceptance": "`/ask` or @mention in a group answers only from that same group's live passages; never cites other groups (C02). Redirect stays for DM-only commands.",
+      "relates_to": "new",
+      "estimate": "0.5d",
+      "status": "open",
+      "evidence": [],
+      "github_issue": 146
+    },
+    {
+      "id": "P13-02",
+      "title": "Already-answered hints",
+      "priority": 1,
+      "acceptance": "Per-group admin opt-in. When a new help_request matches an earlier answered question in the same group (coverage >= 0.6 and replies > 0), reply once with a link to the earlier thread. Max 1 hint per question, rate-limited per group.",
+      "relates_to": "new",
+      "estimate": "1d",
+      "status": "open",
+      "evidence": [],
+      "github_issue": 147
+    },
+    {
+      "id": "P13-03",
+      "title": "Unanswered-question routing",
+      "priority": 2,
+      "acceptance": "Help request with no reply after N hours (default 4): privately DM at most 2 opted-in, available experts with matching skills who can read that group, with a link only. Respects the expert weekly cap and a per-expert daily cap. Experts can turn it off.",
+      "relates_to": "new",
+      "estimate": "1d",
+      "status": "open",
+      "evidence": [],
+      "github_issue": 148
+    },
+    {
+      "id": "P13-04",
+      "title": "Russian / English bot interface",
+      "priority": 1,
+      "acceptance": "All bot texts in RU and EN, chosen from Telegram language_code with a /language override. Tests assert every message key exists in both locales.",
+      "relates_to": "new",
+      "estimate": "0.5d",
+      "status": "open",
+      "evidence": [],
+      "github_issue": 149
+    },
+    {
+      "id": "P13-05",
+      "title": "Answer feedback",
+      "priority": 1,
+      "acceptance": "Helpful / not helpful / wrong-citation buttons on /ask results; aggregate per passage only; boosts rank of helpful passages; no public personal judgements.",
+      "relates_to": "extends P06-07",
+      "estimate": "0.5d",
+      "status": "open",
+      "evidence": [],
+      "github_issue": 150
+    },
+    {
+      "id": "P13-06",
+      "title": "/catchup on demand",
+      "priority": 3,
+      "acceptance": "Digest-style summary of the member's readable groups since a chosen time (default: last visit), reusing digest.build; rate-limited.",
+      "relates_to": "new",
+      "estimate": "0.25d",
+      "status": "open",
+      "evidence": [],
+      "github_issue": 151
+    },
+    {
+      "id": "P13-07",
+      "title": "Canonical answers",
+      "priority": 3,
+      "acceptance": "Admin replies /canonical to a message: it ranks first for its topic; marking a newer one labels the old one outdated (supersedes link).",
+      "relates_to": "extends P07-06/P07-07",
+      "estimate": "1d",
+      "status": "open",
+      "evidence": [],
+      "github_issue": 152
+    },
+    {
+      "id": "P13-08",
+      "title": "Search filters",
+      "priority": 3,
+      "acceptance": "`/ask in:<group> since:<date> has:file` parsed before FTS; filters narrow the readable set, never widen it.",
+      "relates_to": "new",
+      "estimate": "0.25d",
+      "status": "open",
+      "evidence": [],
+      "github_issue": 153
+    },
+    {
+      "id": "P13-09",
+      "title": "Private skill suggestions",
+      "priority": 3,
+      "acceptance": "After a member gives several replies on a skill topic, privately suggest adding it; nothing is stored as confirmed unless they accept.",
+      "relates_to": "extends P08-04",
+      "estimate": "1d",
+      "status": "open",
+      "evidence": [],
+      "github_issue": 154
+    },
+    {
+      "id": "P13-10",
+      "title": "Events list",
+      "priority": 3,
+      "acceptance": "Detect event announcements; /events lists upcoming ones with links and an .ics file; moderators can hide false positives.",
+      "relates_to": "extends P10-06",
+      "estimate": "1d",
+      "status": "open",
+      "evidence": [],
+      "github_issue": 155
+    },
+    {
+      "id": "P13-11",
+      "title": "Telegram Mini App",
+      "priority": 4,
+      "acceptance": "Web app served by the Worker (static assets) for search, profile, requests and settings; identity from Telegram's signed initData, verified server-side; no new data collection.",
+      "relates_to": "extends P11-01/P11-02",
+      "estimate": "2-3d",
+      "status": "open",
+      "evidence": [],
+      "github_issue": 156
+    }
+  ]
+}

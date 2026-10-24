@@ -1,0 +1,58 @@
+# Telepathy minimal AAA-inspired constitution v1
+project: Telepathy
+runtime_profile: AG1_BOUNDED_MODELS
+agent_self_modification: false
+active_generation_mutable: false
+external_model_egress_default: deny
+production_trial_model_egress: deny
+invariants:
+  - {id: C01, hard: true, description: "No ingestion outside authorized community scope"}
+  - {id: C02, hard: true, description: "Every answer excerpt requires source authorization"}
+  - {id: C03, hard: true, description: "External model egress requires lawful-data and contract approval"}
+  - {id: C04, hard: true, description: "Expert discovery requires member opt-in"}
+  - {id: C05, hard: true, description: "Contact release requires mutual agreement"}
+  - {id: C06, hard: true, description: "Revoked/deleted evidence is ineligible"}
+  - {id: C07, hard: true, description: "All derived claims retain resolvable evidence IDs"}
+  - {id: C08, hard: true, description: "Classifier score is not competence evidence"}
+  - {id: C09, hard: true, description: "External effects have ledger IDs and recovery paths"}
+  - {id: C10, hard: true, description: "Builders cannot edit live evaluator or hidden fixtures"}
+  - {id: C11, hard: true, description: "No secrets or participant data in GitHub"}
+  - {id: C12, hard: true, description: "Active release has identity and rollback ancestor"}
+  - {id: C13, hard: true, description: "Consent withdrawal invalidates derived projections"}
+  - {id: C14, hard: true, description: "No free NVIDIA trial production processing"}
+  # Federation invariants (Opportunity Internet plan I01-I16; enforced in worker/src/{domain,assist,federation})
+  - {id: C15, hard: true, description: "Cross-organization access is deny-by-default; only allowlisted, active partners with a key are heard (I01, I06)"}
+  - {id: C16, hard: true, description: "Nothing leaves the node without a current member grant bound to mission version, policy version, audience and fields (I02, I08)"}
+  - {id: C17, hard: true, description: "Envelopes carry only job, summary, criteria and a per-exchange pseudonym; no Telegram ids, contacts, archives (I05)"}
+  - {id: C18, hard: true, description: "Contact reveal needs the member's reveal grant for that one partner and the provider's offer (I03)"}
+  - {id: C19, hard: true, description: "Capacity is reserved atomically with the commitment; no overbooking (I12)"}
+  - {id: C20, hard: true, description: "Inbound messages are signed, addressed to this node, unexpired, non-forwardable and replay-checked (I06, J.2)"}
+  - {id: C21, hard: true, description: "Withdrawal propagates: partner copies of summary and contact are deleted; grants revoked (I09)"}
+  - {id: C22, hard: true, description: "Unverified outcomes are never reported as success (I11)"}
+  # Continuity (docs/CONTINUITY_PLAN_RU.md)
+  - {id: C23, hard: true, description: "No one is enrolled, followed or emailed without their own action; Telegram ids never become email consent"}
+  - {id: C24, hard: true, description: "The primary club address moves only with a root-threshold-signed relocation; no heuristic or AI-detected 'new address'"}
+  - {id: C25, hard: true, description: "A withdrawn consent can't be revived by restore, replay or import (versioned ops + tombstones)"}
+  - {id: C26, hard: true, description: "'Protected' and reach metrics count only verified routes; Telegram group size is never reach"}
+  - {id: C27, hard: true, description: "Recovery works without Telepathy: signed export + independent verifier"}
+  # Hydra (docs/HYDRA_PLAN.md)
+  - {id: C28, hard: true, description: "Reach is counted in independent failure domains from verified heads only; channels sharing a domain count once"}
+  - {id: C29, hard: true, description: "Regrowth never subscribes anyone: invitations go over heads the person already verified, only with critical-notice consent"}
+  - {id: C30, hard: true, description: "No single partner, owner or key can release a sealed relocation: k shares, each released only on its holder's own evidence"}
+  - {id: C31, hard: true, description: "Public heads (feeds, social, mirrors, anchors) carry only signed public notices, never member data"}
+  - {id: C32, hard: true, description: "A withdrawn choice stays withdrawn across receipts, escrow restores and gossip (highest sequence wins; tombstones checked at send)"}
+authority:
+  builder: [repo_read, isolated_workcell_write, test_run, candidate_publish]
+  independent_reviewer: [repo_read, hidden_eval_run, evidence_sign]
+  integration_owner: [contract_merge, migration_merge, release_candidate_build]
+  community_owner: [source_approve, deployment_approve, external_egress_approve]
+  runtime_bot: [approved_source_ingest, authorized_member_reply, consent_request]
+  classifier_adapter: [approved_nonsensitive_inference_only]
+  embedding_adapter: [approved_nonsensitive_inference_only]
+forbidden:
+  - classifier_adapter.grant_source_access
+  - embedding_adapter.publish_member_profile
+  - runtime_bot.auto_intro_without_consent
+  - builder.modify_hidden_test_data
+  - builder.deploy_production
+  - any_provider.send_unapproved_private_content

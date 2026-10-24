@@ -1,0 +1,95 @@
+{
+  "version": "4.0",
+  "status": "in_progress",
+  "tracked_in": "MASTER_PLAN.md phase P15; source docs/CONTINUITY_PLAN_RU.md",
+  "tasks": [
+    {
+      "id": "CONT-0",
+      "title": "Pilot: real-loss evidence, honest limits, first drill",
+      "implementation": "owner_task",
+      "status": "open",
+      "github_issue": 169,
+      "evidence": []
+    },
+    {
+      "id": "CONT-1",
+      "title": "Verified community identity (TUF-style root, online key, signed destinations)",
+      "implementation": "built",
+      "status": "open",
+      "github_issue": 170,
+      "evidence": []
+    },
+    {
+      "id": "CONT-2",
+      "title": "/passport and Mini App enrolment, explicit consent",
+      "implementation": "built",
+      "status": "open",
+      "github_issue": 170,
+      "evidence": []
+    },
+    {
+      "id": "CONT-3",
+      "title": "Independent login (email code, recovery codes), truthful 'protected'",
+      "implementation": "built",
+      "status": "open",
+      "github_issue": 170,
+      "evidence": []
+    },
+    {
+      "id": "CONT-4",
+      "title": "FollowIntent ops log, delivery registrations, preference centre, tombstones",
+      "implementation": "built",
+      "status": "open",
+      "github_issue": 170,
+      "evidence": []
+    },
+    {
+      "id": "CONT-5",
+      "title": "Signed export/import; restore without Nexus (Python)",
+      "implementation": "built",
+      "status": "open",
+      "github_issue": 171,
+      "evidence": []
+    },
+    {
+      "id": "CONT-6",
+      "title": "Verified relocation and low-frequency continuity alerts",
+      "implementation": "built",
+      "status": "open",
+      "github_issue": 171,
+      "evidence": []
+    },
+    {
+      "id": "CONT-7",
+      "title": "Club passport for partners (pairwise, signed, revocable)",
+      "implementation": "built",
+      "status": "open",
+      "github_issue": 172,
+      "evidence": []
+    },
+    {
+      "id": "CONT-8",
+      "title": "Rescue relay among partner clubs",
+      "implementation": "built",
+      "status": "open",
+      "github_issue": 172,
+      "evidence": []
+    },
+    {
+      "id": "CONT-9",
+      "title": "Recovery drills and metrics (IER, VAR, RE, RDS, PI)",
+      "implementation": "built; drills owner_task",
+      "status": "open",
+      "github_issue": 171,
+      "evidence": []
+    },
+    {
+      "id": "CONT-10",
+      "title": "Continuity SDK, vectors, independent Python implementation",
+      "implementation": "built",
+      "status": "open",
+      "github_issue": 172,
+      "evidence": []
+    }
+  ]
+}

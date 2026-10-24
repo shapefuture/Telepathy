@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/shapefuture/Telepathy/contracts/nexus-v1.schema.json",
+  "title": "nexus.v1 federation message",
+  "description": "Signed message between community nodes. Signature: Ed25519 over canonical JSON (keys sorted, no whitespace) of the object without `signature`. Reference implementation: worker/src/federation/envelope.ts.",
+  "type": "object",
+  "required": ["schema", "type", "exchange_id", "issuer_org", "recipient_org", "issued_at", "expires_at", "nonce", "body", "signature"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "nexus.v1" },
+    "type": { "enum": ["inquiry", "offer", "decline", "approval", "commitment", "withdraw", "notice"] },
+    "exchange_id": { "type": "string", "maxLength": 200, "description": "Always the requester node's exchange id." },
+    "issuer_org": { "type": "string", "maxLength": 200 },
+    "recipient_org": { "type": "string", "maxLength": 200 },
+    "issued_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time", "description": "At most 15 days after issued_at." },
+    "nonce": { "type": "string", "maxLength": 200, "description": "Unique per message; receivers treat a repeat as an idempotent no-op." },
+    "signature": { "type": "string", "contentEncoding": "base64" },
+    "body": { "type": "object" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "inquiry" } } },
+      "then": {
+        "properties": {
+          "body": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["mission_ref", "job", "summary", "allowed_fields", "purpose", "forwarding", "max_hops", "policy_version"],
+            "properties": {
+              "mission_ref": { "type": "string", "description": "Per-exchange pseudonym, never a member or mission id." },
+              "job": { "type": "string", "pattern": "^[a-z0-9_.]{2,80}$" },
+              "summary": { "type": "string", "maxLength": 600 },
+              "criteria": { "type": "object" },
+              "allowed_fields": { "type": "array", "items": { "enum": ["job", "summary", "criteria"] } },
+              "purpose": { "const": "evaluate_willing_provider" },
+              "forwarding": { "const": "prohibited" },
+              "max_hops": { "const": 1 },
+              "policy_version": { "type": "integer" }
+            }
+          }
+        }
+      }
+    },
+    { "if": { "properties": { "type": { "const": "offer" } } }, "then": { "properties": { "body": { "required": ["offer_ref", "summary"], "properties": { "offer_ref": { "type": "string" }, "summary": { "type": "string", "maxLength": 300 }, "terms": { "type": "object", "properties": { "mode": { "enum": ["volunteer", "paid", "reciprocal", "member_benefit"] } } } } } } } },
+    { "if": { "properties": { "type": { "const": "approval" } } }, "then": { "properties": { "body": { "required": ["consent", "contact"], "properties": { "consent": { "type": "object", "required": ["action", "fields"], "properties": { "action": { "const": "reveal" }, "fields": { "type": "array", "contains": { "const": "contact" } }, "purpose": { "type": "string" }, "grant_ref": { "type": "string" } } }, "contact": { "type": "string", "pattern": "^(tg://user\\?id=\\d{1,15}|https://t\\.me/[A-Za-z0-9_]{4,32})( @[A-Za-z0-9_]{4,32})?$" } } } } } },
+    { "if": { "properties": { "type": { "const": "commitment" } } }, "then": { "properties": { "body": { "required": ["status"], "properties": { "status": { "enum": ["committed", "delivered", "released", "cancelled"] } } } } } }
+  ],
+  "x-routes": {
+    "GET /.well-known/nexus-node.json": "node id, protocol versions, public key, categories (no counts)",
+    "GET /v1/capabilities": "categories only",
+    "POST /v1/opportunities/inquiries": "inquiry",
+    "POST /v1/opportunities/{exchange_id}/offers": "offer | decline",
+    "POST /v1/opportunities/{exchange_id}/approvals": "approval",
+    "POST /v1/commitments/{exchange_id}/events": "commitment",
+    "POST /v1/exchanges/{exchange_id}/withdraw": "withdraw",
+    "POST /v1/notices": "notice (relocation relay: body.community = {root, destinations})",
+    "GET /v1/relay": "verified relocation notices this node relays for its partners",
+    "GET /.well-known/nexus-community.json": "club root + destinations (continuity)",
+    "GET /v1/attestations/{id}/status": "active | revoked | expired | unknown"
+  }
+}

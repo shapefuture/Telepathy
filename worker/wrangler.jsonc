@@ -1,0 +1,63 @@
+{
+  // Telepathy on Cloudflare Workers (free plan). See ../docs/DEPLOY_CLOUDFLARE.md
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "telepathy",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-30",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "telepathy",
+      // Replace with the id printed by `wrangler d1 create telepathy`.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // Every minute (free; ~1,440 of the 100,000 daily requests): sends, partner messages, expiry,
+  // reminders, digest batches, retention. Replaces the old GitHub Actions "maintenance" burst job.
+  "triggers": { "crons": ["* * * * *"] },
+  "vars": {
+    "COMMUNITY_LABEL": "Community",
+    "TIMEZONE": "Asia/Jerusalem",
+    "DIGEST_HOUR": "9",
+    "ASK_RATE_PER_MINUTE": "10",
+    // "true" queues PDF/DOCX/PPTX for the GitHub Actions parser (files pass through GitHub).
+    // Approved by the community owner on 2026-10-23 (K18).
+    "OFFLOAD_DOCUMENTS": "true",
+    // Public https origin of this Worker, for the /app button (the chat menu button works without it).
+    "PUBLIC_URL": "",
+    // Partner gateway (Opportunity Envelopes). "false" = /v1/* and the node manifest return 404.
+    "FEDERATION_ENABLED": "false",
+    // Optional: how partners name this node (defaults to PUBLIC_URL).
+    "FEDERATION_NODE_ID": "",
+    // Ed25519 public key from `npm run fed:keys` (the private half is a secret).
+    "FEDERATION_PUBLIC_KEY": "",
+    // Continuity (docs/CONTINUITY.md). Off until the CONTINUITY_KEY secret exists.
+    "IDENTITY_ONLINE_PUBLIC_KEY": "",
+    // "resend" sends codes/notices through that processor (EMAIL_API_KEY secret); "log" = dev; "" = off.
+    "EMAIL_PROVIDER": "",
+    "EMAIL_FROM": "",
+    // Hydra (docs/HYDRA.md): extra heads, each off until set (e.g. NTFY_SERVERS "https://ntfy.sh").
+    "NTFY_SERVERS": "",
+    "EMAIL_B_PROVIDER": "",
+    "EMAIL_B_FROM": "",
+    "VAPID_PUBLIC_KEY": "",
+    "VAPID_SUBJECT": "",
+    "MATRIX_HOMESERVER": "",
+    "SMS_PROVIDER": "",
+    "MASTODON_URL": "",
+    "BLUESKY_HANDLE": "",
+    "ARCHIVE_ANCHOR": "false",
+    // Comma-separated X25519 public keys (npm run hydra -- escrow-keys) and S3-compatible targets (JSON).
+    "ESCROW_RECIPIENTS": "",
+    "ESCROW_TARGETS": "[]"
+  },
+  // Secrets (set with `wrangler secret put NAME`, never committed):
+  //   BOT_TOKEN, WEBHOOK_SECRET, ADMIN_TOKEN, OWNER_IDS, FEDERATION_PRIVATE_KEY (only with federation),
+  //   CONTINUITY_KEY, IDENTITY_ONLINE_KEY, EMAIL_API_KEY (only with continuity)
+  //   Hydra, each optional: EMAIL_B_API_KEY, EMAIL_WEBHOOK_SECRET, VAPID_PRIVATE_KEY, MATRIX_ACCESS_TOKEN,
+  //   SMS_ACCOUNT_SID, SMS_AUTH_TOKEN, SMS_FROM, MASTODON_TOKEN, BLUESKY_APP_PASSWORD, and the escrow
+  //   target secrets named in ESCROW_TARGETS
+  "observability": { "enabled": true }
+}

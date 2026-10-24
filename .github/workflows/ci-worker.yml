@@ -1,0 +1,39 @@
+name: CI worker
+
+on:
+  pull_request:
+    paths: ["worker/**", "contracts/**", ".github/workflows/ci-worker.yml"]
+  push:
+    branches: [main]
+    paths: ["worker/**", "contracts/**", ".github/workflows/ci-worker.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-worker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  worker:
+    name: worker (Cloudflare)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+      - name: Install (locked)
+        run: npm ci
+      - name: Types
+        run: npm run typecheck
+      - name: Tests (real workerd + D1 via Miniflare)
+        run: npm test
+      - name: Bundle builds under the free-plan size limit
+        run: npx wrangler deploy --dry-run --outdir dist

@@ -1,0 +1,103 @@
+{
+  "version": "3.0",
+  "status": "in_progress",
+  "tracked_in": "MASTER_PLAN.md phase P14; source docs/OPPORTUNITY_INTERNET_PLAN.md",
+  "tasks": [
+    {
+      "id": "P14-01",
+      "title": "Organization boundary (one node per org)",
+      "implementation": "built",
+      "status": "open",
+      "github_issue": 157,
+      "evidence": []
+    },
+    {
+      "id": "P14-02",
+      "title": "Missions: /help, /requests, /cancel, /desk",
+      "implementation": "built",
+      "status": "open",
+      "github_issue": 158,
+      "evidence": []
+    },
+    {
+      "id": "P14-03",
+      "title": "Capability offers + atomic capacity",
+      "implementation": "built",
+      "status": "open",
+      "github_issue": 159,
+      "evidence": []
+    },
+    {
+      "id": "P14-04",
+      "title": "Consent grants + disclosure preview",
+      "implementation": "built",
+      "status": "open",
+      "github_issue": 160,
+      "evidence": []
+    },
+    {
+      "id": "P14-05",
+      "title": "Manual partner gateway E0",
+      "implementation": "built",
+      "status": "open",
+      "github_issue": 161,
+      "evidence": []
+    },
+    {
+      "id": "P14-06",
+      "title": "Signed federation transport",
+      "implementation": "built",
+      "status": "open",
+      "github_issue": 162,
+      "evidence": []
+    },
+    {
+      "id": "P14-07",
+      "title": "Outcome receipts + operator report",
+      "implementation": "built",
+      "status": "open",
+      "github_issue": 163,
+      "evidence": []
+    },
+    {
+      "id": "P14-08",
+      "title": "Protocol contract + conformance",
+      "implementation": "built",
+      "status": "open",
+      "github_issue": 164,
+      "evidence": []
+    },
+    {
+      "id": "P14-09",
+      "title": "Clearing ledger + paid programs",
+      "implementation": "built",
+      "status": "open",
+      "github_issue": 165,
+      "evidence": []
+    },
+    {
+      "id": "P14-10",
+      "title": "Gap signals -> new capacity",
+      "implementation": "built",
+      "status": "open",
+      "github_issue": 166,
+      "evidence": []
+    },
+    {
+      "id": "P14-11",
+      "title": "Owner: job research, partner commitment, first exchange",
+      "implementation": "tooling_built_owner_task_open",
+      "status": "open",
+      "github_issue": 167,
+      "evidence": []
+    },
+    {
+      "id": "P14-12",
+      "title": "Federation maturity: key rotation, A2A, trust registry",
+      "implementation": "built",
+      "status": "open",
+      "github_issue": 168,
+      "evidence": []
+    }
+  ]
+}

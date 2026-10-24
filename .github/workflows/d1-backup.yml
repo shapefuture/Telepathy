@@ -1,0 +1,58 @@
+# Weekly encrypted backup of D1, stored off Cloudflare as a workflow artifact.
+# The repo is PUBLIC: the export is encrypted with your age public key BEFORE upload and the
+# job refuses to run without one. Only the holder of the private key can read it.
+# Enable: variables D1_BACKUP=true and AGE_RECIPIENT=age1...; secrets CLOUDFLARE_API_TOKEN,
+#         CLOUDFLARE_ACCOUNT_ID; variable D1_DATABASE_ID.
+name: D1 backup
+
+on:
+  schedule:
+    - cron: "41 2 * * 0" # Sundays 02:41 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    if: vars.D1_BACKUP == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      AGE_RECIPIENT: ${{ vars.AGE_RECIPIENT }}
+    steps:
+      - name: Require an encryption key
+        run: |
+          case "$AGE_RECIPIENT" in age1*) ;; *) echo "AGE_RECIPIENT must be an age public key"; exit 1;; esac
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+      - run: npm ci
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq age
+      - name: Point wrangler.jsonc at the real D1 database
+        run: sed -i "s/00000000-0000-0000-0000-000000000000/${{ vars.D1_DATABASE_ID }}/" wrangler.jsonc
+      - name: Export and encrypt (plaintext never leaves the runner)
+        run: |
+          umask 077
+          name="telepathy-$(date -u +%Y%m%dT%H%M%SZ)"
+          npx wrangler d1 export telepathy --remote --output "$RUNNER_TEMP/$name.sql" > /dev/null
+          age -r "$AGE_RECIPIENT" -o "$RUNNER_TEMP/$name.sql.age" "$RUNNER_TEMP/$name.sql"
+          sha256sum "$RUNNER_TEMP/$name.sql" | cut -d' ' -f1 > "$RUNNER_TEMP/$name.plain.sha256"
+          shred -u "$RUNNER_TEMP/$name.sql"
+          echo "BACKUP_NAME=$name" >> "$GITHUB_ENV"
+          ls -l "$RUNNER_TEMP/$name.sql.age" | awk '{print "encrypted size:", $5}'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BACKUP_NAME }}
+          path: |
+            ${{ runner.temp }}/${{ env.BACKUP_NAME }}.sql.age
+            ${{ runner.temp }}/${{ env.BACKUP_NAME }}.plain.sha256
+          retention-days: 30
+          if-no-files-found: error

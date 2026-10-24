@@ -1,0 +1,39 @@
+# systemd unit (P11-05). Install:
+#   sudo useradd --system --home /var/lib/telepathy telepathy
+#   sudo install -d -o telepathy -m 700 /var/lib/telepathy /etc/telepathy
+#   sudo install -m 600 -o telepathy .env /etc/telepathy/telepathy.env
+#   sudo cp deploy/telepathy.service /etc/systemd/system/ && sudo systemctl enable --now telepathy
+[Unit]
+Description=Telepathy community bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=telepathy
+WorkingDirectory=/opt/telepathy
+EnvironmentFile=/etc/telepathy/telepathy.env
+Environment=TELEPATHY_DB_PATH=/var/lib/telepathy/telepathy.db
+Environment=TELEPATHY_BACKUP_DIR=/var/lib/telepathy/backups
+ExecStartPre=/opt/telepathy/.venv/bin/telepathy migrate
+ExecStart=/opt/telepathy/.venv/bin/telepathy run
+# SIGTERM -> aiogram stops polling, worker is cancelled, WAL is checkpointed, DB closed.
+KillSignal=SIGTERM
+TimeoutStopSec=30
+Restart=on-failure
+RestartSec=5
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/telepathy
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,118 @@
+{
+  "version": "5.0",
+  "status": "built",
+  "tracked_in": "MASTER_PLAN.md phase P16; source docs/HYDRA_PLAN.md",
+  "order": [
+    "H0",
+    "H1",
+    "H3",
+    "H2",
+    "H4",
+    "H5",
+    "H6",
+    "H7",
+    "H8"
+  ],
+  "tasks": [
+    {
+      "id": "H0",
+      "title": "Head model: failure domains, k-path coverage, hydra index, regrowth ratio",
+      "implementation": "built",
+      "status": "open",
+      "evidence": [
+        "worker/test/hydra.test.ts",
+        "tests/test_hydra_conformance.py"
+      ],
+      "pending": "independent review; drill with a pilot club"
+    },
+    {
+      "id": "H1",
+      "title": "More delivery heads: Web Push, ntfy, signed RSS/iCal, Matrix, second email provider",
+      "implementation": "built",
+      "status": "open",
+      "evidence": [
+        "worker/test/hydra.test.ts",
+        "tests/test_hydra_conformance.py"
+      ],
+      "pending": "independent review; drill with a pilot club"
+    },
+    {
+      "id": "H2",
+      "title": "More login heads: TOTP, magic link over any head, device key, passkeys later",
+      "implementation": "built",
+      "status": "open",
+      "evidence": [
+        "worker/test/hydra.test.ts",
+        "tests/test_hydra_conformance.py"
+      ],
+      "pending": "independent review; drill with a pilot club"
+    },
+    {
+      "id": "H3",
+      "title": "Regrowth engine + canaries: reroute, add-two-heads invitations, playbooks",
+      "implementation": "built",
+      "status": "open",
+      "evidence": [
+        "worker/test/hydra.test.ts",
+        "tests/test_hydra_conformance.py"
+      ],
+      "pending": "independent review; drill with a pilot club"
+    },
+    {
+      "id": "H4",
+      "title": "Hosting and data multi-homing: second account, non-Cloudflare node, mirrors, 3-2-1 escrow, Shamir",
+      "implementation": "built",
+      "status": "open",
+      "evidence": [
+        "worker/test/hydra.test.ts",
+        "tests/test_hydra_conformance.py"
+      ],
+      "pending": "independent review; drill with a pilot club"
+    },
+    {
+      "id": "H5",
+      "title": "Member-held proof: countersigned follow receipts, social recovery",
+      "implementation": "built",
+      "status": "open",
+      "evidence": [
+        "worker/test/hydra.test.ts",
+        "tests/test_hydra_conformance.py"
+      ],
+      "pending": "independent review; drill with a pilot club"
+    },
+    {
+      "id": "H6",
+      "title": "Anchors and gossip: DNS/Nostr/AT/public repo/Archive, partner gossip, recovery cards",
+      "implementation": "built",
+      "status": "open",
+      "evidence": [
+        "worker/test/hydra.test.ts",
+        "tests/test_hydra_conformance.py"
+      ],
+      "pending": "independent review; drill with a pilot club"
+    },
+    {
+      "id": "H7",
+      "title": "Sealed relocation (k-of-n dead man's switch) + chaos calendar",
+      "implementation": "built",
+      "status": "open",
+      "evidence": [
+        "worker/test/hydra.test.ts",
+        "tests/test_hydra_conformance.py"
+      ],
+      "pending": "independent review; drill with a pilot club"
+    },
+    {
+      "id": "H8",
+      "title": "Conformance: SDK and vectors for heads, receipts, anchors, gossip",
+      "implementation": "built",
+      "status": "open",
+      "evidence": [
+        "worker/test/hydra.test.ts",
+        "tests/test_hydra_conformance.py",
+        "contracts/test-vectors/hydra-v1.json"
+      ],
+      "pending": "independent review; drill with a pilot club"
+    }
+  ]
+}

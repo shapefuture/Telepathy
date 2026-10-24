@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "name": "Telepathy Community Intelligence OS",
+  "repository": "shapefuture/Telepathy",
+  "tracker": "github_issues",
+  "status": "implementation_in_progress",
+  "requirements": {
+    "REQ-01": {
+      "task_ids": [
+        "P02-01",
+        "P03-01",
+        "P03-10"
+      ],
+      "github_issue_numbers": [
+        35,
+        45,
+        54
+      ]
+    },
+    "REQ-02": {
+      "task_ids": [
+        "P04-01",
+        "P04-10"
+      ],
+      "github_issue_numbers": [
+        55,
+        64
+      ]
+    },
+    "REQ-03": {
+      "task_ids": [
+        "P05-01",
+        "P05-10"
+      ],
+      "github_issue_numbers": [
+        65,
+        74
+      ]
+    },
+    "REQ-04": {
+      "task_ids": [
+        "P06-01",
+        "P06-10"
+      ],
+      "github_issue_numbers": [
+        75,
+        84
+      ]
+    },
+    "REQ-05": {
+      "task_ids": [
+        "P07-01",
+        "P07-10"
+      ],
+      "github_issue_numbers": [
+        85,
+        94
+      ]
+    },
+    "REQ-06": {
+      "task_ids": [
+        "P08-01",
+        "P08-10"
+      ],
+      "github_issue_numbers": [
+        95,
+        104
+      ]
+    },
+    "REQ-07": {
+      "task_ids": [
+        "P09-01",
+        "P09-10"
+      ],
+      "github_issue_numbers": [
+        105,
+        114
+      ]
+    },
+    "REQ-08": {
+      "task_ids": [
+        "P10-01",
+        "P10-10"
+      ],
+      "github_issue_numbers": [
+        115,
+        124
+      ]
+    },
+    "REQ-09": {
+      "task_ids": [
+        "P00-02",
+        "P02-10",
+        "P11-10"
+      ],
+      "github_issue_numbers": [
+        15,
+        44,
+        134
+      ]
+    },
+    "REQ-10": {
+      "task_ids": [
+        "P01-05",
+        "P02-01",
+        "P11-05"
+      ],
+      "github_issue_numbers": [
+        28,
+        35,
+        129
+      ]
+    },
+    "REQ-11": {
+      "task_ids": [
+        "P01-08",
+        "P12-09"
+      ],
+      "github_issue_numbers": [
+        31,
+        143
+      ]
+    },
+    "REQ-12": {
+      "task_ids": [
+        "P12-01",
+        "P12-10"
+      ],
+      "github_issue_numbers": [
+        135,
+        144
+      ]
+    }
+  },
+  "phase_issue_numbers": {
+    "P00": 1,
+    "P01": 2,
+    "P02": 3,
+    "P03": 4,
+    "P04": 5,
+    "P05": 6,
+    "P06": 7,
+    "P07": 8,
+    "P08": 9,
+    "P09": 10,
+    "P10": 11,
+    "P11": 12,
+    "P12": 13
+  },
+  "authorization": {
+    "production_deployment": false,
+    "real_community_ingest": false,
+    "external_model_send_real_content": false
+  },
+  "quality_gates": [
+    "QG01",
+    "QG02",
+    "QG03",
+    "QG04",
+    "QG05",
+    "QG06",
+    "QG07",
+    "QG08",
+    "QG09",
+    "QG10"
+  ]
+}

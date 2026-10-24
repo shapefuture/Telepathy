@@ -194,7 +194,13 @@ async function onMessage(app: App, msg: TgMessage, edited: boolean): Promise<str
     const keys: string[] = [];
     const mentioned = edited ? null : mentionQuestion(msg, app.env.BOT_USERNAME);
     // Answer before storing, so the question can't match itself.
-    if (mentioned) keys.push(...(await groupAsk(app, msg, mentioned)));
+    if (mentioned) {
+      try {
+        keys.push(...(await groupAsk(app, msg, mentioned)));
+      } catch (e) {
+        if (!(e instanceof DefiniteFailure)) throw e; // a refused reply must not lose the message itself
+      }
+    }
     keys.push(...(await ingest(app, msg, edited)));
     return keys;
   }

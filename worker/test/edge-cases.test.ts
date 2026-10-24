@@ -90,4 +90,19 @@ describe("a Telegram failure in one part of an update doesn't skip the rest", ()
     expect((await access(42))?.revoked_at).toBeNull();
   });
 
+  it("a group message that mentions the bot is stored even if the reply can't be posted", async () => {
+    const t = testApp();
+    await enableGroup(t.app);
+    const fetcher = async (url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body ?? "{}"));
+      if (url.endsWith("/sendMessage") && body.chat_id === GROUP) return Response.json({ ok: false, error_code: 400, description: "Bad Request: not enough rights to send text messages to the chat" });
+      return t.fetcher(url, init);
+    };
+    const app = makeApp({ ...(env as any), BOT_USERNAME: "tp_bot" }, fetcher);
+    const text = "@tp_bot where is the bicycle parking downtown";
+    const u = groupMsg(43, text, { entities: [{ type: "mention", offset: 0, length: 7 }] });
+    await handleUpdate(app, { update_id: nextUpdate(), ...u } as any).catch(() => undefined); // the webhook answers "ok" to a DefiniteFailure
+    const row = await env.DB.prepare("SELECT body FROM passages WHERE msg_id=?").bind(u.message.message_id).first<{ body: string }>();
+    expect(row?.body).toBe(text);
+  });
 });

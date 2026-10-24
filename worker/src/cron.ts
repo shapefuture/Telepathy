@@ -1,6 +1,7 @@
 // Scheduled work (every 5 minutes). Each step is idempotent and bounded so one run stays
 // inside the free plan's CPU and subrequest limits; leftovers are picked up next run.
 
+import { pruneCache } from "./ai/cache";
 import type { App } from "./bot";
 import { digestStep } from "./digest";
 import { routeUnanswered, suggestSkills } from "./features";
@@ -51,6 +52,7 @@ export async function runCron(base: App, now = new Date()): Promise<Record<strin
   await step("expired", async () => (await expireDue(app.db, nowIso(now))).length);
   await step("reminders", async () => (await sendReminders(app.db, nowIso(now))).length);
   await step("digest", async () => (await digestStep(app.db, now, timezone(app.env), digestHour(app.env))).keys.length);
+  await step("ai_cache", () => pruneCache(app.db, now));
   await step("retention", async () => {
     const today = localParts(now, timezone(app.env)).date;
     const last = await app.db.prepare("SELECT value FROM settings WHERE key='retention.day'").first<{ value: string }>();

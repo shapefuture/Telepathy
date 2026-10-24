@@ -21,6 +21,7 @@ import { cmdPassport, CONTINUITY_OWNER, ownerContinuity } from "./continuity/bot
 import { hydraStatus } from "./hydra/bot";
 import { touchOwners } from "./hydra/notices";
 import { assistCallback, cmdHelpNeed, forgetMissions, listMissions, ownerAssistCommand, OWNER_COMMANDS } from "./assist/bot";
+import { brief } from "./ai/beam";
 import { answer, parseFilters, renderAnswer } from "./search";
 import type { Fetcher, InlineButton, Telegram } from "./telegram";
 import { DefiniteFailure } from "./telegram";
@@ -251,7 +252,8 @@ async function groupAsk(app: App, msg: TgMessage, question: string): Promise<str
   const f = await parseFilters(app.db, new Set([source.id]), question);
   const a = await answer(app.db, f.readable, f.query, f.filters);
   const answerId = a.status === "answered" ? await recordAnswer(app.db, asker.id, a.quotes.map((q) => q.id)) : undefined;
-  const r = renderAnswer(a, timezone(app.env), lang, { scope: "group", answerId });
+  const ai = a.status === "answered" ? await brief(app, f.readable, f.query, a.quotes, lang) : null;
+  const r = renderAnswer(a, timezone(app.env), lang, { scope: "group", answerId, brief: ai });
   await reply(app, msg.chat.id, r.text, r.buttons, msg.message_id);
   return [];
 }
@@ -469,7 +471,8 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
       const f = await parseFilters(app.db, await readable(app.db, mem), args);
       const a = await answer(app.db, f.readable, f.query, f.filters);
       const answerId = a.status === "answered" ? await recordAnswer(app.db, mem.id, a.quotes.map((q) => q.id)) : undefined;
-      const r = renderAnswer(a, timezone(app.env), lang, { answerId });
+      const ai = a.status === "answered" ? await brief(app, f.readable, f.query, a.quotes, lang) : null;
+      const r = renderAnswer(a, timezone(app.env), lang, { answerId, brief: ai });
       await reply(app, chat, r.text, r.buttons);
       return [];
     }

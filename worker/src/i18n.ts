@@ -98,6 +98,7 @@ const EN = {
 
   // search
   askUsage: "Usage: <code>/ask your question</code>",
+  aiNote: "AI summary — check it against the sources below.",
   noAccess: "I don't have any community sources you're allowed to read yet. Post in an enabled group first, or ask an admin.",
   insufficient: "<b>No reliable answer found</b> in sources you can access.\nTry different wording, or ask the community directly.",
   insufficientGroup: "<b>No reliable answer found</b> in this group.\nTry different wording.",
@@ -334,7 +335,8 @@ const RU: Messages = {
   hint: (link: string) => `💡 Похоже, здесь уже отвечали на это: ${link}`,
   earlierAnswer: "прошлое обсуждение",
 
-  askUsage: "Использование: <code>/ask ваш вопрос</code>",
+  askUsage: "Напиши вопрос после <code>/ask</code> — или просто отправь его мне в личку.",
+  aiNote: "Кратко от ИИ — сверься с источниками ниже.",
   noAccess: "Пока нет источников, которые вам разрешено читать. Сначала напишите в подключённой группе или обратитесь к админу.",
   insufficient: "<b>Надёжного ответа не нашлось</b> в доступных вам источниках.\nПопробуйте переформулировать или спросите в сообществе.",
   insufficientGroup: "<b>Надёжного ответа не нашлось</b> в этой группе.\nПопробуйте переформулировать.",

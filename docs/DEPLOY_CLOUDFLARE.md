@@ -110,7 +110,11 @@ or upload it anywhere.
    100,000 daily D1 writes, which leaves room for live traffic. Re-running a file is safe.
    Members who used `/forget_me` are skipped, and names are never stored.
 
-## 4. Free-plan capacity (measured in tests)
+## 4. Optional: AI summaries
+
+See [AI.md](AI.md). Off until you run `npx wrangler secret put OLLAMA_API_KEY`.
+
+## 5. Free-plan capacity (measured in tests)
 
 | Resource | Free limit | Telepathy usage | What it means |
 |---|---|---|---|
@@ -126,7 +130,7 @@ and [D1 limits](https://developers.cloudflare.com/d1/platform/limits) pages (che
 they can change). If you outgrow them, Workers Paid starts at $5/month and raises D1 to 10 GB per
 database. No code changes are needed.
 
-## 5. Daily operation
+## 6. Daily operation
 
 | When | What happens |
 |---|---|
@@ -141,7 +145,7 @@ HTTP (needs `Authorization: Bearer <ADMIN_TOKEN>`): `GET /admin/status`, `POST /
 
 Logs: `npx wrangler tail`. Message contents are never logged.
 
-## 6. Backups and restore
+## 7. Backups and restore
 
 - **Point-in-time restore (built into D1):** `npx wrangler d1 time-travel info telepathy`, then
   `npx wrangler d1 time-travel restore telepathy --timestamp=<ISO time>`. Check Cloudflare's
@@ -157,7 +161,7 @@ Logs: `npx wrangler tail`. Message contents are never logged.
   load the export with `wrangler d1 execute telepathy-restore --remote --file backup.sql`, and
   spot-check row counts.
 
-## 7. Upgrades and rollback
+## 8. Upgrades and rollback
 
 ```bash
 git pull && cd worker && npm ci && npm test
@@ -167,7 +171,7 @@ npm run deploy
 Roll back code with `npx wrangler rollback`. Migrations are never rolled back. If one ever has
 to be undone, use Time Travel to restore the database to just before it.
 
-## 8. Incidents
+## 9. Incidents
 
 | Symptom | Action |
 |---|---|
@@ -180,14 +184,14 @@ to be undone, use Time Travel to restore the database to just before it.
 | Group upgraded to a supergroup | Handled automatically: the bot follows Telegram's migration notice to the new chat id. Check `/sources`. |
 | A member asks for deletion | They use `/forget_me` themselves, or reply `/forget` to one message. |
 
-## 9. GitHub Actions (optional) and running without it
+## 10. GitHub Actions (optional) and running without it
 
 Automatic deploys, weekly encrypted backups and PDF/DOCX/PPTX parsing can run on GitHub's
 runners. Each is off until you set its variable. Every one of them also has a no-Actions path
 (Cloudflare Workers Builds, `scripts/backup-local.sh`, `scripts/offload-local.sh`,
 `scripts/check.sh`). See [`GITHUB_ACTIONS.md`](GITHUB_ACTIONS.md#if-your-actions-minutes-run-out).
 
-## 10. Assistance desk and partner gateway
+## 11. Assistance desk and partner gateway
 
 Members ask with `/help <need>`; owners work the desk with `/desk`, publish capacity with
 `/offer`, and connect partner communities with `/partner`. All of it works locally with
@@ -200,7 +204,7 @@ npx wrangler secret put FEDERATION_PRIVATE_KEY     # paste the private key
 npm run db:migrate:remote && npm run deploy
 ```
 
-## 11. What's different from the Python version
+## 12. What's different from the Python version
 
 | Python v1 (Linux host) | Worker v2 (this runbook) |
 |---|---|

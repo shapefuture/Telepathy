@@ -78,6 +78,13 @@ export interface Env {
   ESCROW_TARGETS?: string;
   /** Optional R2 bucket binding for one escrow copy (a second storage kind next to D1). */
   ESCROW_R2?: R2Bucket;
+  // ---- AI summaries (off until OLLAMA_API_KEY is set; docs/AI.md) ----
+  /** Secret: Ollama Cloud API key. Only redacted conversation text is sent. */
+  OLLAMA_API_KEY?: string;
+  /** Model name, default "beam" (some accounts need "beam:cloud"). */
+  BEAM_MODEL?: string;
+  /** API origin, default https://ollama.com. */
+  OLLAMA_URL?: string;
 }
 
 export function ownerIds(env: Env): Set<number> {

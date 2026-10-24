@@ -76,7 +76,27 @@ and `/retention 0` returns to keep-all.
 
 ## 3. Import past history
 
-Bots only see messages sent after they joined. To add older history:
+Bots only see messages sent after they joined. There are two ways to add older history.
+
+**Automatic (recommended): fetch it with your own account.** This needs no export file. It runs
+on your computer, and your login and the messages stay there.
+
+1. Get `api_id` and `api_hash` at <https://my.telegram.org> → *API development tools*.
+2. Enable the group (step 2), then run:
+   ```bash
+   export TG_API_ID=... TG_API_HASH=...
+   npm run backfill -- --chat @yourgroup        # first time: your phone number + login code
+   npm run import -- backfill/chat123.json --chat-id -100123   # the line it prints
+   npx wrangler d1 execute telepathy --remote --file import/part-001.sql
+   ```
+3. Run `npm run backfill -- --chat @yourgroup` again any time. It fetches only new messages
+   since the last run.
+
+Your account must be a member of the group and able to see its history. Keep
+`~/.telepathy-backfill.session` private: it is a login to your Telegram account. Don't commit it
+or upload it anywhere.
+
+**Manual: Telegram Desktop export.**
 
 1. In Telegram Desktop: open the group → ⋮ → **Export chat history** → format **JSON**. Untick
    media to keep the file small.

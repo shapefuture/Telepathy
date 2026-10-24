@@ -48,8 +48,8 @@ interface CallbackQuery {
 interface ChatMemberUpdated {
   chat: { id: number; type: string; title?: string };
   from: TgUser;
-  old_chat_member?: { status: string; user: TgUser };
-  new_chat_member: { status: string; user: TgUser };
+  old_chat_member?: { status: string; user: TgUser; is_member?: boolean };
+  new_chat_member: { status: string; user: TgUser; is_member?: boolean };
 }
 interface ChatJoinRequest {
   chat: { id: number; type: string; title?: string };
@@ -801,14 +801,15 @@ async function onBotMembership(app: App, ev: ChatMemberUpdated): Promise<string[
 
 /** Leaving a group revokes read access to it (C06); joining grants it. */
 const IN = ["member", "administrator", "creator", "restricted"];
+// A restricted person who leaves stays "restricted" with is_member false (Bot API ChatMemberRestricted).
+const inChat = (cm?: { status: string; is_member?: boolean }) => !!cm && IN.includes(cm.status) && !(cm.status === "restricted" && cm.is_member === false);
 async function onChatMember(app: App, ev: ChatMemberUpdated): Promise<string[]> {
   // Newly joined (not a promotion or restriction change): a short welcome, privately when possible.
-  const was = ev.old_chat_member?.status ?? "left";
-  if (IN.includes(ev.new_chat_member.status) && !IN.includes(was)) await welcomeJoiner(app, ev.chat.id, ev.new_chat_member.user);
+  if (inChat(ev.new_chat_member) && !inChat(ev.old_chat_member)) await welcomeJoiner(app, ev.chat.id, ev.new_chat_member.user);
   const src = await enabledSource(app.db, ev.chat.id);
   const m = src ? await memberByTg(app.db, ev.new_chat_member.user.id) : null;
   if (!src || !m) return [];
-  if (["left", "kicked"].includes(ev.new_chat_member.status)) await revoke(app.db, src.id, m.id);
-  else if (["member", "administrator", "creator", "restricted"].includes(ev.new_chat_member.status)) await grantStatement(app.db, src.id, m.id).run();
+  if (!inChat(ev.new_chat_member)) await revoke(app.db, src.id, m.id);
+  else await grantStatement(app.db, src.id, m.id).run();
   return [];
 }

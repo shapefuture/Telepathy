@@ -848,3 +848,14 @@ describe("H8 conformance: the Worker and the SDK agree with the shared Hydra vec
     for (const c of V.totp.cases) expect(await totp(secret, c.step)).toBe(c.expect);
   });
 });
+
+describe("audit: login enumeration", () => {
+  it("an email login ticket has the same shape whether or not the address is registered", async () => {
+    const n = node();
+    await setup(n, 90);
+    await member(n, 90, "m90@proton.me");
+    const uuidish = /^[0-9a-f]{12}4[0-9a-f]{3}[89ab][0-9a-f]{15}$/;
+    expect((await n.http("POST", "/portal/api/login", { email: "m90@proton.me" }, P)).json.ticket).toMatch(uuidish);
+    for (let i = 0; i < 8; i++) expect((await n.http("POST", "/portal/api/login", { email: `nobody${i}@proton.me` }, P)).json.ticket).toMatch(uuidish);
+  });
+});

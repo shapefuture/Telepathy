@@ -71,7 +71,9 @@ export async function handlePortal(req: Request, app: App): Promise<Response> {
   if (route === "login" && req.method === "POST") {
     const r = await requestLogin(app, String(body.email ?? ""));
     // Same answer whether or not the address is registered: a ticket either way.
-    const ticket = r.registrationId ?? (await hmacHex(app.env.CONTINUITY_KEY, "fake", String(body.email ?? ""))).slice(0, 32);
+    // The fake has the shape of a real one (newId: a UUID v4 without dashes).
+    const f = await hmacHex(app.env.CONTINUITY_KEY, "fake", String(body.email ?? ""));
+    const ticket = r.registrationId ?? `${f.slice(0, 12)}4${f.slice(13, 16)}${"89ab"[parseInt(f[16]!, 16) & 3]}${f.slice(17, 32)}`;
     return json({ ok: true, ticket });
   }
   if (route === "verify" && req.method === "POST") {

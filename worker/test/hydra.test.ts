@@ -927,7 +927,7 @@ describe("audit: verifying an address", () => {
   });
 });
 
-describe("audit: malformed receipts", () => {
+describe("audit: malformed input", () => {
   it("receipts with broken signature lists are rejected, not a crash", async () => {
     const n = node();
     await setup(n, 97);
@@ -936,5 +936,14 @@ describe("audit: malformed receipts", () => {
     const r = await portal("POST", "receipts", { receipts: [{ signed, signatures: [null] }, { signed, signatures: 7 }, { signed, signatures: [{ keyid: 1, sig: {} }] }] });
     expect(r.status).toBe(200);
     expect(r.json).toMatchObject({ applied: 0, rejected: 3 });
+  });
+
+  it("a portal request whose JSON body is null or a number gets an answer, not a crash", async () => {
+    const n = node();
+    await setup(n, 98);
+    for (const body of [null, 5]) {
+      expect((await n.http("POST", "/portal/api/login", body, P)).json).toMatchObject({ ok: true });
+      expect((await n.http("POST", "/portal/api/login/totp", body, P)).status).toBe(401);
+    }
   });
 });

@@ -64,7 +64,8 @@ export async function handlePortal(req: Request, app: App): Promise<Response> {
   }
   if (!p.startsWith("/portal/api/")) return new Response("not found", { status: 404 });
   if (req.method === "POST" && req.headers.get("x-portal") !== "1") return json({ error: "forbidden" }, 403);
-  const body = req.method === "POST" ? ((await req.json().catch(() => ({}))) as Record<string, unknown>) : {};
+  const parsed: unknown = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+  const body = (parsed && typeof parsed === "object" ? parsed : {}) as Record<string, unknown>;
   const route = p.slice("/portal/api/".length);
 
   // ---- unauthenticated: start a login ----

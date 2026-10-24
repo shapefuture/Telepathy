@@ -183,20 +183,44 @@ export async function useRecoveryCode(env: Env, db: D1Database, code: string, no
   return r?.person_id ?? null;
 }
 
-export async function newSession(env: Env, db: D1Database, personId: string, method: string, now = new Date()): Promise<string> {
+/** Login methods that can arrive in the same inbox count as one factor. */
+export const factorOf = (method: string) => (method === "email_code" || method === "head_code" ? "code" : method);
+const STRONG_WINDOW_MS = 15 * 60_000;
+
+/** `priorToken`: the session this browser already had, if any; a login made on top of it is linked. */
+export async function newSession(env: Env, db: D1Database, personId: string, method: string, now = new Date(), priorToken?: string | null): Promise<string> {
   const token = randomToken();
-  await db.prepare("INSERT INTO sessions(token_hash, person_id, method, created_at, expires_at) VALUES (?,?,?,?,?)").bind(await hmacHex(env.CONTINUITY_KEY, "session", token), personId, method, nowIso(now), nowIso(new Date(now.getTime() + SESSION_DAYS * DAY))).run();
+  let parent: string | null = null;
+  if (priorToken) {
+    const h = await hmacHex(env.CONTINUITY_KEY, "session", priorToken);
+    const prior = await db.prepare("SELECT token_hash FROM sessions WHERE token_hash=? AND person_id=? AND revoked_at IS NULL AND expires_at>?").bind(h, personId, nowIso(now)).first<{ token_hash: string }>();
+    parent = prior?.token_hash ?? null;
+  }
+  await db
+    .prepare("INSERT INTO sessions(token_hash, person_id, method, created_at, expires_at, parent_hash) VALUES (?,?,?,?,?,?)")
+    .bind(await hmacHex(env.CONTINUITY_KEY, "session", token), personId, method, nowIso(now), nowIso(new Date(now.getTime() + SESSION_DAYS * DAY)), parent)
+    .run();
   return token;
 }
 
+/** `methods`: the factors used in THIS browser's chain of logins within the last 15 minutes. */
 export async function sessionPerson(env: Env, db: D1Database, token: string | null, now = nowIso()): Promise<{ personId: string; methods: string[] } | null> {
   if (!token) return null;
   const h = await hmacHex(env.CONTINUITY_KEY, "session", token);
   const s = await db.prepare("SELECT s.person_id FROM sessions s JOIN people p ON p.id=s.person_id WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>? AND p.removed_at IS NULL").bind(h, now).first<{ person_id: string }>();
   if (!s) return null;
-  // Methods used recently by this person (strong auth = two different factors within 15 minutes).
-  const { results } = await db.prepare("SELECT DISTINCT method FROM sessions WHERE person_id=? AND revoked_at IS NULL AND created_at>?").bind(s.person_id, nowIso(new Date(Date.parse(now) - 15 * 60_000))).all<{ method: string }>();
-  return { personId: s.person_id, methods: results.map((r) => r.method) };
+  const since = nowIso(new Date(Date.parse(now) - STRONG_WINDOW_MS));
+  const { results } = await db
+    .prepare(
+      "WITH RECURSIVE chain(token_hash, parent_hash, method, created_at, depth) AS (" +
+        "SELECT token_hash, parent_hash, method, created_at, 0 FROM sessions WHERE token_hash=? " +
+        "UNION ALL SELECT x.token_hash, x.parent_hash, x.method, x.created_at, c.depth+1 FROM sessions x JOIN chain c ON x.token_hash=c.parent_hash " +
+        "WHERE x.person_id=? AND x.revoked_at IS NULL AND c.depth<5) " +
+        "SELECT DISTINCT method FROM chain WHERE created_at>?",
+    )
+    .bind(h, s.person_id, since)
+    .all<{ method: string }>();
+  return { personId: s.person_id, methods: [...new Set(results.map((r) => factorOf(r.method)))] };
 }
 
 export async function endSession(env: Env, db: D1Database, token: string): Promise<void> {

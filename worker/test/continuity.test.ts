@@ -304,7 +304,18 @@ describe("CONT-6 alerts, CONT-9 drills and metrics", () => {
     const v = await n.http("POST", "/portal/api/verify", { ticket: t, code: codeIn(n.mails.at(-1)!.text) }, P);
     let cookie = /tp_s=[^;]+/.exec(v.cookie!)![0];
     expect((await n.http("POST", "/portal/api/alert", { kind: "relocation" }, { ...P, cookie })).json.reason).toBe("strong_auth_required");
-    const rc = await n.http("POST", "/portal/api/recover", { code: codes[1] }, P);
+    // A second method in another browser (no cookie) doesn't strengthen anyone's session.
+    const elsewhere = await n.http("POST", "/portal/api/recover", { code: codes[0] }, P);
+    expect((await n.http("POST", "/portal/api/alert", { kind: "relocation" }, { ...P, cookie })).json.reason).toBe("strong_auth_required");
+    const other = /tp_s=[^;]+/.exec(elsewhere.cookie!)![0];
+    expect((await n.http("POST", "/portal/api/alert", { kind: "relocation" }, { ...P, cookie: other })).json.reason).toBe("strong_auth_required");
+    // The same method twice is still one factor.
+    const t2 = (await n.http("POST", "/portal/api/login", { email: "owner@example.com" }, P)).json.ticket;
+    const v2 = await n.http("POST", "/portal/api/verify", { ticket: t2, code: codeIn(n.mails.at(-1)!.text) }, { ...P, cookie });
+    cookie = /tp_s=[^;]+/.exec(v2.cookie!)![0];
+    expect((await n.http("POST", "/portal/api/alert", { kind: "relocation" }, { ...P, cookie })).json.reason).toBe("strong_auth_required");
+    // A different method in the same browser, on top of that session: strong.
+    const rc = await n.http("POST", "/portal/api/recover", { code: codes[1] }, { ...P, cookie });
     cookie = /tp_s=[^;]+/.exec(rc.cookie!)![0];
     const a = await n.http("POST", "/portal/api/alert", { kind: "relocation", note: "new home" }, { ...P, cookie });
     expect(a.json).toMatchObject({ ok: true });

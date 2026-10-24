@@ -116,7 +116,9 @@ describe("requester side: our member's mission reaches a partner (S4)", () => {
     expect(Object.keys(inq.body.body).sort()).toEqual(["allowed_fields", "criteria", "forwarding", "job", "max_hops", "mission_ref", "policy_version", "purpose", "summary"]);
     const wire = JSON.stringify(inq.body);
     const alice = (await q<{ id: string }>("SELECT id FROM members WHERE tg_id=?", ALICE))!.id;
-    for (const secret of [String(ALICE), alice, mid, "tg://", "-1001234"]) expect(wire).not.toContain(secret); // I05: no identifiers
+    for (const secret of [alice, mid, "tg://", "-1001234"]) expect(wire).not.toContain(secret); // I05: no identifiers
+    // The Telegram id as a standalone value (signatures and timestamps may contain the digits).
+    expect(JSON.stringify(inq.body.body)).not.toMatch(new RegExp(`(^|[^0-9A-Za-z])${ALICE}([^0-9A-Za-z]|$)`));
     expect(inq.body.body.mission_ref).not.toBe(mid);
 
     // Club B offers.

@@ -17,6 +17,7 @@ export interface Mission {
   handler: string;
   local_hits: number;
   reason: string | null;
+  case_type?: string | null;
   created_at: string;
   updated_at: string;
   expires_at: string;

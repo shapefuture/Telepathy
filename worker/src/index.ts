@@ -71,7 +71,7 @@ export async function handleFetch(req: Request, env: Env, fetcher?: Fetcher, net
       return r.response;
     }
   }
-  if (url.pathname === "/app" || url.pathname.startsWith("/app/api/")) return handleApp(req, env);
+  if (url.pathname === "/app" || url.pathname.startsWith("/app/api/")) return handleApp(req, env, fetcher, net);
 
   if (req.method === "POST" && url.pathname === "/telegram") {
     // Telegram echoes the secret we registered with setWebhook (P11-02).

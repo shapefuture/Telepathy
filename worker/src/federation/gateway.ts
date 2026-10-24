@@ -5,7 +5,6 @@
 // the manual E0 mode: operators carry signed messages by hand (/desk shows them, /fed loads them).
 
 import type { App } from "../bot";
-import { A } from "../assist/i18n";
 import { liveCommitment, openOffers, release, reserve, deliver } from "../assist/capacity";
 import { getMission, grantFor, receipt, recordGrant, transition, type Mission } from "../assist/missions";
 import { findIdentifiers, grantAllows, audienceOf, ENVELOPE_FIELDS } from "../domain/consent";

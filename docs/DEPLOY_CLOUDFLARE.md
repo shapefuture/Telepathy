@@ -58,6 +58,12 @@ curl -X POST https://telepathy.<you>.workers.dev/admin/setup \
 7. Members: `/catchup [12h|3d]`, `/events` (with an .ics file), search filters
    `in:<group> since:<date|7d> has:file`, and the **Mini App** (chat menu button set by
    `/admin/setup`; set `PUBLIC_URL` in `wrangler.jsonc` to also enable the `/app` button).
+   The app has tabs for Home (search, catch-up, counters, next events), Ask (filters, sources,
+   feedback), Requests (new request, local answer, partner offers, intro invitations, ratings),
+   Events, Me (settings, skills, privacy, delete my data) and, for owners, Desk (requests,
+   partner requests, offers, unserved needs, ledger, health). Optional deep links: create a Mini
+   App in BotFather (`/newapp`, URL `https://<worker>/app`); then `t.me/<bot>/<app>?startapp=help`
+   opens a new request, and `ask`, `requests`, `events`, `profile`, `desk` open those tabs.
 
 Full history is kept by default. `/retention 365` (in the group) purges older messages daily,
 and `/retention 0` returns to keep-all.

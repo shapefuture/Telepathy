@@ -2,45 +2,26 @@
 //   members:  /help <need> · /requests · /cancel  (+ buttons m:, o:, r:)
 //   owners:   /desk [report] · /offer · /partner · /fed  (+ buttons d:, x:)
 
-import { langOf, readable, type Member } from "../acl";
+import { langOf, type Member } from "../acl";
 import type { App } from "../bot";
-import { ENVELOPE_FIELDS, findIdentifiers, grantAllows } from "../domain/consent";
 import { ownerIds, timezone } from "../env";
-import { resolveSkill, TAXONOMY, labelIn } from "../experts";
-import { recordAnswer } from "../feedback";
+import { resolveSkill } from "../experts";
 import type { Lang } from "../i18n";
-import { IntroError, requestIntro } from "../intros";
-import { answer, renderAnswer } from "../search";
+import { renderAnswer } from "../search";
 import type { InlineButton } from "../telegram";
 import { escapeHtml } from "../text";
-import { audit, newId, nowIso } from "../util";
-import {
-  chooseOffer,
-  declineInbound,
-  declineOffer,
-  eligiblePartners,
-  fedEnabled,
-  finishInbound,
-  markManualSent,
-  offerInbound,
-  partnerList,
-  policyVersion,
-  receive,
-  routeMission,
-  safeEndpoint,
-  withdrawMission,
-} from "../federation/gateway";
+import { audit, nowIso } from "../util";
+import { partnerList, receive, safeEndpoint } from "../federation/gateway";
 import type { MessageType } from "../federation/envelope";
-import { addOffer, deliver, listOffers, liveCommitment, MODES, openOffers, release, reserve, withdrawOffer, type CommitmentMode } from "./capacity";
+import { addOffer, listOffers, MODES, openOffers, withdrawOffer, type CommitmentMode } from "./capacity";
 import { A, type AssistMessages } from "./i18n";
-import { createDraft, getMission, grantFor, isTerminal, MissionError, openMissions, receipt, recordGrant, report, revokeGrants, transition, type Mission } from "./missions";
-import { b, notifyMember, notifyOwners } from "./notify";
+import { createDraft, getMission, isTerminal, MissionError, openMissions, report, type Mission } from "./missions";
+import { b } from "./notify";
+import { deskAction, deskActions, exchangeAction, forgetMissions, gapAction, jobLabel, memberAction, offerChoice, rateMission, short, type Outcome } from "./actions";
 import { balances, formatAmount, parsePrice, recent, reverse } from "./ledger";
-import { bucket, openGaps, setGapStatus } from "./gaps";
+import { bucket, openGaps } from "./gaps";
 import { applyRotation, refreshPartner, verifyRotation, type RotationProof } from "../federation/keys";
 
-const short = (id: string) => id.slice(0, 6);
-const jobLabel = (code: string, lang: Lang) => (TAXONOMY.get(code) ? labelIn(TAXONOMY.get(code)!, lang) : code);
 const send = (app: App, chat: number, text: string, buttons?: InlineButton[][]) => app.tg.sendMessage(chat, text, { buttons });
 const isOwner = (app: App, tgId: number) => ownerIds(app.env).has(tgId);
 
@@ -70,50 +51,22 @@ export async function listMissions(app: App, chat: number, mem: Member): Promise
   return ms.length;
 }
 
-/** Cancel: stop the mission, revoke its grants, withdraw partner exchanges, free local slots. */
-async function stopMission(app: App, m: Mission, actor: "member" | "operator", to: "cancelled" | "failed_with_explanation" = "cancelled", reason?: string): Promise<string[]> {
-  if (m.status === "draft") {
-    await app.db.prepare("DELETE FROM missions WHERE id=? AND status='draft'").bind(m.id).run();
-    return [];
-  }
-  if (!(await transition(app.db, m.id, to, actor, { reason }))) return [];
-  await revokeGrants(app.db, m.id);
-  const c = await liveCommitment(app.db, { missionId: m.id });
-  if (c) await release(app.db, c.id, "cancelled");
-  return withdrawMission(app, m.id);
-}
-
-/** /forget_me: stop every mission and scrub its text everywhere we hold a copy (I09). */
-export async function forgetMissions(app: App, memberId: string): Promise<string[]> {
-  const { results } = await app.db.prepare("SELECT * FROM missions WHERE member_id=?").bind(memberId).all<Mission>();
-  const keys: string[] = [];
-  for (const m of results) if (!isTerminal(m)) keys.push(...(await stopMission(app, m, "member")));
-  await app.db.batch([
-    app.db.prepare("UPDATE missions SET summary='[removed]', criteria='{}' WHERE member_id=?").bind(memberId),
-    app.db.prepare("UPDATE federation_exchanges SET summary='[removed]', envelope='{}' WHERE mission_id IN (SELECT id FROM missions WHERE member_id=?)").bind(memberId),
-    app.db.prepare("UPDATE consent_grants SET revoked_at=COALESCE(revoked_at, ?) WHERE member_id=?").bind(nowIso(), memberId),
-  ]);
-  return keys;
-}
+export { forgetMissions };
 
 async function deskCard(app: App, m: Mission, a: AssistMessages, lang: Lang): Promise<{ text: string; buttons: InlineButton[][] }> {
-  const g = await grantFor(app.db, m.id, "external_discovery");
-  const pv = await policyVersion(app.db);
-  const external = !!g && !g.revoked_at && g.mission_version === m.version && g.policy_version === pv && g.expires_at > nowIso();
+  const { external, actions } = await deskActions(app, m, a);
   const buttons: InlineButton[][] = [];
-  if (["local_investigation", "external_permission_needed", "no_eligible_provider"].includes(m.status)) {
-    for (const o of await openOffers(app.db, m.job_code)) buttons.push([b(a.bAssign(o.description.slice(0, 40)), `d:${m.id}:a:${o.id}`)]);
-    const row = [b(a.bIntro, `d:${m.id}:i`)];
-    if (external && fedEnabled(app.env) && m.status !== "local_investigation") row.push(b(a.bRoute, `d:${m.id}:rt`));
-    buttons.push(row, [b(a.bNoProvider, `d:${m.id}:np`)]);
-  } else if (["service_committed", "in_delivery"].includes(m.status) && (await liveCommitment(app.db, { missionId: m.id }))) {
-    buttons.push([b(a.bDelivered, `d:${m.id}:dv`), b(a.bRelease, `d:${m.id}:rl`)]);
+  const rest: InlineButton[] = [];
+  for (const x of actions) {
+    const btn = b(x.label, `d:${m.id}:${x.act}${x.extra ? `:${x.extra}` : ""}`);
+    if (x.act === "a" || x.act === "np") buttons.push([btn]);
+    else rest.push(btn);
   }
+  // Order: assignments, then intro/route (and delivered/release), then "no provider" last.
+  const np = buttons.findIndex((r) => r[0]!.callback_data.endsWith(":np"));
+  if (rest.length) buttons.splice(np >= 0 ? np : buttons.length, 0, rest);
   return { text: a.deskMission(short(m.id), a.status(m.status), escapeHtml(jobLabel(m.job_code, lang)), escapeHtml(m.summary), m.local_hits, external), buttons };
 }
-
-const toDesk = (app: App, m: Mission, tag: string) =>
-  notifyOwners(app, `desk:${m.id}:${tag}`, (a) => ({ text: a.deskMission(short(m.id), a.status(m.status), escapeHtml(m.job_code), escapeHtml(m.summary), m.local_hits, tag === "ext"), buttons: [[b("/desk", `d:${m.id}:show`)]] }));
 
 interface Cb {
   id: string;
@@ -130,248 +83,80 @@ export async function assistCallback(app: App, cb: Cb, mem: Member | null, data:
     if (cb.message) await app.tg.call("editMessageReplyMarkup", { chat_id: cb.message.chat.id, message_id: cb.message.message_id, reply_markup: { inline_keyboard: [] } }).catch(() => undefined);
   };
   const chat = cb.from.id;
+  const done = async (r: Outcome & { alert?: boolean }) => {
+    await toast(r.msg ?? "", !!r.alert);
+    if (r.ok) await clear();
+    return r.keys;
+  };
 
-  if (kind === "g") {
+  if (kind === "g" || kind === "d" || kind === "x") {
     if (!isOwner(app, cb.from.id)) {
       await toast();
       return [];
     }
-    const ok = await setGapStatus(app.db, id, act === "off" ? "actioned" : "dismissed");
-    await toast(ok ? a.done : a.notOpen);
-    await clear();
-    if (ok && act === "off") await send(app, chat, a.gapOfferHint(escapeHtml(id)));
-    return [];
-  }
-  if (kind === "d" || kind === "x") {
-    if (!isOwner(app, cb.from.id)) {
-      await toast();
+    if (kind === "g") {
+      const r = await gapAction(app, id, act, lang);
+      if (r.ok && act === "off") await send(app, chat, a.gapOfferHint(escapeHtml(id)));
+      return done(r);
+    }
+    if (kind === "x") return done(await exchangeAction(app, id, act, extra, lang));
+    if (act === "show") {
+      const m = await getMission(app.db, id);
+      await toast(m ? "" : a.notOpen);
+      if (m && !isTerminal(m)) {
+        const c = await deskCard(app, m, a, lang);
+        await send(app, chat, c.text, c.buttons.length ? c.buttons : undefined);
+      }
       return [];
     }
-    return kind === "d" ? deskAction(app, id, act, extra, a, lang, toast, clear, chat) : exchangeAction(app, id, act, extra, a, toast, clear);
+    return done(await deskAction(app, id, act, extra, lang));
   }
   if (!mem) {
     await toast(a.notOpen);
     return [];
   }
-
   if (kind === "o") {
-    if (act === "y") {
-      const contact = `tg://user?id=${cb.from.id}${cb.from.username ? ` @${cb.from.username}` : ""}`;
-      const r = await chooseOffer(app, mem.id, id, contact);
-      await toast(r.ok ? a.chosen(r.brand ?? "") : a.notOpen, true);
-      await clear();
-      return r.keys;
-    }
-    const r = await declineOffer(app, mem.id, id);
-    await toast(r.ok ? a.offerDeclined : a.notOpen);
+    const contact = `tg://user?id=${cb.from.id}${cb.from.username ? ` @${cb.from.username}` : ""}`;
+    const r = await offerChoice(app, mem, id, act === "y", contact);
+    await toast(r.msg ?? "", act === "y" && r.ok);
     await clear();
     return r.keys;
   }
-
-  const m = await getMission(app.db, id);
-  if (!m || m.member_id !== mem.id) {
-    await toast(a.notOpen);
-    return [];
-  }
-
-  if (kind === "r") {
-    if (m.status !== "delivered") {
-      await toast(a.notOpen);
-      return [];
-    }
-    await receipt(app.db, m.id, { useful: act === "1" });
-    if (await transition(app.db, m.id, "evaluated", "member")) await transition(app.db, m.id, "closed", "system");
-    await toast(a.thanks);
-    await clear();
-    return [];
-  }
+  if (kind === "r") return done(await rateMission(app, mem, id, act === "1"));
   if (kind !== "m") {
     await toast();
     return [];
   }
 
-  switch (act) {
-    case "ok": {
-      if (!(await transition(app.db, m.id, "confirmed", "member", { from: "draft" }))) break;
-      await recordGrant(app.db, m, "local", "home", ["job", "summary"], "assistance", await policyVersion(app.db));
-      await transition(app.db, m.id, "local_investigation", "system");
-      const ans = await answer(app.db, await readable(app.db, mem), m.summary);
-      await app.db.prepare("UPDATE missions SET local_hits=? WHERE id=?").bind(ans.quotes.length, m.id).run();
-      await toast();
-      await clear();
-      if (ans.status === "answered") {
-        const r = renderAnswer(ans, timezone(app.env), lang, { answerId: await recordAnswer(app.db, mem.id, ans.quotes.map((q) => q.id)) });
-        await send(app, chat, `${a.foundLocal}\n${r.text}`, r.buttons);
-        await send(app, chat, a.solvedQ, [[b(a.bSolved, `m:${m.id}:solved`), b(a.bMore, `m:${m.id}:more`)]]);
-      } else {
-        await send(app, chat, a.nothingLocal, [[b(a.bToDesk, `m:${m.id}:more`), b(a.bCancel, `m:${m.id}:x`)]]);
-      }
-      return [];
-    }
-    case "solved":
-      if (await transition(app.db, m.id, "locally_satisfied", "member")) {
-        await receipt(app.db, m.id, { service: "knowledge_answer", useful: true });
-        await transition(app.db, m.id, "evaluated", "member");
-        await transition(app.db, m.id, "closed", "system");
-        await toast(a.solved);
-        await clear();
-        return [];
-      }
-      break;
-    case "more": {
-      const moved = await transition(app.db, m.id, "external_permission_needed", "member", { handler: "operator" });
-      if (!moved) break;
-      const partners = await eligiblePartners(app, m);
-      await toast();
-      await clear();
-      await send(app, chat, a.onDesk(partners.length > 0), partners.length ? [[b(a.bPreview, `m:${m.id}:pv`)]] : undefined);
-      return toDesk(app, moved, "new");
-    }
-    case "pv": {
-      if (m.status !== "external_permission_needed" && m.status !== "no_eligible_provider") break;
-      await toast();
-      const found = findIdentifiers(m.summary);
-      if (found.length) {
-        await send(app, chat, a.previewBlocked(found.join(", ")));
-        return [];
-      }
-      const partners = await eligiblePartners(app, m);
-      if (!partners.length) {
-        await send(app, chat, a.noPartners);
-        return [];
-      }
-      await send(app, chat, a.preview(escapeHtml(jobLabel(m.job_code, lang)), escapeHtml(m.summary), escapeHtml(partners.map((p) => p.brand_label).join(", "))), [
+  const r = await memberAction(app, mem, id, act);
+  if (act === "pv") {
+    await toast(r.ok || r.blocked ? "" : r.msg);
+    const m = await getMission(app.db, id);
+    if (r.blocked) await send(app, chat, a.previewBlocked(r.blocked.join(", ")));
+    else if (r.ok && m && !r.partners?.length) await send(app, chat, a.noPartners);
+    else if (r.ok && m)
+      await send(app, chat, a.preview(escapeHtml(jobLabel(m.job_code, lang)), escapeHtml(m.summary), escapeHtml(r.partners!.map((p) => p.brand_label).join(", "))), [
         [b(a.bAllow, `m:${m.id}:allow`)],
         [b(a.bKeepInside, `m:${m.id}:in`)],
       ]);
-      return [];
-    }
-    case "allow": {
-      const partners = await eligiblePartners(app, m);
-      if (!partners.length || findIdentifiers(m.summary).length || !["external_permission_needed", "no_eligible_provider"].includes(m.status)) break;
-      await recordGrant(app.db, m, "external_discovery", JSON.stringify(partners.map((p) => p.id)), [...ENVELOPE_FIELDS], "evaluate_willing_provider", await policyVersion(app.db));
-      await audit(app.db, "consent.external", mem.id, m.id, { partners: partners.length });
-      await toast(a.allowed);
-      await clear();
-      return toDesk(app, m, "ext");
-    }
-    case "in":
-      await toast(a.keptInside);
-      await clear();
-      return [];
-    case "x": {
-      const keys = await stopMission(app, m, "member");
-      await toast(a.cancelled);
-      await clear();
-      return keys;
-    }
-  }
-  await toast(a.notOpen);
-  return [];
-}
-
-// ---- operator side -------------------------------------------------------------------------
-
-async function deskAction(
-  app: App,
-  id: string,
-  act: string,
-  extra: string,
-  a: AssistMessages,
-  lang: Lang,
-  toast: (t?: string, alert?: boolean) => Promise<unknown>,
-  clear: () => Promise<void>,
-  chat: number,
-): Promise<string[]> {
-  const m = await getMission(app.db, id);
-  if (!m || isTerminal(m)) {
-    await toast(a.notOpen);
-    return [];
-  }
-  if (act === "show") {
-    const c = await deskCard(app, m, a, lang);
-    await toast();
-    await send(app, chat, c.text, c.buttons);
-    return [];
-  }
-  if (act === "a") {
-    const offer = (await openOffers(app.db, m.job_code)).find((o) => o.id === extra);
-    if (!offer) {
-      await toast(a.capacityFull, true);
-      return [];
-    }
-    // Slot first (atomic), then the state change; give the slot back if the mission moved meanwhile.
-    const cid = await reserve(app.db, offer.id, { missionId: m.id });
-    if (!cid) {
-      await toast(a.capacityFull, true);
-      return [];
-    }
-    if (!(await transition(app.db, m.id, "provider_selected", "operator", { from: m.status }))) {
-      await release(app.db, cid, "cancelled");
-      await toast(a.notOpen);
-      return [];
-    }
-    await transition(app.db, m.id, "service_committed", "operator", { handler: "operator" });
-    await toast(a.done);
-    await clear();
-    return notifyMember(app, m.member_id, `mcl:${m.id}`, (x) => ({ text: x.committedLocal(escapeHtml(offer.description)) }));
-  }
-  if (act === "i") {
-    try {
-      const r = await requestIntro(app.db, m.member_id, m.summary, nowIso(), lang);
-      await app.db.prepare("UPDATE missions SET handler='intro' WHERE id=?").bind(m.id).run();
-      await toast(a.done);
-      return [...r.keys, ...(await notifyMember(app, m.member_id, `mint:${m.id}`, (x) => ({ text: x.introStarted })))];
-    } catch (e) {
-      if (!(e instanceof IntroError)) throw e;
-      await toast(e.message, true);
-      return [];
-    }
-  }
-  if (act === "rt") {
-    if (!fedEnabled(app.env)) {
-      await toast(a.fedOff, true);
-      return [];
-    }
-    const r = await routeMission(app, m.id);
-    await toast(a.routed(r.routed), true);
-    if (r.routed) await clear();
     return r.keys;
   }
-  if (act === "np") {
-    const keys = await stopMission(app, m, "operator", "failed_with_explanation", "no_provider");
-    await receipt(app.db, m.id, { service: "no_provider" });
-    await toast(a.done);
-    await clear();
-    return [...keys, ...(await notifyMember(app, m.member_id, `mnp:${m.id}`, (x) => ({ text: x.noProvider })))];
+  await toast(r.msg ?? "");
+  if (!r.ok) return [];
+  await clear();
+  if (act === "ok") {
+    const ans = r.answer!;
+    if (ans.status === "answered") {
+      const out = renderAnswer(ans, timezone(app.env), lang, { answerId: r.answerId });
+      await send(app, chat, `${a.foundLocal}\n${out.text}`, out.buttons);
+      await send(app, chat, a.solvedQ, [[b(a.bSolved, `m:${id}:solved`), b(a.bMore, `m:${id}:more`)]]);
+    } else {
+      await send(app, chat, a.nothingLocal, [[b(a.bToDesk, `m:${id}:more`), b(a.bCancel, `m:${id}:x`)]]);
+    }
+  } else if (act === "more") {
+    const n = r.partners?.length ?? 0;
+    await send(app, chat, a.onDesk(n > 0), n ? [[b(a.bPreview, `m:${id}:pv`)]] : undefined);
   }
-  const c = await liveCommitment(app.db, { missionId: m.id });
-  if (act === "dv" && c && (await deliver(app.db, c.id))) {
-    await transition(app.db, m.id, "delivered", "operator", { handler: "member" });
-    await receipt(app.db, m.id, { service: "local_service", commitmentId: c.id, provider: true });
-    await toast(a.done);
-    await clear();
-    return notifyMember(app, m.member_id, `mdv:${m.id}`, (x) => ({ text: x.deliveredQ, buttons: [[b(x.bUseful, `r:${m.id}:1`), b(x.bNotUseful, `r:${m.id}:0`)]] }));
-  }
-  if (act === "rl" && c && (await release(app.db, c.id))) {
-    await transition(app.db, m.id, "external_permission_needed", "operator", { handler: "operator" });
-    await toast(a.done);
-    await clear();
-    return notifyMember(app, m.member_id, `mrl:${m.id}:${c.id}`, (x) => ({ text: x.released }));
-  }
-  await toast(a.notOpen);
-  return [];
-}
-
-async function exchangeAction(app: App, id: string, act: string, extra: string, a: AssistMessages, toast: (t?: string, alert?: boolean) => Promise<unknown>, clear: () => Promise<void>): Promise<string[]> {
-  let r: { ok: boolean; keys: string[] } = { ok: false, keys: [] };
-  if (act === "s") r = { ok: await markManualSent(app.db, id), keys: [] };
-  else if (act === "o") r = await offerInbound(app, id, extra);
-  else if (act === "d") r = await declineInbound(app, id);
-  else if (act === "v") r = await finishInbound(app, id, "delivered");
-  else if (act === "r") r = await finishInbound(app, id, "released");
-  await toast(r.ok ? a.done : a.notOpen);
-  if (r.ok) await clear();
   return r.keys;
 }
 

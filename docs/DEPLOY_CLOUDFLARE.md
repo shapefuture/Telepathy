@@ -86,24 +86,32 @@ app → **Пульт → История**. Then:
    screen walks you through it and remembers them on that device.
 2. Enter your phone number and the login code Telegram sends you (and your cloud password, if
    you have one).
-3. Keep the screen open. It reads the group from newest to oldest, so recent history becomes
-   searchable first, and shows how far back it has got.
+3. Wait a few seconds while it reads. Supergroups are read 6 pages of 100 messages at a time,
+   so 15,000 messages take about 5–10 seconds. Then you can close the app.
+4. The bot saves everything in the background and messages you **✅ История … загружена** when
+   it's done.
 
 How it works and what it keeps private:
 - The sign-in happens in your browser over Telegram's own connection (`*.web.telegram.org`).
   It is kept only in that screen's memory and is never sent to the Worker or stored anywhere.
-  When loading stops (finished, paused, cancelled or closed), the app logs that session out, so
-  it disappears from Telegram → Settings → Devices.
-- The Worker receives only the group's messages, through the same signed Mini App API, and
-  stores them with the same rules as the other two ways. Only owners (`OWNER_IDS`) can do this,
-  and only for enabled groups. Members who used `/forget_me` are skipped. Messages deleted with
-  `/forget` stay deleted, and live messages are never overwritten.
-- **Daily limit:** 15,000 messages a day across all groups (`HISTORY_PER_DAY`), which leaves
-  room in the free plan's 100,000 D1 writes for live traffic. When it is reached, the import
-  pauses. The next day, at the digest hour, the bot reminds you with a button, and the import
-  continues where it stopped. Reminders stop after a week, or once the import is finished.
-- If `/retention` is set, the import stops at that horizon, because older messages would be
-  purged anyway.
+  As soon as reading ends (finished, stopped or closed), the app logs that session out, so it
+  disappears from Telegram → Settings → Devices.
+- Reading only parks the messages on the Worker as raw pages (`history_pages`, one D1 row per
+  100 messages), so it needs almost none of the daily write allowance. The every-minute cron
+  then stores about 200 messages a minute, with the same rules as the other two ways. Only
+  owners (`OWNER_IDS`) can do this, and only for enabled groups. Members who used `/forget_me`
+  are skipped, checked again when each page is stored. Messages deleted with `/forget` stay
+  deleted, live messages are never overwritten, and old messages never give access back to
+  people who left. Once everything is stored, the parked pages are deleted.
+- **Daily limit:** storing stops at 15,000 messages a day across all groups
+  (`HISTORY_PER_DAY`), which leaves room in the free plan's 100,000 D1 writes for live traffic.
+  It carries on by itself the next day. Nothing is needed from you, and the History screen shows
+  how many days are left. With the Workers Paid plan, raise `HISTORY_PER_DAY` (for example to
+  200000) to finish in a day.
+- If you close the screen before reading ends, the bot reminds you once a day at the digest hour
+  (for at most a week). **Continue** skips the pages already read.
+- If `/retention` is set, reading stops at that horizon, because older messages would be purged
+  anyway.
 - Your account must be a member of the group and able to see its history.
 
 **From your computer: a script.** This is the same idea, run in a terminal. It suits very large

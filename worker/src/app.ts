@@ -23,7 +23,7 @@ import { act as introAct, cancelNeed } from "./intros";
 import { citation } from "./ingest";
 import { dispatchPending } from "./outbox";
 import { forgetMember } from "./rights";
-import { HISTORY_PAGE_MAX, historyGroups, importPage, perDay, resetHistory } from "./history";
+import { HISTORY_PAGE_MAX, historyGroups, perDay, resetHistory, stagePage } from "./history";
 import { answer, parseFilters } from "./search";
 import { createTelegram, type Fetcher } from "./telegram";
 import { audit, DAY, HOUR, localParts, nowIso, safeEqual } from "./util";
@@ -110,7 +110,7 @@ export async function handleApp(req: Request, env: Env, fetcher?: Fetcher, net?:
     try {
       const text = await req.text();
       // History pages carry up to 100 messages; everything else is a small form.
-      if (text.length > (url.pathname === "/app/api/history/page" ? 1_200_000 : 8192)) return json({ error: "too large" }, 413);
+      if (text.length > (url.pathname === "/app/api/history/stage" ? 1_200_000 : 8192)) return json({ error: "too large" }, 413);
       body = text ? (JSON.parse(text) as Record<string, unknown>) : {};
     } catch {
       return json({ error: "bad json" }, 400);
@@ -382,9 +382,9 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
     if (key === "GET history") return out({ groups: await historyGroups(app.env, db), perDay: perDay(app.env), pageMax: HISTORY_PAGE_MAX });
     const chatId = Number(body.chat_id);
     if (!Number.isSafeInteger(chatId)) return out({ error: "bad chat" }, undefined, 400);
-    if (key === "POST history" && p[1] === "page") {
-      const r = await importPage(app.env, db, user.id, chatId, body.messages, Number(body.cursor), body.done === true);
-      return out(r, undefined, r.ok || r.error === "paused" ? 200 : 404);
+    if (key === "POST history" && p[1] === "stage") {
+      const r = await stagePage(db, user.id, chatId, body.page, body.messages, body.done === true);
+      return out(r, undefined, r.ok ? 200 : r.error === "not_enabled" ? 404 : 400);
     }
     if (key === "POST history" && p[1] === "reset") return out({ ok: await resetHistory(db, chatId) });
     return notFound();

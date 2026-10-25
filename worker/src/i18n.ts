@@ -80,11 +80,12 @@ const EN = {
   welcomeButton: "Start a chat",
   historyOffer: (button: boolean) =>
     "\n\n📜 <b>Older messages</b>\nRight now I only know what's written from today on. " +
-    (button ? "Tap the button below and I'll load the group's past messages too — it takes a few minutes." : "To load the group's past messages too, open the app → Desk → History."),
+    (button ? "Tap the button below and I'll load the group's past messages too — it takes a few seconds, then I finish in the background." : "To load the group's past messages too, open the app → Desk → History."),
   historyButton: "📜 Load past messages",
-  historyRemind: (title: string, imported: number, button: boolean) =>
-    `📜 Loading the history of <b>${title}</b> isn't finished yet (${imported} messages so far). ` +
-    (button ? "Tap the button to continue where it stopped." : "Open the app → Desk → History to continue where it stopped."),
+  historyRemind: (title: string, read: number, button: boolean) =>
+    `📜 Reading the history of <b>${title}</b> stopped before the start of the chat (${read} messages read). ` +
+    (button ? "Tap the button to finish it — it takes a few seconds." : "Open the app → Desk → History to finish it — it takes a few seconds."),
+  historyDone: (title: string, n: number) => `✅ The history of <b>${title}</b> is loaded: ${n} past messages are now searchable.`,
   welcomeUsage: "Usage: /welcome on or /welcome off (owner, in an enabled group).",
   welcomeOn: "Welcome is <b>on</b>: new members get a short intro from me, privately when Telegram allows it.",
   welcomeOff: "Welcome is <b>off</b> in this group.",
@@ -326,11 +327,12 @@ const RU: Messages = {
   welcomeButton: "Начать",
   historyOffer: (button: boolean) =>
     "\n\n📜 <b>Старые сообщения</b>\nСейчас я знаю только то, что напишут начиная с сегодня. " +
-    (button ? "Нажми кнопку ниже — и я загружу прошлые сообщения группы. Это займёт несколько минут." : "Чтобы я загрузил и прошлые сообщения группы, открой приложение → Пульт → История."),
+    (button ? "Нажми кнопку ниже — и я загружу прошлые сообщения группы. Это займёт несколько секунд, остальное я сделаю сам в фоне." : "Чтобы я загрузил и прошлые сообщения группы, открой приложение → Пульт → История."),
   historyButton: "📜 Загрузить старые сообщения",
-  historyRemind: (title: string, imported: number, button: boolean) =>
-    `📜 Загрузка истории <b>${title}</b> ещё не закончена (уже ${imported} сообщений). ` +
-    (button ? "Нажми кнопку, чтобы продолжить с того места, где остановились." : "Открой приложение → Пульт → История, чтобы продолжить с того места, где остановились."),
+  historyRemind: (title: string, read: number, button: boolean) =>
+    `📜 Чтение истории <b>${title}</b> остановилось раньше начала чата (прочитано ${read} сообщений). ` +
+    (button ? "Нажми кнопку, чтобы дочитать, — это займёт несколько секунд." : "Открой приложение → Пульт → История, чтобы дочитать, — это займёт несколько секунд."),
+  historyDone: (title: string, n: number) => `✅ История <b>${title}</b> загружена: ${n} прошлых сообщений теперь можно найти.`,
   welcomeUsage: "Использование: /welcome on или /welcome off (владелец, в подключённой группе).",
   welcomeOn: "Приветствие <b>включено</b>: новые участники получат от меня короткое интро — лично, когда Telegram это позволяет.",
   welcomeOff: "Приветствие в этой группе <b>выключено</b>.",

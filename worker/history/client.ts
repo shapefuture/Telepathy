@@ -5,13 +5,12 @@
 // (*.web.telegram.org). The login lives only in this tab's memory: it is never stored, never sent
 // to the Worker, and is ended with auth.logOut when the import stops. The Worker only receives the
 // group's messages, page by page, through the same signed Mini App API as everything else.
+// Reading takes seconds: supergroup pages are fetched 6 at a time, and the Worker stores them later.
 
 import { Long, MemoryStorage, TelegramClient, tl } from "@mtcute/web";
-import { readHistory, type Outcome, type Page, type PageResult } from "./read";
+import { PAGE, readAll, type Outcome, type Source, type Stage, type StageResult } from "./read";
 
-export type { Outcome, Page, PageResult } from "./read";
-
-const PAGE = 100;
+export type { Outcome, Stage, StageResult } from "./read";
 
 export class SignInError extends Error {}
 
@@ -65,24 +64,35 @@ export function createImporter(apiId: number, apiHash: string) {
     }
   }
 
-  /** Read the chat backwards from `cursor` and post it page by page (see read.ts). */
+  /** Read the whole chat and park it on the Worker (see read.ts); `read` = pages parked before. */
   async function run(
     chatId: number,
-    cursor: number,
+    read: number[],
     keepFrom: number,
-    post: (p: Page) => Promise<PageResult>,
-    progress: (read: number, oldest: number | null, r: PageResult) => void,
+    stage: (p: Stage) => Promise<StageResult>,
+    progress: (done: number, total: number) => void,
     signal: AbortSignal,
   ): Promise<Outcome> {
     if (!signedIn) throw new SignInError("not signed in");
     const peer = await peerOf(chatId);
     // Telegram's FLOOD_WAIT (up to 5 minutes) is waited out rather than failing the import.
-    const fetchPage = (offsetId: number) =>
-      tg.call(
-        { _: "messages.getHistory", peer, offsetId, offsetDate: 0, addOffset: 0, limit: PAGE, maxId: 0, minId: 0, hash: Long.ZERO },
-        { floodSleepThreshold: 300_000, abortSignal: signal },
-      );
-    return readHistory({ chatId, cursor, keepFrom, fetchPage, post, progress, signal });
+    const opts = { floodSleepThreshold: 300_000, abortSignal: signal };
+    const history = (offsetId: number) =>
+      tg.call({ _: "messages.getHistory", peer, offsetId, offsetDate: 0, addOffset: 0, limit: PAGE, maxId: 0, minId: 0, hash: Long.ZERO }, opts);
+    const src: Source =
+      peer._ === "inputPeerChannel"
+        ? {
+            kind: "ids",
+            newest: async () => {
+              const r = await history(0);
+              return r._ === "messages.messagesNotModified" ? 0 : Math.max(0, ...r.messages.map((m) => m.id));
+            },
+            byIds: (ids) =>
+              tg.call({ _: "channels.getMessages", channel: { _: "inputChannel", channelId: peer.channelId, accessHash: peer.accessHash }, id: ids.map((id) => ({ _: "inputMessageID", id })) }, opts),
+            history,
+          }
+        : { kind: "seq", newest: async () => 0, byIds: () => Promise.reject(new Error("unused")), history };
+    return readAll({ chatId, keepFrom, read, src, stage, progress, signal });
   }
 
   /** Ends the Telegram session we created (it disappears from Settings → Devices) and disconnects. */

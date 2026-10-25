@@ -291,7 +291,11 @@ async function cmdEnable(app: App, msg: TgMessage, args: string): Promise<string
   await reply(app, msg.chat.id, m.enabled(vis));
   // The command guide goes to the admin privately, not to the whole group.
   try {
-    await app.tg.sendMessage(msg.from!.id, m.adminGuide(escapeHtml(msg.chat.title ?? "")));
+    // Offer the past messages too, unless they were already loaded.
+    const loaded = await app.db.prepare("SELECT 1 FROM history_jobs WHERE source_id=? AND done_at IS NOT NULL").bind(id).first();
+    const origin = appOrigin(app);
+    const buttons = origin && !loaded ? [[{ text: m.historyButton, web_app: { url: `${origin}/app?start=history` } } as unknown as InlineButton]] : undefined;
+    await app.tg.sendMessage(msg.from!.id, m.adminGuide(escapeHtml(msg.chat.title ?? "")) + (loaded ? "" : m.historyOffer(!!origin)), { buttons });
   } catch (e) {
     if (!(e instanceof DefiniteFailure)) throw e; // they never opened the bot privately: nothing to do
   }

@@ -78,6 +78,13 @@ const EN = {
   welcomeGroup: (name: string) =>
     `👋 ${name}, welcome! I'll help you find anything that was ever discussed here, and if needed, the person who knows the answer. Start a private chat with me to begin.`,
   welcomeButton: "Start a chat",
+  historyOffer: (button: boolean) =>
+    "\n\n📜 <b>Older messages</b>\nRight now I only know what's written from today on. " +
+    (button ? "Tap the button below and I'll load the group's past messages too — it takes a few minutes." : "To load the group's past messages too, open the app → Desk → History."),
+  historyButton: "📜 Load past messages",
+  historyRemind: (title: string, imported: number, button: boolean) =>
+    `📜 Loading the history of <b>${title}</b> isn't finished yet (${imported} messages so far). ` +
+    (button ? "Tap the button to continue where it stopped." : "Open the app → Desk → History to continue where it stopped."),
   welcomeUsage: "Usage: /welcome on or /welcome off (owner, in an enabled group).",
   welcomeOn: "Welcome is <b>on</b>: new members get a short intro from me, privately when Telegram allows it.",
   welcomeOff: "Welcome is <b>off</b> in this group.",
@@ -317,6 +324,13 @@ const RU: Messages = {
   welcomeGroup: (name: string) =>
     `👋 ${name}, добро пожаловать! Я помогу найти любую информацию, которая здесь когда-то обсуждалась, а если потребуется — человека, который знает ответ. Создай личный чат со мной, чтобы начать.`,
   welcomeButton: "Начать",
+  historyOffer: (button: boolean) =>
+    "\n\n📜 <b>Старые сообщения</b>\nСейчас я знаю только то, что напишут начиная с сегодня. " +
+    (button ? "Нажми кнопку ниже — и я загружу прошлые сообщения группы. Это займёт несколько минут." : "Чтобы я загрузил и прошлые сообщения группы, открой приложение → Пульт → История."),
+  historyButton: "📜 Загрузить старые сообщения",
+  historyRemind: (title: string, imported: number, button: boolean) =>
+    `📜 Загрузка истории <b>${title}</b> ещё не закончена (уже ${imported} сообщений). ` +
+    (button ? "Нажми кнопку, чтобы продолжить с того места, где остановились." : "Открой приложение → Пульт → История, чтобы продолжить с того места, где остановились."),
   welcomeUsage: "Использование: /welcome on или /welcome off (владелец, в подключённой группе).",
   welcomeOn: "Приветствие <b>включено</b>: новые участники получат от меня короткое интро — лично, когда Telegram это позволяет.",
   welcomeOff: "Приветствие в этой группе <b>выключено</b>.",

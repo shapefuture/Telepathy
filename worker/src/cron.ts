@@ -18,6 +18,7 @@ import { classify, dispatchInvites, runCanaries } from "./hydra/regrow";
 import { dispatchAnnouncements } from "./hydra/notices";
 import { runEscrow } from "./hydra/escrow";
 import { deleteDue } from "./welcome";
+import { remindHistory } from "./history";
 import { watchSeals } from "./hydra/fed";
 import { remindDrills } from "./hydra/chaos";
 import { bucket, computeGaps, setGapStatus } from "./assist/gaps";
@@ -86,6 +87,7 @@ export async function runCron(base: App, now = new Date()): Promise<Record<strin
   await step("reminders", async () => (await sendReminders(app.db, nowIso(now))).length);
   await step("digest", async () => (await digestStep(app.db, now, timezone(app.env), digestHour(app.env))).keys.length);
   await step("ai_cache", () => pruneCache(app.db, now));
+  await step("history_remind", () => remindHistory(app, now));
   await step("retention", async () => {
     const today = localParts(now, timezone(app.env)).date;
     const last = await app.db.prepare("SELECT value FROM settings WHERE key='retention.day'").first<{ value: string }>();

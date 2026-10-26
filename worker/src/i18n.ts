@@ -82,6 +82,10 @@ const EN = {
     "\n\n📜 <b>Older messages</b>\nRight now I only know what's written from today on. " +
     (button ? "Tap the button below and I'll load the group's past messages too — it takes a few seconds, then I finish in the background." : "To load the group's past messages too, open the app → Desk → History."),
   historyButton: "📜 Load past messages",
+  historyAuto: "\n\n📜 <b>Older messages</b>\nI'm loading the group's past messages by myself through your Telegram MCP server. I'll message you when they're all searchable.",
+  historyMcpFailed: (title: string, button: boolean) =>
+    `📜 I couldn't read the history of <b>${title}</b> through your Telegram MCP server (it kept failing for 10 minutes). Check its key and that it's running. ` +
+    (button ? "Or load it from the app with the button below." : "Or load it from the app → Desk → History."),
   historyRemind: (title: string, read: number, button: boolean) =>
     `📜 Reading the history of <b>${title}</b> stopped before the start of the chat (${read} messages read). ` +
     (button ? "Tap the button to finish it — it takes a few seconds." : "Open the app → Desk → History to finish it — it takes a few seconds."),
@@ -329,6 +333,10 @@ const RU: Messages = {
     "\n\n📜 <b>Старые сообщения</b>\nСейчас я знаю только то, что напишут начиная с сегодня. " +
     (button ? "Нажми кнопку ниже — и я загружу прошлые сообщения группы. Это займёт несколько секунд, остальное я сделаю сам в фоне." : "Чтобы я загрузил и прошлые сообщения группы, открой приложение → Пульт → История."),
   historyButton: "📜 Загрузить старые сообщения",
+  historyAuto: "\n\n📜 <b>Старые сообщения</b>\nЗагружаю прошлые сообщения группы сам — через твой Telegram MCP-сервер. Напишу, когда всё можно будет найти.",
+  historyMcpFailed: (title: string, button: boolean) =>
+    `📜 Не получилось прочитать историю <b>${title}</b> через твой Telegram MCP-сервер (10 минут подряд ошибки). Проверь ключ и что сервер работает. ` +
+    (button ? "Или загрузи её из приложения кнопкой ниже." : "Или загрузи её из приложения → Пульт → История."),
   historyRemind: (title: string, read: number, button: boolean) =>
     `📜 Чтение истории <b>${title}</b> остановилось раньше начала чата (прочитано ${read} сообщений). ` +
     (button ? "Нажми кнопку, чтобы дочитать, — это займёт несколько секунд." : "Открой приложение → Пульт → История, чтобы дочитать, — это займёт несколько секунд."),

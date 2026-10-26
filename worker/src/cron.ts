@@ -19,6 +19,7 @@ import { dispatchAnnouncements } from "./hydra/notices";
 import { runEscrow } from "./hydra/escrow";
 import { deleteDue } from "./welcome";
 import { ingestHistory, remindHistory } from "./history";
+import { readViaMcp } from "./history-mcp";
 import { watchSeals } from "./hydra/fed";
 import { remindDrills } from "./hydra/chaos";
 import { bucket, computeGaps, setGapStatus } from "./assist/gaps";
@@ -87,6 +88,7 @@ export async function runCron(base: App, now = new Date()): Promise<Record<strin
   await step("reminders", async () => (await sendReminders(app.db, nowIso(now))).length);
   await step("digest", async () => (await digestStep(app.db, now, timezone(app.env), digestHour(app.env))).keys.length);
   await step("ai_cache", () => pruneCache(app.db, now));
+  await step("history_mcp", () => readViaMcp(app, now));
   await step("history", () => ingestHistory(app, now));
   await step("history_remind", () => remindHistory(app, now));
   await step("retention", async () => {

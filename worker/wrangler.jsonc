@@ -58,11 +58,17 @@
     "ARCHIVE_ANCHOR": "false",
     // Comma-separated X25519 public keys (npm run hydra -- escrow-keys) and S3-compatible targets (JSON).
     "ESCROW_RECIPIENTS": "",
-    "ESCROW_TARGETS": "[]"
+    "ESCROW_TARGETS": "[]",
+    // Optional: your Telegram MCP server (shapefuture/telegram_mcp) reads past messages by itself,
+    // no app needed. Set its https origin here and the TG_MCP_KEY secret (a read-only key from its
+    // POST /keys/history). If both Workers are on one Cloudflare account, also add the binding:
+    //   "services": [{ "binding": "TG_MCP", "service": "telegram-mcp-saas" }]
+    "TG_MCP_URL": ""
   },
   // Secrets (set with `wrangler secret put NAME`, never committed):
   //   BOT_TOKEN, WEBHOOK_SECRET, ADMIN_TOKEN, OWNER_IDS, FEDERATION_PRIVATE_KEY (only with federation),
   //   CONTINUITY_KEY, IDENTITY_ONLINE_KEY, EMAIL_API_KEY (only with continuity)
+  //   TG_MCP_KEY (only with TG_MCP_URL: automatic history import)
   //   Hydra, each optional: EMAIL_B_API_KEY, EMAIL_WEBHOOK_SECRET, VAPID_PRIVATE_KEY, MATRIX_ACCESS_TOKEN,
   //   SMS_ACCOUNT_SID, SMS_AUTH_TOKEN, SMS_FROM, MASTODON_TOKEN, BLUESKY_APP_PASSWORD, and the escrow
   //   target secrets named in ESCROW_TARGETS

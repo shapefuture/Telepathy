@@ -76,7 +76,32 @@ and `/retention 0` returns to keep-all.
 
 ## 3. Import past history
 
-Bots only see messages sent after they joined. There are three ways to add older history.
+Bots only see messages sent after they joined. There are four ways to add older history.
+
+**Fully automatic: your Telegram MCP server.** If you run
+[telegram_mcp](https://github.com/shapefuture/telegram_mcp) (a Worker that keeps your Telegram
+login), the bot can read past messages through it by itself. You don't open the app or sign in
+anywhere.
+
+1. On the MCP server, create a **read-only** key for your groups. It can only call
+   `export_history`, and only for these chats:
+   ```bash
+   curl -X POST https://<mcp-worker>/keys/history -H "X-API-Key: <your full key>" \
+     -H "content-type: application/json" -d '{"chats": ["-1001234567890"]}'
+   ```
+   Never give the bot your full key, which can also send and delete messages.
+2. In `worker/wrangler.jsonc` set `"TG_MCP_URL": "https://<mcp-worker>"`. If both Workers are
+   on the same Cloudflare account, also add
+   `"services": [{ "binding": "TG_MCP", "service": "telegram-mcp-saas" }]`, because Cloudflare
+   blocks one Worker from fetching another Worker's workers.dev address on the same account.
+3. `npx wrangler secret put TG_MCP_KEY` (paste the read-only key), then `npm run deploy`.
+
+From then on, `/enable` starts the import by itself. Groups that were already enabled are picked
+up within 10 minutes. The every-minute cron reads 500 messages a minute through the MCP server,
+stores them as described below, and messages you when it's done. The History screen shows
+**Читаю автоматически**. If the server fails 10 minutes in a row, the bot stops, tells you, and
+the in-app way below takes over for that chat.
+
 
 **In the app (recommended): nothing to install.** After `/enable`, the bot privately sends you a
 **📜 Загрузить старые сообщения** button (it needs `PUBLIC_URL`). Without `PUBLIC_URL`, open the

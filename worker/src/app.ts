@@ -24,6 +24,7 @@ import { citation } from "./ingest";
 import { dispatchPending } from "./outbox";
 import { forgetMember } from "./rights";
 import { HISTORY_PAGE_MAX, historyGroups, perDay, resetHistory, stagePage } from "./history";
+import { mcpOn, startAuto } from "./history-mcp";
 import { answer, parseFilters } from "./search";
 import { createTelegram, type Fetcher } from "./telegram";
 import { audit, DAY, HOUR, localParts, nowIso, safeEqual } from "./util";
@@ -379,14 +380,20 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
   // ---- history import (owners): the browser reads Telegram, we only store the pages ------------
   if (p[0] === "history") {
     if (!owner) return out({ error: "owners only" }, undefined, 403);
-    if (key === "GET history") return out({ groups: await historyGroups(app.env, db), perDay: perDay(app.env), pageMax: HISTORY_PAGE_MAX });
+    if (key === "GET history") return out({ groups: await historyGroups(app.env, db), perDay: perDay(app.env), pageMax: HISTORY_PAGE_MAX, mcp: mcpOn(app.env) });
     const chatId = Number(body.chat_id);
     if (!Number.isSafeInteger(chatId)) return out({ error: "bad chat" }, undefined, 400);
     if (key === "POST history" && p[1] === "stage") {
       const r = await stagePage(db, user.id, chatId, body.page, body.messages, body.done === true);
       return out(r, undefined, r.ok ? 200 : r.error === "not_enabled" ? 404 : 400);
     }
-    if (key === "POST history" && p[1] === "reset") return out({ ok: await resetHistory(db, chatId) });
+    if (key === "POST history" && (p[1] === "reset" || p[1] === "auto")) {
+      // With the MCP server configured, a (re)start is read in the background right away.
+      const ok = p[1] === "reset" ? await resetHistory(db, chatId) : true;
+      const src = await db.prepare("SELECT id FROM sources WHERE chat_id=? AND enabled=1").bind(chatId).first<{ id: string }>();
+      const auto = !!src && (await startAuto(db, app.env, src.id)) > 0;
+      return out({ ok, auto });
+    }
     return notFound();
   }
 

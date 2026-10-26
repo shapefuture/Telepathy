@@ -13,7 +13,11 @@ CREATE TABLE history_jobs(
   done_at TEXT,                            -- everything stored
   updated_at TEXT NOT NULL,
   reminded_day TEXT,
-  reminders INTEGER NOT NULL DEFAULT 0
+  reminders INTEGER NOT NULL DEFAULT 0,
+  -- Reading through the owner's Telegram MCP server instead of the browser (TG_MCP_KEY set):
+  -- the next offset_id to ask for (0 = newest), NULL when the browser reads this chat.
+  mcp_offset INTEGER,
+  mcp_errors INTEGER NOT NULL DEFAULT 0
 );
 
 -- page: for supergroups, message ids page*100+1 … page*100+100 (read in parallel); for basic

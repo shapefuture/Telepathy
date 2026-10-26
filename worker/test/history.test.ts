@@ -190,7 +190,7 @@ describe("history import", () => {
     const { app } = testApp();
     await enableGroup(app);
     await stagePage(env.DB, OWNER, GROUP, 0, [msg(1, "a", 1)], false);
-    expect((await call(OWNER, "POST", "history/reset", { chat_id: GROUP })).body).toEqual({ ok: true });
+    expect((await call(OWNER, "POST", "history/reset", { chat_id: GROUP })).body).toEqual({ ok: true, auto: false }); // no MCP server: back to the app
     expect(await q("SELECT (SELECT COUNT(*) FROM history_pages) + (SELECT COUNT(*) FROM history_jobs) AS n")).toEqual({ n: 0 });
   });
 

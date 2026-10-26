@@ -46,10 +46,10 @@ const posInt = (v: unknown) => (Number.isSafeInteger(v) && (v as number) > 0 ? (
 const keepFromOf = (retentionDays: number, now: Date) => (retentionDays > 0 ? Math.floor((now.getTime() - retentionDays * DAY) / 1000) : 0);
 
 /** Drops anything malformed instead of failing the page: one odd message shouldn't stop an import. */
-export function cleanMessages(raw: unknown): HistoryMessage[] {
+export function cleanMessages(raw: unknown, max = HISTORY_PAGE_MAX): HistoryMessage[] {
   if (!Array.isArray(raw)) return [];
   const out: HistoryMessage[] = [];
-  for (const r of raw.slice(0, HISTORY_PAGE_MAX)) {
+  for (const r of raw.slice(0, max)) {
     if (!r || typeof r !== "object") continue;
     const m = r as Record<string, unknown>;
     const id = posInt(m.id);
@@ -72,13 +72,13 @@ export function cleanMessages(raw: unknown): HistoryMessage[] {
 export async function historyGroups(env: Env, db: D1Database, now = new Date()) {
   const { results } = await db
     .prepare(
-      "SELECT s.id, s.chat_id, s.title, s.retention_days, j.staged, j.imported, j.read_at, j.done_at, " +
+      "SELECT s.id, s.chat_id, s.title, s.retention_days, j.staged, j.imported, j.read_at, j.done_at, j.mcp_offset, " +
         "(SELECT COUNT(*) FROM passages p WHERE p.source_id=s.id AND p.removed_at IS NULL) AS stored, " +
         "(SELECT COALESCE(SUM(n),0) FROM history_pages h WHERE h.source_id=s.id AND h.body IS NOT NULL) AS pending, " +
         "(SELECT json_group_array(page) FROM history_pages h WHERE h.source_id=s.id) AS pages " +
         "FROM sources s LEFT JOIN history_jobs j ON j.source_id=s.id WHERE s.enabled=1 ORDER BY s.enabled_at",
     )
-    .all<{ chat_id: number; title: string | null; retention_days: number; staged: number | null; imported: number | null; read_at: string | null; done_at: string | null; stored: number; pending: number; pages: string }>();
+    .all<{ chat_id: number; title: string | null; retention_days: number; staged: number | null; imported: number | null; read_at: string | null; done_at: string | null; mcp_offset: number | null; stored: number; pending: number; pages: string }>();
   const cap = perDay(env);
   const left = Math.max(0, cap - (await usedToday(db, today(now))));
   return results.map((r) => ({
@@ -90,6 +90,7 @@ export async function historyGroups(env: Env, db: D1Database, now = new Date()) 
     pending: r.pending,
     read: !!r.read_at,
     done: !!r.done_at,
+    auto: r.mcp_offset !== null && !r.read_at, // being read by the MCP server right now
     // Pages already read, so a closed tab resumes without reading them again.
     pages: r.read_at ? [] : (JSON.parse(r.pages) as number[]),
     days: Math.ceil(r.pending / cap),
@@ -99,15 +100,23 @@ export async function historyGroups(env: Env, db: D1Database, now = new Date()) 
   }));
 }
 
-export type StageResult = { ok: true; pending: number } | { ok: false; error: "not_enabled" | "bad_page" };
+export type StageResult = { ok: true; pending: number } | { ok: false; error: "not_enabled" | "bad_page" | "auto" };
 
 /**
  * Park one page the browser read (or, with `done`, mark the chat fully read). Costs one D1 row
  * per page, so reading a whole chat takes seconds and almost none of the daily write budget.
  */
 export async function stagePage(db: D1Database, ownerTg: number, chatId: number, page: unknown, raw: unknown, done: boolean, now = new Date()): Promise<StageResult> {
-  const source = await db.prepare("SELECT id, retention_days FROM sources WHERE chat_id=? AND enabled=1").bind(chatId).first<{ id: string; retention_days: number }>();
+  const source = await db
+    .prepare(
+      "SELECT s.id, s.retention_days, (j.mcp_offset IS NOT NULL AND j.read_at IS NULL) AS auto " +
+        "FROM sources s LEFT JOIN history_jobs j ON j.source_id=s.id WHERE s.chat_id=? AND s.enabled=1",
+    )
+    .bind(chatId)
+    .first<{ id: string; retention_days: number; auto: number | null }>();
   if (!source) return { ok: false, error: "not_enabled" };
+  // The MCP reader and the browser number pages differently; one reader per chat at a time.
+  if (source.auto) return { ok: false, error: "auto" };
   const at = nowIso(now);
   const keepFrom = keepFromOf(source.retention_days, now);
   const stmts: D1PreparedStatement[] = [];

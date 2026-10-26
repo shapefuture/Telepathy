@@ -31,12 +31,14 @@ describe("welcome for new members", () => {
     const { app, texts } = world();
     await enableGroup(app);
     await handleUpdate(app, joined(501));
-    expect(texts(501).at(-1)!.text).toContain("Я помогу тебе ориентироваться в этом сообществе");
+    // The welcome comes first; the onboarding (questions and topics to pick from) follows it.
+    expect(texts(501)[0]!.text).toContain("Я помогу тебе ориентироваться в этом сообществе");
+    expect(texts(501).at(-1)!.text).toContain("Чем можешь помочь");
     expect(texts(GROUP).some((m) => m.text.includes("добро пожаловать"))).toBe(false);
-    await handleUpdate(app, joined(501, "left", "member")); // left and came back
-    expect(texts(501)).toHaveLength(1);
+    await handleUpdate(app, joined(501, "left", "member")); // left and came back: no second welcome or onboarding
+    expect(texts(501)).toHaveLength(2);
     await handleUpdate(app, joined(501, "member", "administrator")); // a promotion isn't a join
-    expect(texts(501)).toHaveLength(1);
+    expect(texts(501)).toHaveLength(2);
   });
 
   it("falls back to a tagged group message with a Start button that deletes itself", async () => {
@@ -56,7 +58,7 @@ describe("welcome for new members", () => {
     const { app, texts } = world([503]);
     await enableGroup(app);
     await handleUpdate(app, { update_id: upd++, chat_join_request: { chat: { id: GROUP, type: "supergroup", title: "G" }, from: { id: 504, is_bot: false }, user_chat_id: 504 } } as any);
-    expect(texts(504).at(-1)!.text).toContain("Привет!");
+    expect(texts(504)[0]!.text).toContain("Привет!");
     await feed(app, groupCmd(OWNER, "/welcome off"));
     await dispatchPending(app.db, app.tg, 10);
     await handleUpdate(app, joined(503));

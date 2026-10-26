@@ -6,6 +6,7 @@ import { langOf, readableSets, type Member } from "./acl";
 import { T, type Lang } from "./i18n";
 import { citation } from "./ingest";
 import { effectStatement } from "./outbox";
+import { glavnoeFor, sharedParts, type SharedParts } from "./glavnoe";
 import { escapeHtml, snippet } from "./text";
 import { DAY, localParts, nowIso } from "./util";
 
@@ -120,18 +121,20 @@ export async function digestStep(db: D1Database, now: Date, tz: string, hour: nu
     return { keys: [], done: true };
   }
   const sets = await readableSets(db, pending.results);
-  const cache = new Map<string, string | null>();
+  // «Главное» (plan: journey 7): the club's shared lines are built once per set of groups, and each
+  // person's own lines are added for them alone.
+  const cache = new Map<string, SharedParts>();
   const stmts: D1PreparedStatement[] = [];
   const keys: string[] = [];
   for (const m of pending.results) {
     const set = sets.get(m.id)!;
     const lang = langOf(m);
     const sig = `${lang}|${[...set].sort().join(",")}`;
-    if (!cache.has(sig)) cache.set(sig, await build(db, set, start, end, day, lang));
-    const text = cache.get(sig);
+    if (!cache.has(sig)) cache.set(sig, await sharedParts(db, set, start, end, now, tz, lang));
+    const card = await glavnoeFor(db, m.id, set, start, end, now, tz, lang, cache.get(sig));
     const key = `digest:${day}:${m.id}`;
-    if (text) {
-      stmts.push(effectStatement(db, key, m.tg_id, { text }));
+    if (card) {
+      stmts.push(effectStatement(db, key, m.tg_id, { text: card.text, buttons: card.buttons }));
       keys.push(key);
     } else {
       // Nothing happened in this member's groups: record it so the batch moves on, send nothing.

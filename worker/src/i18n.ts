@@ -423,6 +423,23 @@ const EN = {
   bridgeClosedByOperator: "Closed.",
   bridgeSent: "Sent to the club.",
   bHelpIt: "🙋 I can help",
+  // «Главное»: the daily card (journey 7)
+  glavTitle: "What matters",
+  glavNeed: "📌 Waiting for you",
+  glavOwnQ: "❓ Your question, still unanswered",
+  glavPay: "💸 Money, with a deadline",
+  glavMeet: "🗓 Meetings and decisions",
+  glavTalk: "💬 What the club talked about",
+  glavQuiet: "Quiet today. Nothing needs your attention ✨",
+  bDone: "✓ Done",
+  // Newcomer onboarding (journey 2)
+  onbQuestions: "People here often ask about:",
+  onbPick: "What can you help others with? Or what are you looking for? Tap one, or skip.",
+  onbPrivacy: "What I keep: messages from this group, while it's connected.\nTo delete everything: /forget_me.",
+  bSkip: "Skip",
+  onbSaved: (label: string) => `Noted: ${label}. If someone needs this, I'll let you know.`,
+  onbMatch: (label: string) => `Someone here knows ${label} well. Shall I ask them, with their consent? An introduction happens only if they agree.`,
+  bAskThem: "🙋 Ask",
 };
 
 export type Messages = typeof EN;
@@ -823,6 +840,23 @@ const RU: Messages = {
   bridgeClosedByOperator: "Закрыто.",
   bridgeSent: "Отправлено клубу.",
   bHelpIt: "🙋 Помогу",
+  // «Главное»: ежедневная карточка (путь 7)
+  glavTitle: "Главное",
+  glavNeed: "📌 Ждёт тебя",
+  glavOwnQ: "❓ Твой вопрос без ответа",
+  glavPay: "💸 Деньги и сроки",
+  glavMeet: "🗓 Встречи и решения",
+  glavTalk: "💬 О чём говорил клуб",
+  glavQuiet: "Сегодня тихо. Ничего не требует твоего внимания ✨",
+  bDone: "✓ Готово",
+  // Знакомство с новичком (путь 2)
+  onbQuestions: "Здесь часто спрашивают про:",
+  onbPick: "Чем можешь помочь другим? Или что ищешь? Нажми одно или пропусти.",
+  onbPrivacy: "Что я храню: сообщения этой группы, пока она подключена.\nУдалить всё: /forget_me.",
+  bSkip: "Пропустить",
+  onbSaved: (label: string) => `Записал: ${label}. Если кому-то это понадобится, я дам знать.`,
+  onbMatch: (label: string) => `Здесь есть человек, который хорошо разбирается в «${label}». Спросить его? Знакомство — только если он согласится.`,
+  bAskThem: "🙋 Спросить",
 };
 
 export const MESSAGES: Record<Lang, Messages> = { en: EN, ru: RU };

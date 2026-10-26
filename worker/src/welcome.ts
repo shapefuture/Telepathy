@@ -6,9 +6,11 @@
 // Once per person per group. Owners switch it off per group with /welcome off.
 
 import type { App } from "./bot";
-import { defaultLang, T } from "./i18n";
+import { defaultLang, T, type Lang } from "./i18n";
+import { labelIn, TAXONOMY } from "./experts";
 import { DefiniteFailure, type InlineButton } from "./telegram";
-import { escapeHtml } from "./text";
+import { escapeHtml, snippet } from "./text";
+import { topicCounts } from "./wow";
 import { nowIso } from "./util";
 
 export const GROUP_WELCOME_TTL_MS = 2 * 60_000;
@@ -47,6 +49,7 @@ export async function welcomeJoiner(app: App, chatId: number, user: Joiner): Pro
   const title = src.title ?? "";
   if (await dm(app, user.id, title)) {
     await app.db.prepare("UPDATE welcomed SET via='dm' WHERE source_id=? AND tg_id=?").bind(src.id, user.id).run();
+    await onboarding(app, user.id, src.id, defaultLang());
     return;
   }
   const m = T(defaultLang());
@@ -66,7 +69,8 @@ export async function welcomeJoinRequest(app: App, chatId: number, user: Joiner,
   const src = await source(app.db, chatId);
   if (!src || !src.welcome) return;
   if (!(await claim(app.db, src.id, user.id, "join_request"))) return;
-  await dm(app, userChatId ?? user.id, src.title ?? "");
+  const chat = userChatId ?? user.id;
+  if (await dm(app, chat, src.title ?? "")) await onboarding(app, chat, src.id, defaultLang());
 }
 
 /** Cron: delete group welcome messages whose time is up. */
@@ -77,4 +81,30 @@ export async function deleteDue(app: App, budget = 5, now = new Date()): Promise
     await app.db.prepare("DELETE FROM pending_deletes WHERE chat_id=? AND message_id=?").bind(r.chat_id, r.message_id).run();
   }
   return results.length;
+}
+
+/**
+ * Newcomer onboarding (plan: journey 2): the questions this group asks most, the topics it talks
+ * about (tap one to say what you can help with), and two lines on what is kept and how to delete it.
+ */
+export async function onboarding(app: App, userChat: number, sourceId: string, lang: Lang): Promise<void> {
+  const m = T(lang);
+  const { results: qs } = await app.db
+    .prepare(
+      "SELECT p.id, p.body FROM passages p WHERE p.source_id=? AND p.part=0 AND p.removed_at IS NULL AND p.body IS NOT NULL AND p.intent='help_request' AND p.intent_conf>=0.55 " +
+        "ORDER BY (SELECT COUNT(*) FROM passages r WHERE r.source_id=p.source_id AND r.reply_to=p.msg_id AND r.part=0 AND r.removed_at IS NULL) DESC, p.event_at DESC LIMIT 3",
+    )
+    .bind(sourceId)
+    .all<{ id: number; body: string }>();
+  const topics = await topicCounts(app.db, sourceId, 4);
+  const rows: InlineButton[][] = qs.map((q) => [{ text: snippet(q.body, [], 52), callback_data: `nq:${q.id}` } as InlineButton]);
+  const chips = topics.map((t) => ({ text: labelIn(TAXONOMY.get(t.code)!, lang), callback_data: `ob:${t.code}` }) as InlineButton);
+  for (let i = 0; i < chips.length; i += 2) rows.push(chips.slice(i, i + 2));
+  rows.push([{ text: m.bSkip, callback_data: "ob:skip" } as InlineButton]);
+  const parts = [...(qs.length ? [m.onbQuestions] : []), m.onbPick, m.onbPrivacy];
+  try {
+    await app.tg.sendMessage(userChat, parts.join("\n\n"), { buttons: rows });
+  } catch (e) {
+    if (!(e instanceof DefiniteFailure)) throw e;
+  }
 }

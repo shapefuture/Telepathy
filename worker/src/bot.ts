@@ -52,7 +52,7 @@ interface CallbackQuery {
   id: string;
   from: TgUser;
   data?: string;
-  message?: { message_id: number; chat: { id: number; type?: string } };
+  message?: { message_id: number; chat: { id: number; type?: string }; reply_markup?: { inline_keyboard: { text: string; callback_data?: string }[][] } };
 }
 interface ChatMemberUpdated {
   chat: { id: number; type: string; title?: string };
@@ -853,6 +853,74 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
     await clearButtons();
     return [];
   }
+  if (kind === "gd") {
+    // Done on a line of «Главное» (plan: journey 7): it doesn't come back, and its button leaves the card.
+    const mem = await memberByTg(app.db, cb.from.id);
+    if (!mem || !/^\d+$/.test(a)) {
+      await answerCb(pre.notAvailable);
+      return [];
+    }
+    await app.db.prepare("INSERT OR IGNORE INTO glavnoe_done(member_id, passage_id, at) VALUES (?,?,?)").bind(mem.id, Number(a), nowIso()).run();
+    await answerCb(pre.bDone);
+    if (cb.message?.reply_markup) {
+      const rest = cb.message.reply_markup.inline_keyboard.map((row) => row.filter((x) => x.callback_data !== data)).filter((row) => row.length);
+      await app.tg.call("editMessageReplyMarkup", { chat_id: cb.message.chat.id, message_id: cb.message.message_id, reply_markup: { inline_keyboard: rest } }).catch(() => undefined);
+    }
+    return [];
+  }
+  if (kind === "ob") {
+    // Onboarding chips (plan: journey 2): what I can help with. Then, if someone here knows it, offer to ask.
+    const mem = await memberByTg(app.db, cb.from.id);
+    if (!mem) {
+      await answerCb(pre.notAvailable);
+      return [];
+    }
+    await answerCb();
+    await clearButtons();
+    if (a === "skip") return [];
+    if (!TAXONOMY.has(a)) return [];
+    await app.db.prepare("INSERT INTO skills(member_id, code, state, kind) VALUES (?,?,'confirmed','self_claim') ON CONFLICT(member_id, code) DO UPDATE SET state='confirmed'").bind(mem.id, a).run();
+    const label = labelIn(TAXONOMY.get(a)!, langOf(mem));
+    const someone = await app.db
+      .prepare(
+        "SELECT m.id FROM members m JOIN skills s ON s.member_id = m.id AND s.code = ? AND s.state = 'confirmed' " +
+          "WHERE m.discoverable = 1 AND m.removed_at IS NULL AND m.id <> ? AND EXISTS (SELECT 1 FROM source_access a1 JOIN source_access a2 ON a1.source_id = a2.source_id " +
+          "WHERE a1.member_id = ? AND a2.member_id = m.id AND a1.revoked_at IS NULL AND a2.revoked_at IS NULL) LIMIT 1",
+      )
+      .bind(a, mem.id, mem.id)
+      .first();
+    const mm = T(langOf(mem));
+    if (someone) await app.tg.sendMessage(cb.from.id, mm.onbMatch(label), { buttons: [[btn(mm.bAskThem, `wy:${a}`)]] });
+    else await app.tg.sendMessage(cb.from.id, mm.onbSaved(label));
+    return [];
+  }
+  if (kind === "wy") {
+    // Ask the people who know a topic you picked. Still an introduction: they must agree.
+    const mem = await memberByTg(app.db, cb.from.id);
+    if (!mem || !TAXONOMY.has(a)) {
+      await answerCb(pre.notAvailable);
+      return [];
+    }
+    await answerCb();
+    await clearButtons();
+    const label = labelIn(TAXONOMY.get(a)!, langOf(mem));
+    const r = await requestIntro(app.db, mem.id, `${label}: looking for help`, nowIso(), langOf(mem));
+    await app.tg.sendMessage(cb.from.id, T(langOf(mem)).introCreated(escapeHtml(label)));
+    return r.keys;
+  }
+  if (kind === "nq") {
+    // A question another member asked, tapped from the welcome: it becomes this person's own thread.
+    const mem = await memberByTg(app.db, cb.from.id);
+    const q = await app.db.prepare("SELECT source_id, body FROM passages WHERE id=? AND part=0 AND removed_at IS NULL").bind(Number(a)).first<{ source_id: string; body: string }>();
+    const readableNow = mem ? await readable(app.db, mem) : new Set<string>();
+    if (!mem || !q || !q.body || !readableNow.has(q.source_id)) {
+      await answerCb(pre.notAvailable);
+      return [];
+    }
+    await answerCb();
+    await openThread(app, { memberId: mem.id, tgId: cb.from.id, question: q.body.slice(0, 300), readable: readableNow, filters: {}, lang: langOf(mem), sourceId: q.source_id });
+    return [];
+  }
   if (kind === "st") {
     // Settings card toggles (group admins only): edit the card in place.
     const chat = cb.message?.chat;
@@ -1097,7 +1165,9 @@ const inChat = (cm?: { status: string; is_member?: boolean }) => !!cm && IN.incl
 async function onChatMember(app: App, ev: ChatMemberUpdated): Promise<string[]> {
   if (ev.old_chat_member?.status !== ev.new_chat_member.status) await forgetAdminCache(app.db, ev.chat.id, ev.new_chat_member.user.id);
   const src = await enabledSource(app.db, ev.chat.id);
-  const m = src ? await memberByTg(app.db, ev.new_chat_member.user.id) : null;
+  // Joining an enabled group grants reading it (C06), so the person gets their record here, before they post.
+  const joining = inChat(ev.new_chat_member) && !ev.new_chat_member.user.is_bot;
+  const m = src ? (joining ? await ensureMember(app.db, ev.new_chat_member.user.id, undefined, ev.new_chat_member.user.language_code) : await memberByTg(app.db, ev.new_chat_member.user.id)) : null;
   if (src && m) {
     if (!inChat(ev.new_chat_member)) await revoke(app.db, src.id, m.id);
     else await grantStatement(app.db, src.id, m.id).run();

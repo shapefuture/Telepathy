@@ -7,6 +7,7 @@ import { defaultLang } from "./i18n";
 import { eligibleCandidates, labelsFor, matchSkills } from "./experts";
 import { T, type Lang } from "./i18n";
 import { effectStatement } from "./outbox";
+import { syncNeed } from "./thread-card";
 import { escapeHtml } from "./text";
 import { DAY, HOUR, addMs, audit, newId, nowIso } from "./util";
 
@@ -92,6 +93,11 @@ export async function requestIntro(
 }
 
 async function nextCandidate(db: D1Database, needId: string, now: string, notifyNone = true): Promise<{ introId: string | null; keys: string[] }> {
+  const r = await pickCandidate(db, needId, now, notifyNone);
+  return { introId: r.introId, keys: [...r.keys, ...(await syncNeed(db, needId, now))] };
+}
+
+async function pickCandidate(db: D1Database, needId: string, now: string, notifyNone: boolean): Promise<{ introId: string | null; keys: string[] }> {
   const need = await db.prepare("SELECT * FROM needs WHERE id=?").bind(needId).first<{ member_id: string; text: string; skills_json: string; status: string; expires_at: string }>();
   if (!need || !["open", "matching"].includes(need.status)) return { introId: null, keys: [] };
   const tried = new Set(
@@ -156,7 +162,8 @@ export async function act(db: D1Database, introId: string, memberId: string, act
     .run();
   if (!r.meta.changes) return { reply: me.alreadyHandled, keys: [] };
   await audit(db, `intro.${event}`, memberId, introId);
-  return after(db, intro, to, actor, now);
+  const done = await after(db, intro, to, actor, now);
+  return { reply: done.reply, keys: [...done.keys, ...(await syncNeed(db, intro.need_id, now))] };
 }
 
 async function after(db: D1Database, intro: IntroRow, to: Status, actor: Actor, now: string): Promise<{ reply: string; keys: string[] }> {
@@ -217,6 +224,7 @@ export async function cancelNeed(db: D1Database, requesterId: string, needId: st
     .prepare("UPDATE needs SET status='cancelled' WHERE id=? AND member_id=? AND status IN ('open','matching','no_match')")
     .bind(needId, requesterId)
     .run();
+  keys.push(...(await syncNeed(db, needId, now)));
   return { ok: res.meta.changes > 0 || live.results.length > 0, keys };
 }
 
@@ -236,7 +244,10 @@ export async function expireDue(db: D1Database, now = nowIso()): Promise<string[
     await audit(db, "intro.expire", "system", intro.id);
     keys.push(...(await nextCandidate(db, intro.need_id, now)).keys);
   }
+  // Only requests that expire in this sweep get a card edit; older expired ones were already shown.
+  const expiring = await db.prepare("SELECT id FROM needs WHERE status IN ('open','matching') AND expires_at <= ?").bind(now).all<{ id: string }>();
   await db.prepare("UPDATE needs SET status='expired' WHERE status IN ('open','matching') AND expires_at <= ?").bind(now).run();
+  for (const n of expiring.results) keys.push(...(await syncNeed(db, n.id, now)));
   return keys;
 }
 

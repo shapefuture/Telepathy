@@ -13,6 +13,7 @@ import { T } from "./i18n";
 import { DefiniteFailure, type InlineButton } from "./telegram";
 import { escapeHtml } from "./text";
 import { audit, DAY, localParts, nowIso } from "./util";
+import { wowCard } from "./wow";
 
 /** At ≈5 D1 rows per message this keeps imports inside the free plan's 100,000 writes a day. */
 export const HISTORY_PER_DAY = 15_000;
@@ -244,9 +245,11 @@ async function finishHistory(app: App, now: Date): Promise<void> {
       app.db.prepare("DELETE FROM history_pages WHERE source_id=?").bind(r.source_id),
     ]);
     await audit(app.db, "history.import", String(r.owner_tg), r.source_id, { imported: r.imported });
-    const t = T(langOf(await memberByTg(app.db, r.owner_tg)));
+    // The owner gets the wow card: the import line, then what the community talks about (plan: journey 1).
+    const lang = langOf(await memberByTg(app.db, r.owner_tg));
+    const card = await wowCard(app.db, r.source_id, lang, T(lang).historyDone(escapeHtml(r.title ?? ""), r.imported));
     try {
-      await app.tg.sendMessage(r.owner_tg, t.historyDone(escapeHtml(r.title ?? ""), r.imported));
+      await app.tg.sendMessage(r.owner_tg, card.text, { buttons: card.buttons });
     } catch (e) {
       if (!(e instanceof DefiniteFailure)) throw e;
     }

@@ -2,7 +2,7 @@ import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { runCron } from "../src/cron";
 import { handleFetch } from "../src/index";
-import { GROUP, OWNER, dm, enableGroup, fakeTelegram, feed, groupCmd, groupMsg, press, testApp, webhook } from "./helpers";
+import { GROUP, OWNER, dm, enableGroup, fakeTelegram, feed, groupCmd, groupMsg, press, shown, testApp, webhook } from "./helpers";
 
 describe("webhook endpoint", () => {
   it("rejects requests without the Telegram secret", async () => {
@@ -30,7 +30,7 @@ describe("webhook endpoint", () => {
     expect((await webhook({ update_id: 10, ...cmd }, undefined, t.fetcher)).status).toBe(200);
     await webhook({ update_id: 11, ...groupMsg(5, "The meetup venue is Hall B on Rothschild") }, undefined, t.fetcher);
     await webhook({ update_id: 12, ...dm(5, "/ask where is the meetup venue?") }, undefined, t.fetcher);
-    const last = t.sent(5).at(-1)!.params.text as string;
+    const last = shown(t.calls, 5); // the answer is the living card, edited in place
     expect(last).toContain("Hall B");
     expect(last).toContain("t.me/c/1234/");
   });
@@ -127,11 +127,11 @@ describe("bot behaviour", () => {
   });
 
   it("text documents posted in a group become searchable", async () => {
-    const { app, texts } = testApp({ files: { F1: "WEBVTT\n\n00:02:00.000 --> 00:02:05.000\nThe parking is behind the library." } });
+    const { app, calls } = testApp({ files: { F1: "WEBVTT\n\n00:02:00.000 --> 00:02:05.000\nThe parking is behind the library." } });
     await enableGroup(app);
     await feed(app, groupMsg(5, "slides", { document: { file_id: "F1", file_name: "meetup.vtt", file_size: 80 } }));
     await feed(app, dm(5, "/ask where is the parking?"));
-    expect(texts(5).at(-1)).toContain("meetup.vtt · 02:00");
+    expect(shown(calls, 5)).toContain("meetup.vtt · 02:00");
   });
 
   it("/skills all is paged under Telegram's 4096-char limit; owner-only /status", async () => {

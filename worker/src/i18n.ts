@@ -58,15 +58,15 @@ const EN = {
     "Here, in private — everything.\n" +
     "In a group — just /ask <i>question</i> (I answer from that group) and /forget as a reply to your own message to delete it.",
   whereOwner: "\n\n🛠 <b>For the owner</b>\n" +
-    "Here: /status — is all well, /desk — help requests, /sources — connected groups.\n" +
-    "In a group where you're admin: /enable — connect, /disable — disconnect, /welcome — greet newcomers, /hints — hints, /routing — questions to experts.",
+    "Here: /status — is all well, /desk — your console for help requests, /sources — connected groups.\n" +
+    "In a group where you're admin: /enable — connect, /disable — disconnect, /welcome — greet newcomers, /hints — hints, /routing — ask the experts when nothing is found.",
   adminGuide: (title: string) =>
     `✅ <b>“${title}” is connected.</b> Only you see this.\n\n` +
     "Members can now ask me about anything discussed here — in the group with /ask, or privately.\n\n" +
     "<b>What you can set in the group</b>\n" +
     "/welcome on|off — greet newcomers (on now)\n" +
     "/hints on|off — point to earlier answers to repeated questions\n" +
-    "/routing on|off — send questions unanswered for 4 hours to experts\n" +
+    "/routing on|off — ask the experts about questions unanswered for 4 hours\n" +
     "/retention 365 — keep only the last year (0 — everything)\n" +
     "/disable — disconnect the group\n\n" +
     "As a reply: /canonical — best answer, /notevent — not an event.\n" +
@@ -78,10 +78,9 @@ const EN = {
   welcomeGroup: (name: string) =>
     `👋 ${name}, welcome! I'll help you find anything that was ever discussed here, and if needed, the person who knows the answer. Start a private chat with me to begin.`,
   welcomeButton: "Start a chat",
-  connected: (vis: string) =>
+  connected: () =>
     "✨ I'm connected to this group. Anyone here can now ask me about anything discussed in it — /ask right here, or privately. " +
-    "To search, I keep the group's messages: /privacy in a private chat with me explains how, and /forget_me deletes your data." +
-    (vis === "MEMBER_CONSENTED" ? "" : ` (Visibility: ${vis}.)`),
+    "To search, I keep the group's messages: /privacy in a private chat with me explains how, and /forget_me deletes your data.",
   guideInGroup: (name: string) => `${name}, your settings and the button to load past messages are waiting in a private chat with me.`,
   guideButton: "⚙️ Open settings",
   askToConnect: "👋 Hi! I help this group find anything that was ever discussed here — and the person who knows the answer. To start, a group admin taps the button.",
@@ -90,7 +89,7 @@ const EN = {
   whereGroupAdmin: "\n\n🛠 <b>Run a community?</b>\nAdd me to your group — that's the whole setup.",
   historyOffer: (button: boolean) =>
     "\n\n📜 <b>Older messages</b>\nRight now I only know what's written from today on. " +
-    (button ? "Tap the button below and I'll load the group's past messages too — it takes a few seconds, then I finish in the background." : "To load the group's past messages too, open the app → Desk → History."),
+    (button ? "Tap the button below and I'll load the group's past messages too — it takes a few seconds, then I finish in the background." : "To load the group's past messages too, open the app → Console → History."),
   historyButton: "📜 Load past messages",
   historyAuto: "\n\n📜 <b>Older messages</b>\nI'm loading the group's past messages by myself through your Telegram MCP server. I'll message you when they're all searchable.",
   historyMcpFailed: (title: string, button: boolean) =>
@@ -248,8 +247,8 @@ const EN = {
 
   // v2.1b
   routingUsage: "Usage: /routing on or /routing off (owner, in an enabled group).",
-  routingOn: "Routing is <b>on</b>: questions with no reply after 4 hours are sent privately to up to 2 opted-in experts who can read this group.",
-  routingOff: "Routing is off.",
+  routingOn: "Asking the experts is <b>on</b>: questions with no reply after 4 hours are sent privately to up to 2 opted-in experts who can read this group.",
+  routingOff: "Asking the experts is off.",
   routePing: (labels: string, snippet: string, link: string) =>
     `<b>A question in your group is waiting for an answer</b> (<i>${labels}</i>):\n<blockquote>${snippet}</blockquote>\n${link}\n\nYou get this because you opted in as an expert. Stop these: /pings off`,
   openQuestion: "open the question",
@@ -258,9 +257,9 @@ const EN = {
   pingsOff: "No more pings about unanswered questions.",
   catchupUsage: "Usage: <code>/catchup</code>, <code>/catchup 12h</code> or <code>/catchup 3d</code>",
   catchupNothing: "Nothing new in your groups since then.",
-  canonicalSet: "⭐ Marked as the canonical answer. It will rank first for this topic.",
-  canonicalSuperseded: (n: number) => `⭐ Marked as the canonical answer. ${n} older canonical answer(s) are now labelled outdated.`,
-  canonicalTag: "⭐ canonical",
+  canonicalSet: "⭐ Marked as the best answer. It will rank first for this topic.",
+  canonicalSuperseded: (n: number) => `⭐ Marked as the best answer. ${n} older best answer(s) are now labelled outdated.`,
+  canonicalTag: "⭐ best answer",
   outdatedTag: "⚠️ outdated",
   suggestSkill: (label: string) =>
     `You've answered several questions about <b>${label}</b>. Add it to your skills? Only you can see this suggestion, and nothing changes unless you accept.`,
@@ -273,6 +272,70 @@ const EN = {
   eventsIcs: "Calendar file for these events:",
   eventHidden: "Hidden from /events.",
   appButton: "Open app",
+  // «Нить»: the living request card (one message, edited in place)
+  memberAnon: "Member",
+  threadSearching: "🔍 Searching the community's memory…",
+  threadMemoryHead: "💡 Found in the community's memory",
+  threadMemoryAsk: "Is this what you need?",
+  threadNothing: "Nothing in the community's memory on this yet. Ask the people who know it?",
+  threadAsking: (n: number) => `🙋 Asked ${n} people who know this. I'll write here as soon as someone replies.`,
+  threadNoMatch: "No one suitable has taken it yet. I'll keep looking and write here.",
+  threadCancelled: "Request cancelled.",
+  threadExpired: "This request expired. You can ask again.",
+  threadCandidate: (who: string) => `🤝 ${who} is ready to help. Confirm to open the contacts.`,
+  threadConnected: "🤝 You're connected. The contacts are open.",
+  threadFollowup: "Did it help? Pick how it went.",
+  threadFollowupAsk: "Did it help? Pick how it went, it takes a second.",
+  threadClosed: (label: string) => `✅ Outcome: ${label}`,
+  threadThanked: "🙏 Thanks sent.",
+  threadStopped: "This request is closed.",
+  threadSolvedToast: "Glad it helped!",
+  threadNotThatToast: "Thanks, noted.",
+  threadThanksSent: "Thanks sent.",
+  thanksReceived: (q: string, n: number) => `🙏 Someone thanked you for helping with “${q}”. You've helped ${n} people so far.`,
+  outcomeContactLabel: "got the contact",
+  outcomeAdviceLabel: "got advice",
+  outcomeSolvedLabel: "solved",
+  bOutcomeContact: "📇 Got the contact",
+  bOutcomeAdvice: "💬 Got advice",
+  bOutcomeSolved: "✅ Solved it",
+  bThatsIt: "✅ That's it",
+  bAskPeople: "🙋 Ask people",
+  bNotThat: "👎 Not that",
+  bThanks: "🙏 Thank them",
+  bCancelAsk: "✖ Cancel request",
+  bOpenPrivately: "💬 Open in private",
+  threadGroupFound: (n: number) => `💡 Found ${n} answer(s) in the community's memory. I sent them to you privately.`,
+  threadGroupNothing: "🔍 Nothing in the memory yet. I sent the next steps to you privately.",
+  // Wow moment after a history import, and forgotten questions
+  wowTopics: "What your community talks about",
+  wowHelpers: "Who helps most",
+  wowForgotten: (n: number) => `I found ${n} question(s) nobody answered`,
+  wowNoneForgotten: "Every question found an answer. Lovely.",
+  wowForgottenHead: "Questions without an answer. Tap one and I'll look for it.",
+  bLook: "Look",
+  bAnswerIt: "Answer it",
+  // Pilot metrics (owner)
+  pilotTitle: "Pilot: how requests go",
+  pilotAll: "Requests",
+  pilotMemory: "Answered from memory",
+  pilotAsked: "Asked people",
+  pilotConnected: "Connected",
+  pilotSolved: "Outcomes: solved / advice / contact",
+  pilotSpeed: "Median time to the first answer",
+  pilotNone: "No requests yet.",
+  // Group settings card
+  settingsTitle: "⚙️ Settings for this group",
+  setHints: "Answer repeated questions",
+  setRouting: "Ask people who know when nothing is found",
+  setWelcome: "Welcome newcomers",
+  setRetention: (days: number) => (days ? `Keeping messages for ${days} days` : "Keeping all messages (change with /retention)"),
+  // Showing a first name on answer cards (off by default)
+  nameOn: "Your first name will show on answer cards now.",
+  nameOff: "Your name is hidden again: you're a face in the crowd 🙂",
+  bNameOn: "🪪 Show my name",
+  bNameOff: "🪪 Hide my name",
+  nameUsage: "Use <code>/name on</code> to show your first name on answer cards, or <code>/name off</code> to hide it.",
 };
 
 export type Messages = typeof EN;
@@ -316,15 +379,15 @@ const RU: Messages = {
     "Здесь, в личке, — всё.\n" +
     "В группе — только /ask <i>вопрос</i> (отвечу из этой группы) и /forget ответом на своё сообщение, чтобы его удалить.",
   whereOwner: "\n\n🛠 <b>Для владельца</b>\n" +
-    "Здесь: /status — всё ли в порядке, /desk — просьбы о помощи, /sources — подключённые группы.\n" +
-    "В группе, где ты админ: /enable — подключить, /disable — отключить, /welcome — приветствие новичков, /hints — подсказки, /routing — вопросы экспертам.",
+    "Здесь: /status — всё ли в порядке, /desk — твой пульт: просьбы о помощи, /sources — подключённые группы.\n" +
+    "В группе, где ты админ: /enable — подключить, /disable — отключить, /welcome — приветствие новичков, /hints — подсказки, /routing — спрашивать знающих, если ответа нет.",
   adminGuide: (title: string) =>
     `✅ <b>«${title}» подключена.</b> Это видишь только ты.\n\n` +
     "Теперь участники могут спрашивать меня о том, что здесь обсуждали, — в группе через /ask или в личке.\n\n" +
     "<b>Что можно настроить в группе</b>\n" +
     "/welcome on|off — приветствовать новичков (сейчас включено)\n" +
     "/hints on|off — подсказывать прошлые ответы на повторные вопросы\n" +
-    "/routing on|off — вопросы без ответа через 4 часа отправлять экспертам\n" +
+    "/routing on|off — спрашивать знающих о вопросах без ответа 4 часа\n" +
     "/retention 365 — хранить только последний год (0 — всё)\n" +
     "/disable — отключить группу\n\n" +
     "Ответом на сообщение: /canonical — лучший ответ, /notevent — это не событие.\n" +
@@ -336,10 +399,9 @@ const RU: Messages = {
   welcomeGroup: (name: string) =>
     `👋 ${name}, добро пожаловать! Я помогу найти любую информацию, которая здесь когда-то обсуждалась, а если потребуется — человека, который знает ответ. Создай личный чат со мной, чтобы начать.`,
   welcomeButton: "Начать",
-  connected: (vis: string) =>
+  connected: () =>
     "✨ Я подключился к этой группе. Теперь любой участник может спросить меня о том, что здесь обсуждали, — /ask прямо здесь или в личке. " +
-    "Чтобы искать, я сохраняю сообщения группы: как именно — /privacy в личке со мной, удалить свои данные — /forget_me." +
-    (vis === "MEMBER_CONSENTED" ? "" : ` (Видимость: ${vis}.)`),
+    "Чтобы искать, я сохраняю сообщения группы: как именно — /privacy в личке со мной, удалить свои данные — /forget_me.",
   guideInGroup: (name: string) => `${name}, настройки и кнопка для загрузки старых сообщений ждут тебя у меня в личке.`,
   guideButton: "⚙️ Открыть настройки",
   askToConnect: "👋 Привет! Я помогаю найти всё, что здесь когда-либо обсуждали, — и человека, который знает ответ. Чтобы начать, админ группы нажимает кнопку.",
@@ -498,8 +560,8 @@ const RU: Messages = {
   alreadyResolved: "Уже решено.",
 
   routingUsage: "Использование: /routing on или /routing off (владелец, в подключённой группе).",
-  routingOn: "Маршрутизация <b>включена</b>: вопросы без ответа через 4 часа приватно отправляются максимум 2 экспертам, которые согласились и могут читать эту группу.",
-  routingOff: "Маршрутизация выключена.",
+  routingOn: "Спрашивание знающих <b>включено</b>: вопросы без ответа через 4 часа приватно отправляются максимум 2 экспертам, которые согласились и могут читать эту группу.",
+  routingOff: "Спрашивание знающих выключено.",
   routePing: (labels: string, snippet: string, link: string) =>
     `<b>Вопрос в вашей группе ждёт ответа</b> (<i>${labels}</i>):\n<blockquote>${snippet}</blockquote>\n${link}\n\nВы получили это, потому что согласились быть экспертом. Отключить: /pings off`,
   openQuestion: "открыть вопрос",
@@ -508,9 +570,9 @@ const RU: Messages = {
   pingsOff: "Больше не буду присылать вопросы без ответа.",
   catchupUsage: "Использование: <code>/catchup</code>, <code>/catchup 12h</code> или <code>/catchup 3d</code>",
   catchupNothing: "С тех пор в ваших группах ничего нового.",
-  canonicalSet: "⭐ Отмечено как основной ответ. Он будет первым по этой теме.",
-  canonicalSuperseded: (n: number) => `⭐ Отмечено как основной ответ. Старых основных ответов помечено устаревшими: ${n}.`,
-  canonicalTag: "⭐ основной ответ",
+  canonicalSet: "⭐ Отмечено как лучший ответ. Он будет первым по этой теме.",
+  canonicalSuperseded: (n: number) => `⭐ Отмечено как лучший ответ. Старых лучших ответов помечено устаревшими: ${n}.`,
+  canonicalTag: "⭐ лучший ответ",
   outdatedTag: "⚠️ устарело",
   suggestSkill: (label: string) =>
     `Вы ответили на несколько вопросов по теме <b>${label}</b>. Добавить её в ваши навыки? Это предложение видите только вы, и ничего не изменится без вашего согласия.`,
@@ -523,6 +585,70 @@ const RU: Messages = {
   eventsIcs: "Файл календаря с этими событиями:",
   eventHidden: "Скрыто из /events.",
   appButton: "Открыть приложение",
+  // «Нить»: живая карточка запроса (одно сообщение, которое правится на месте)
+  memberAnon: "Участник",
+  threadSearching: "🔍 Ищу в памяти клуба…",
+  threadMemoryHead: "💡 Нашёл в памяти клуба",
+  threadMemoryAsk: "Это то, что нужно?",
+  threadNothing: "В памяти клуба пока ничего нет. Спросить тех, кто в этом разбирается?",
+  threadAsking: (n: number) => `🙋 Спросил ${n} чел., которые в этом разбираются. Напишу сюда, как только кто-то откликнется.`,
+  threadNoMatch: "Пока никто подходящий не взялся. Я продолжу искать и напишу сюда.",
+  threadCancelled: "Запрос отменён.",
+  threadExpired: "Срок запроса истёк. Можно спросить ещё раз.",
+  threadCandidate: (who: string) => `🤝 ${who} готов помочь. Подтверди, чтобы открыть контакты.`,
+  threadConnected: "🤝 Вы на связи. Контакты открыты.",
+  threadFollowup: "Помогло? Выбери, как вышло.",
+  threadFollowupAsk: "Ну что, помогло? Выбери, как вышло, — это секунда.",
+  threadClosed: (label: string) => `✅ Итог: ${label}`,
+  threadThanked: "🙏 Спасибо отправлено.",
+  threadStopped: "Этот запрос закрыт.",
+  threadSolvedToast: "Рад, что помогло!",
+  threadNotThatToast: "Спасибо, учту.",
+  threadThanksSent: "Спасибо отправлено.",
+  thanksReceived: (q: string, n: number) => `🙏 Тебя поблагодарили за помощь с вопросом «${q}». Ты уже помог ${n} людям.`,
+  outcomeContactLabel: "получил контакт",
+  outcomeAdviceLabel: "дали совет",
+  outcomeSolvedLabel: "решил задачу",
+  bOutcomeContact: "📇 Получил контакт",
+  bOutcomeAdvice: "💬 Дали совет",
+  bOutcomeSolved: "✅ Решил задачу",
+  bThatsIt: "✅ Это то, что нужно",
+  bAskPeople: "🙋 Спросить людей",
+  bNotThat: "👎 Не то",
+  bThanks: "🙏 Спасибо",
+  bCancelAsk: "✖ Отменить запрос",
+  bOpenPrivately: "💬 Открыть в личке",
+  threadGroupFound: (n: number) => `💡 Нашёл ответов в памяти клуба: ${n}. Отправил тебе в личку.`,
+  threadGroupNothing: "🔍 В памяти пока пусто. Следующие шаги отправил тебе в личку.",
+  // Wow moment после загрузки истории, и вопросы без ответа
+  wowTopics: "О чём говорит ваше сообщество",
+  wowHelpers: "Кто помогает чаще всех",
+  wowForgotten: (n: number) => `Я нашёл ${n} вопросов, на которые никто не ответил`,
+  wowNoneForgotten: "На все вопросы нашлись ответы. Здорово!",
+  wowForgottenHead: "Вопросы без ответа. Нажми на один — я поищу ответ.",
+  bLook: "Посмотреть",
+  bAnswerIt: "Ответить",
+  // Пилот: показатели для владельца
+  pilotTitle: "Пилот: как идут запросы",
+  pilotAll: "Запросов",
+  pilotMemory: "Ответ из памяти",
+  pilotAsked: "Спросили людей",
+  pilotConnected: "Связались",
+  pilotSolved: "Итоги: решил / совет / контакт",
+  pilotSpeed: "Медианное время до первого ответа",
+  pilotNone: "Запросов пока нет.",
+  // Карточка настроек группы
+  settingsTitle: "⚙️ Настройки группы",
+  setHints: "Отвечать на повторные вопросы",
+  setRouting: "Спрашивать знающих, если ответа нет",
+  setWelcome: "Приветствовать новичков",
+  setRetention: (days: number) => (days ? `Храню сообщения ${days} дн.` : "Храню всю историю (изменить: /retention 90)"),
+  // Имя в карточках ответов (по умолчанию скрыто)
+  nameOn: "Теперь в ответах будет видно твоё имя.",
+  nameOff: "Имя скрыто: ты снова участник в толпе 🙂",
+  bNameOn: "🪪 Показывать моё имя",
+  bNameOff: "🪪 Скрыть моё имя",
+  nameUsage: "Напиши <code>/name on</code>, чтобы в ответах видели твоё имя, или <code>/name off</code>, чтобы скрыть.",
 };
 
 export const MESSAGES: Record<Lang, Messages> = { en: EN, ru: RU };

@@ -22,6 +22,7 @@ export interface Hit {
   id: number;
   msg_id: number;
   source_id: string;
+  author_id: string | null;
   body: string;
   label: string | null;
   event_at: string;
@@ -34,6 +35,7 @@ export interface Hit {
 interface Row {
   id: number;
   source_id: string;
+  author_id: string | null;
   body: string;
   label: string | null;
   event_at: string;
@@ -53,7 +55,7 @@ export interface SearchFilters {
 
 function candidatesSql(f: SearchFilters): string {
   return (
-    "SELECT p.id, p.source_id, p.body, p.label, p.event_at, p.msg_id, p.topic_id, p.canonical, p.superseded_by, s.chat_id, s.username " +
+    "SELECT p.id, p.source_id, p.author_id, p.body, p.label, p.event_at, p.msg_id, p.topic_id, p.canonical, p.superseded_by, s.chat_id, s.username " +
     "FROM passages_fts f JOIN passages p ON p.id = f.rowid JOIN sources s ON s.id = p.source_id " +
     "WHERE passages_fts MATCH ? AND p.removed_at IS NULL AND p.body IS NOT NULL AND s.enabled = 1 " +
     "AND p.source_id IN (SELECT value FROM json_each(?)) " +
@@ -171,6 +173,7 @@ export async function search(
       id,
       msg_id: r.msg_id,
       source_id: r.source_id,
+      author_id: r.author_id,
       body: r.body,
       label: r.label,
       event_at: r.event_at,
@@ -194,6 +197,8 @@ export interface Quote {
   url: string | null;
   coverage: number;
   tag?: "canonical" | "outdated";
+  /** Pseudonymous member id of the author; shown as a face and, if opted in, a first name. */
+  author_id?: string | null;
 }
 
 export async function answer(db: D1Database, readable: Set<string>, query: string, filters: SearchFilters = {}): Promise<Answer> {
@@ -209,7 +214,7 @@ export async function answer(db: D1Database, readable: Set<string>, query: strin
     if (coverage >= MIN_COVERAGE) {
       const keys = terms.flatMap((t) => [t, ...(fixes.has(t) ? [fixes.get(t)!] : [])]);
       const tag = h.canonical ? "canonical" : h.superseded_by ? "outdated" : undefined;
-      quotes.push({ id: h.id, text: snippet(h.body, keys), label: h.label, event_at: h.event_at, url: h.url, coverage, ...(tag ? { tag } : {}) });
+      quotes.push({ id: h.id, text: snippet(h.body, keys), label: h.label, event_at: h.event_at, url: h.url, coverage, author_id: h.author_id, ...(tag ? { tag } : {}) });
     }
   }
   // Canonical answers first, then coverage; stable sort keeps rank order among ties.

@@ -9,6 +9,8 @@ export async function forgetMember(db: D1Database, memberId: string, tgId: numbe
     db.prepare("UPDATE passages SET body=NULL, removed_at=? WHERE author_id=? AND removed_at IS NULL RETURNING id").bind(now, memberId),
     db.prepare("DELETE FROM skills WHERE member_id=? RETURNING code").bind(memberId),
     db.prepare("DELETE FROM answer_votes WHERE member_id=?").bind(memberId),
+    db.prepare("DELETE FROM thread_events WHERE thread_id IN (SELECT id FROM threads WHERE member_id=?)").bind(memberId),
+    db.prepare("DELETE FROM threads WHERE member_id=?").bind(memberId),
     db.prepare("DELETE FROM answers WHERE member_id=?").bind(memberId),
     db
       .prepare(

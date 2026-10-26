@@ -2,6 +2,7 @@
 // At-most-once from normal retries: 'dispatching' is written before the network call; an
 // unknown outcome becomes 'uncertain' and is never resent automatically.
 
+import { applyCard, renderThread } from "./thread-card";
 import { DefiniteFailure, RetryLater, type InlineButton, type Telegram } from "./telegram";
 import { escapeHtml } from "./text";
 import { newId, nowIso } from "./util";
@@ -13,6 +14,9 @@ export interface Payload {
   reveal_tg_id?: number;
   /** Reply under this message (group hints). */
   reply_to?: number;
+  /** A living card («Нить»): edit message `edit` to the thread's current state, rendered now. */
+  thread?: string;
+  edit?: number;
 }
 
 export function effectStatement(db: D1Database, key: string, chatId: number, payload: Payload): D1PreparedStatement {
@@ -51,6 +55,16 @@ export async function dispatch(db: D1Database, tg: Telegram, id: string): Promis
   if (!(await setState(db, id, "pending", "dispatching"))) return row.state;
   const p = JSON.parse(row.payload) as Payload;
   try {
+    if (p.thread && p.edit !== undefined) {
+      const card = await renderThread(db, p.thread);
+      if (!card) {
+        await setState(db, id, "dispatching", "skipped");
+        return "skipped";
+      }
+      await applyCard(tg, card);
+      await setState(db, id, "dispatching", "sent");
+      return "sent";
+    }
     let text = p.text;
     if (p.reveal_tg_id) text += `\n${await contactLine(tg, p.reveal_tg_id)}`;
     const msg = await tg.sendMessage(row.chat_id, text, { buttons: p.buttons, replyTo: p.reply_to });

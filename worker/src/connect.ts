@@ -73,7 +73,7 @@ export async function connectGroup(app: App, chat: GroupChat, admin: TgUser, vis
   ]);
   await audit(app.db, "source.enable", member.id, id, { visibility: vis, by: operator ? "operator" : "group admin" });
   const group = T(defaultLang()); // the whole group reads this one
-  await app.tg.sendMessage(chat.id, group.connected(vis));
+  await app.tg.sendMessage(chat.id, group.connected());
   if (!(await sendGuide(app, admin, chat, id))) {
     // They never opened the bot privately, so it can't write to them: one tap opens the guide.
     const bot = await botUsername(app);

@@ -7,7 +7,8 @@ import { redact } from "../src/ai/redact";
 import { conversation } from "../src/ai/threads";
 import { resetRateLimits } from "../src/bot";
 import { makeApp } from "../src/index";
-import { GROUP, dm, press, enableGroup, fakeTelegram, feed, groupMsg, nextMsg } from "./helpers";
+import { GROUP, dm, press, enableGroup, fakeTelegram, feed, groupMsg, nextMsg, shown } from "./helpers";
+import { T } from "../src/i18n";
 
 beforeEach(() => resetRateLimits());
 
@@ -42,7 +43,7 @@ function world(reply: string) {
     return Response.json({ message: { role: "assistant", content: reply } });
   };
   const app = makeApp({ ...(env as any), OLLAMA_API_KEY: "test-key", AI: undefined }, t.fetcher, net);
-  return { app, t, calls, texts: (c: number) => t.sent(c).map((x) => x.params.text as string) };
+  return { app, t, calls, texts: (c: number) => t.sent(c).map((x) => x.params.text as string), shown: (c: number) => shown(t.calls, c) };
 }
 
 async function seed(app: any) {
@@ -68,11 +69,11 @@ describe("conversation", () => {
 
 describe("Beam summary on /ask", () => {
   it("adds a checked summary, sends only redacted text, and caches by content", async () => {
-    const { app, calls, texts } = world('It took "three weeks at the city office". It is "always free".');
+    const { app, t, calls, texts } = world('It took "three weeks at the city office". It is "always free".');
     await seed(app);
     await feed(app, dm(12, "/ask visa paperwork"));
-    const out = texts(12).at(-1)!;
-    expect(out).toContain("💡");
+    const out = shown(t.calls, 12);
+    expect(out).toContain(T("en").aiNote);
     expect(out).toContain("three weeks at the city office");
     expect(out).not.toContain("always free"); // not in the sources, removed
     expect(calls).toHaveLength(1);
@@ -93,8 +94,8 @@ describe("Beam summary on /ask", () => {
     expect(called).toBe(0);
     const broken = makeApp({ ...(env as any), OLLAMA_API_KEY: "k", AI: undefined }, t.fetcher, async () => new Response("down", { status: 503 }));
     await feed(broken, dm(12, "/ask visa"));
-    const last = t.sent(12).at(-1)!.params.text as string;
-    expect(last).not.toContain("💡");
+    const last = shown(t.calls, 12);
+    expect(last).not.toContain(T("en").aiNote);
     expect(last).toContain("paperwork");
   });
 });
@@ -134,8 +135,8 @@ describe("Workers AI backup", () => {
     const app = makeApp({ ...(env as any), OLLAMA_API_KEY: "k", AI: ai.binding }, t.fetcher, async () => new Response("quota", { status: 429 }));
     await seed(app);
     await feed(app, dm(12, "/ask visa paperwork"));
-    const out = t.sent(12).at(-1)!.params.text as string;
-    expect(out).toContain("💡");
+    const out = shown(t.calls, 12);
+    expect(out).toContain(T("en").aiNote);
     expect(out).toContain("three weeks at the city office");
     expect(out).not.toContain("made up");
     expect(ai.runs).toHaveLength(1);
@@ -149,11 +150,11 @@ describe("Workers AI backup", () => {
     const app = makeApp({ ...(env as any), AI: ai.binding }, t.fetcher);
     await seed(app);
     await feed(app, dm(12, "/ask visa paperwork"));
-    expect(t.sent(12).at(-1)!.params.text).toContain("💡");
+    expect(shown(t.calls, 12)).toContain(T("en").aiNote);
     const off = makeApp({ ...(env as any), AI: ai.binding, WORKERS_AI_MODEL: "off" }, t.fetcher);
     await feed(off, dm(12, "/ask visa"));
     expect(ai.runs).toHaveLength(1);
-    expect(t.sent(12).at(-1)!.params.text).not.toContain("💡");
+    expect(shown(t.calls, 12)).not.toContain(T("en").aiNote);
   });
 
   it("an error from Workers AI just shows the normal answer", async () => {
@@ -161,8 +162,8 @@ describe("Workers AI backup", () => {
     const app = makeApp({ ...(env as any), AI: fakeAi(new Error("neurons exhausted")).binding }, t.fetcher);
     await seed(app);
     await feed(app, dm(12, "/ask visa paperwork"));
-    const out = t.sent(12).at(-1)!.params.text as string;
-    expect(out).not.toContain("💡");
+    const out = shown(t.calls, 12);
+    expect(out).not.toContain(T("en").aiNote);
     expect(out).toContain("paperwork");
   });
 });

@@ -25,6 +25,8 @@ export interface Member {
   lang_explicit: number;
   routing: number;
   catchup_at: string | null;
+  /** Opt-in first name for answer cards; null unless the member switched it on. */
+  display_name?: string | null;
 }
 
 /** Interface language for a member: their explicit choice, else the default (Russian). */

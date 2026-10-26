@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ensureMember } from "../src/acl";
 import { langFromCode, MESSAGES, setDefaultLang } from "../src/i18n";
 import { answer } from "../src/search";
-import { GROUP, OWNER, dm, enableGroup, feed, groupCmd, groupMsg, press, testApp } from "./helpers";
+import { fakeTelegram, GROUP, OWNER, dm, enableGroup, feed, groupCmd, groupMsg, press, shown, shownButtons, testApp } from "./helpers";
 
 const OTHER = -1009;
 const inOther = <T extends { message: any }>(u: T): T => ({ ...u, message: { ...u.message, chat: { id: OTHER, type: "supergroup", title: "Other" } } });
@@ -50,16 +50,19 @@ describe("P13-04 Russian / English interface", () => {
 
 describe("P13-01 answers inside groups", () => {
   it("answers from this group only, never from other groups (C02)", async () => {
-    const { app, sent } = testApp();
+    const { app, sent, calls } = testApp();
     await enableGroup(app);
     await feed(app, inOther(groupCmd(OWNER, "/enable")));
     await feed(app, groupMsg(5, "The venue for the meetup is Hall B"));
     await feed(app, inOther(groupMsg(5, "Secret venue for the board meeting is room 7")));
     await feed(app, groupCmd(5, "/ask where is the venue?"));
+    // The group sees one line; the answer itself is the asker's card, in private.
     const out = lastFor(sent(GROUP));
-    expect(out.text).toContain("Hall B");
-    expect(out.text).not.toContain("room 7");
+    expect(out.text).toContain("sent them to you privately");
     expect(out.reply_parameters.message_id).toBeGreaterThan(0);
+    const card = shown(calls, 5);
+    expect(card).toContain("Hall B");
+    expect(card).not.toContain("room 7");
     // The same member in a DM sees both groups they can read.
     const a = await answer(env.DB, new Set((await env.DB.prepare("SELECT id FROM sources").all<{ id: string }>()).results.map((r) => r.id)), "venue");
     expect(a.quotes.length).toBe(2);
@@ -80,36 +83,38 @@ describe("P13-01 answers inside groups", () => {
     await feed(app, groupMsg(5, "Parking is behind the library"));
     const q = "@telepathy_bot where is parking";
     await feed(app, groupMsg(6, q, { entities: [{ type: "mention", offset: 0, length: 14 }] }));
-    const out = t.sent(GROUP).at(-1)!.params.text as string;
-    expect(out).toContain("behind the library");
-    expect(out).not.toContain("@telepathy_bot");
+    const card = shown(t.calls, 6); // the asker's card, edited in place
+    expect(card).toContain("behind the library");
+    expect(card).not.toContain("@telepathy_bot");
   });
 });
 
 describe("P13-05 answer feedback", () => {
+  // The answer is a living card in the asker's private chat: 👍 is "Это то, что нужно", 👎 is "Не то".
   async function askAndGetButtons() {
-    const { app, sent } = testApp();
+    const { app, calls } = testApp();
     await enableGroup(app);
     await feed(app, groupMsg(1, "Our accountant is Dana, she handles VAT."));
     await feed(app, groupMsg(1, "The accountant meetup is on Monday."));
     await feed(app, dm(1, "/ask accountant"));
-    const p = lastFor(sent(1));
-    return { app, sent, buttons: p.reply_markup.inline_keyboard as { text: string; callback_data: string }[][] };
+    return { app, calls, buttons: shownButtons(calls, 1) };
   }
 
   it("records private votes once, lets you change your mind, and counts wrong sources per quote", async () => {
     const { app, buttons } = await askAndGetButtons();
-    const [up, down] = buttons[0]!.map((b) => b.callback_data);
-    const bad0 = buttons[1]![0]!.callback_data;
-    await feed(app, press(1, up!));
-    await feed(app, press(1, up!)); // duplicate click
+    const thatsIt = buttons[0]![0]!.callback_data;
+    const notThat = buttons[1]![0]!.callback_data;
+    await feed(app, press(1, thatsIt));
+    await feed(app, press(1, thatsIt)); // duplicate click
     let totals = await env.DB.prepare("SELECT SUM(up) AS u, SUM(down) AS d, SUM(bad) AS b FROM passage_votes").first();
     expect(totals).toEqual({ u: 2, d: 0, b: 0 }); // 2 passages quoted, one vote each
-    await feed(app, press(1, down!)); // change of mind replaces the up vote
+    await feed(app, press(1, notThat)); // changing your mind replaces the earlier vote
     totals = await env.DB.prepare("SELECT SUM(up) AS u, SUM(down) AS d, SUM(bad) AS b FROM passage_votes").first();
     expect(totals).toEqual({ u: 0, d: 2, b: 0 });
-    await feed(app, press(1, bad0));
-    await feed(app, press(1, bad0));
+    // Wrong sources are reported per quote on the answer (f:<answer>:bad<i>), not on the card.
+    const answerId = (await env.DB.prepare("SELECT id FROM answers ORDER BY created_at DESC LIMIT 1").first<{ id: string }>())!.id;
+    await feed(app, press(1, `f:${answerId}:bad0`));
+    await feed(app, press(1, `f:${answerId}:bad0`));
     expect((await env.DB.prepare("SELECT SUM(bad) AS b FROM passage_votes").first<{ b: number }>())!.b).toBe(1);
   });
 
@@ -126,16 +131,18 @@ describe("P13-05 answer feedback", () => {
     expect(after.quotes[0]!.id).toBe(second);
     const none = await answer(env.DB, new Set([(await env.DB.prepare("SELECT id FROM sources").first<{ id: string }>())!.id]), "kubernetes ingress");
     expect(none.status).toBe("insufficient");
-    expect(buttons[1]).toHaveLength(2);
+    expect(buttons[1]).toHaveLength(1); // the card's "Не то"
   });
 
-  it("forget_me deletes the member's answers and votes", async () => {
-    const { app, buttons } = await askAndGetButtons();
+  it("forget_me deletes the member's answers, votes and living cards", async () => {
+    const { app, calls, buttons } = await askAndGetButtons();
     await feed(app, press(1, buttons[0]![0]!.callback_data));
     await feed(app, dm(1, "/forget_me"));
     await feed(app, press(1, "fm:yes"));
     expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM answer_votes").first<{ n: number }>())!.n).toBe(0);
     expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM answers").first<{ n: number }>())!.n).toBe(0);
+    expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM threads").first<{ n: number }>())!.n).toBe(0);
+    expect(calls.some((c) => c.method === "deleteMessage" && c.params.chat_id === 1)).toBe(true);
   });
 });
 

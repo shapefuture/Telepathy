@@ -26,10 +26,13 @@ import { answer, parseFilters, renderAnswer } from "./search";
 import type { Fetcher, InlineButton, Telegram } from "./telegram";
 import { DefiniteFailure } from "./telegram";
 import { forgetAdminCache, isChatAdminLive } from "./admins";
-import { askToConnect, chatFromParam, connectGroup, sendGuide } from "./connect";
+import { askToConnect, botUsername, chatFromParam, connectGroup, sendGuide } from "./connect";
+import { openThread, pilotText, resend, threadAction } from "./thread";
+import { SETTING_COLUMNS, settingsView, toggleSetting, type SettingColumn } from "./group-settings";
+import { forgottenView } from "./wow";
 import { welcomeJoinRequest, welcomeJoiner } from "./welcome";
 import { escapeHtml } from "./text";
-import { audit, DAY, HOUR, localParts, newId, nowIso, tzOffsetMinutes } from "./util";
+import { audit, DAY, HOUR, localParts, nowIso, tzOffsetMinutes } from "./util";
 
 export interface App {
   env: Env;
@@ -71,9 +74,10 @@ export interface Update {
 /** Kept for tests and docs: the English privacy notice. */
 export const PRIVACY_NOTICE = T("en").privacy;
 
-const PRIVATE_ONLY = new Set(["intro", "expert", "profile", "optin", "optout", "skills", "forget_me", "digest", "requests", "language", "catchup", "events", "pings", "app", "cancel", "desk", "offer", "partner", "fed", "ledger", "passport", "continuity", "destinations", "alert", "drill"]);
+const PRIVATE_ONLY = new Set(["intro", "expert", "profile", "optin", "optout", "skills", "forget_me", "digest", "requests", "language", "catchup", "events", "pings", "app", "cancel", "desk", "offer", "partner", "fed", "ledger", "passport", "continuity", "destinations", "alert", "drill", "name", "pilot"]);
 const GROUP_TYPES = new Set(["group", "supergroup"]);
 const btn = (text: string, data: string): InlineButton => ({ text, callback_data: data });
+const linkBtn = (text: string, href: string) => ({ text, url: href }) as unknown as InlineButton;
 
 // ---- helpers --------------------------------------------------------------------------
 
@@ -183,6 +187,7 @@ async function onMessage(app: App, msg: TgMessage, edited: boolean): Promise<str
       if (command.cmd === "canonical") return cmdCanonical(app, msg);
       if (command.cmd === "notevent") return cmdNotEvent(app, msg);
       if (command.cmd === "forget") return cmdForgetMessage(app, msg);
+      if (command.cmd === "settings") return cmdSettings(app, msg);
     }
     const keys: string[] = [];
     const mentioned = edited ? null : mentionQuestion(msg, app.env.BOT_USERNAME);
@@ -237,7 +242,11 @@ async function ingest(app: App, msg: TgMessage, edited: boolean): Promise<string
   return keys;
 }
 
-/** P13-01: answer in the group, from that group only. Everyone there can already read it. */
+/**
+ * P13-01 + the quiet rule (plan: Нить): the answer opens as a card in the asker's private chat, and
+ * the group sees one line with a button to it. If Telegram won't let the bot write to them yet, the
+ * group gets the answer itself, as before.
+ */
 async function groupAsk(app: App, msg: TgMessage, question: string): Promise<string[]> {
   const source = await enabledSource(app.db, msg.chat.id);
   if (!source || !msg.from || msg.from.is_bot) return [];
@@ -249,11 +258,30 @@ async function groupAsk(app: App, msg: TgMessage, question: string): Promise<str
   const asker = await ensureMember(app.db, msg.from.id, undefined, msg.from.language_code);
   if (asker.collection_opt_out || asker.removed_at) return [];
   const f = await parseFilters(app.db, new Set([source.id]), question);
+  const m = T(lang);
+  if (!f.query) {
+    await reply(app, msg.chat.id, m.askUsage, undefined, msg.message_id);
+    return [];
+  }
+  const opened = await openThread(app, { memberId: asker.id, tgId: msg.from.id, question: f.query, readable: f.readable, filters: f.filters, lang });
+  if (opened) {
+    const bot = await botUsername(app);
+    const buttons = bot ? [[linkBtn(m.bOpenPrivately, `https://t.me/${bot}?start=q${opened.id}`)]] : undefined;
+    await reply(app, msg.chat.id, opened.count ? m.threadGroupFound(opened.count) : m.threadGroupNothing, buttons, msg.message_id);
+    return [];
+  }
   const a = await answer(app.db, f.readable, f.query, f.filters);
   const answerId = a.status === "answered" ? await recordAnswer(app.db, asker.id, a.quotes.map((q) => q.id)) : undefined;
   const ai = a.status === "answered" ? await brief(app, f.readable, f.query, a.quotes, lang) : null;
   const r = renderAnswer(a, timezone(app.env), lang, { scope: "group", answerId, brief: ai });
   await reply(app, msg.chat.id, r.text, r.buttons, msg.message_id);
+  return [];
+}
+
+async function cmdSettings(app: App, msg: TgMessage): Promise<string[]> {
+  if (!(await ownerInGroup(app, msg))) return [];
+  const view = await settingsView(app.db, msg.chat.id, await langForUser(app, msg.from));
+  if (view) await reply(app, msg.chat.id, view.text, view.buttons); // an unconnected group has no card: stay silent
   return [];
 }
 
@@ -379,6 +407,7 @@ function profileView(mem: Member, skills: { code: string; state: string }[]): { 
         btn(mem.available ? m.bPause : m.bResume, `p:available:${mem.available ? 0 : 1}`),
         btn(mem.reminders ? m.bRemindersOff : m.bRemindersOn, `p:reminders:${mem.reminders ? 0 : 1}`),
       ],
+      [btn(mem.display_name ? m.bNameOff : m.bNameOn, `p:name:${mem.display_name ? 0 : 1}`)],
       [btn(lang === "ru" ? "English" : "Русский", `p:lang:${lang === "ru" ? "en" : "ru"}`)],
     ],
   };
@@ -398,6 +427,13 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
   const pre = T(await langForUser(app, from));
   switch (cmd) {
     case "start": {
+      // From a group's quiet reply ("open in private"): that request's card, again.
+      const thread = /^q([0-9a-f]{32})$/i.exec(args.trim());
+      if (thread) {
+        const asker = await memberByTg(app.db, from.id);
+        if (asker) await resend(app, thread[1]!, asker.id);
+        return [];
+      }
       // From a group's "open my guide" link: that group's admin guide, privately.
       const group = chatFromParam(args);
       const src = group !== null ? await enabledSource(app.db, group) : null;
@@ -448,6 +484,11 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
   const lang = langOf(mem);
   const m = T(lang);
   if (cmd === "help") return cmdHelpNeed(app, chat, mem, args);
+  if (cmd === "pilot") {
+    if (!isOwner(app, from.id)) return [];
+    await reply(app, chat, await pilotText(app.db, lang));
+    return [];
+  }
   if (cmd === "passport") return cmdPassport(app, chat, mem);
   switch (cmd) {
     case "ask": {
@@ -456,11 +497,21 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
         return [];
       }
       const f = await parseFilters(app.db, await readable(app.db, mem), args);
-      const a = await answer(app.db, f.readable, f.query, f.filters);
-      const answerId = a.status === "answered" ? await recordAnswer(app.db, mem.id, a.quotes.map((q) => q.id)) : undefined;
-      const ai = a.status === "answered" ? await brief(app, f.readable, f.query, a.quotes, lang) : null;
-      const r = renderAnswer(a, timezone(app.env), lang, { answerId, brief: ai });
-      await reply(app, chat, r.text, r.buttons);
+      if (!f.query) {
+        await reply(app, chat, m.askUsage);
+        return [];
+      }
+      await openThread(app, { memberId: mem.id, tgId: chat, question: f.query, readable: f.readable, filters: f.filters, lang });
+      return [];
+    }
+    case "name": {
+      const arg = args.trim().toLowerCase();
+      if (arg !== "on" && arg !== "off") {
+        await reply(app, chat, m.nameUsage);
+        return [];
+      }
+      await app.db.prepare("UPDATE members SET display_name=? WHERE id=?").bind(arg === "on" ? (from.first_name ?? null) : null, mem.id).run();
+      await reply(app, chat, arg === "on" ? m.nameOn : m.nameOff);
       return [];
     }
     case "profile": {
@@ -730,6 +781,50 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
     await clearButtons();
     return [];
   }
+  if (kind === "st") {
+    // Settings card toggles (group admins only): edit the card in place.
+    const chat = cb.message?.chat;
+    if (!chat || !GROUP_TYPES.has(chat.type ?? "") || !SETTING_COLUMNS.includes(a as SettingColumn)) {
+      await answerCb();
+      return [];
+    }
+    if (!(await isChatAdminLive(app, chat.id, cb.from.id))) {
+      await answerCb(pre.onlyAdminsConnect, true);
+      return [];
+    }
+    const view = await toggleSetting(app, chat.id, a as SettingColumn, b === "1", cb.from.id, await langForUser(app, cb.from));
+    await answerCb(pre.saved);
+    if (view && cb.message) {
+      await app.tg.call("editMessageText", { chat_id: chat.id, message_id: cb.message.message_id, text: view.text, parse_mode: "HTML", reply_markup: { inline_keyboard: view.buttons } });
+    }
+    return [];
+  }
+  if (kind === "wow" || kind === "wq") {
+    // The owner's card after a history import: list the unanswered questions, open one as a card.
+    if (!isOwner(app, cb.from.id)) {
+      await answerCb();
+      return [];
+    }
+    const owner = await ensureMember(app.db, cb.from.id, "owner", cb.from.language_code);
+    const ownerLang = langOf(owner);
+    if (kind === "wow") {
+      await answerCb();
+      const v = await forgottenView(app.db, a, ownerLang);
+      await app.tg.sendMessage(cb.from.id, v.text, { buttons: v.buttons });
+      return [];
+    }
+    const q = await app.db.prepare("SELECT source_id, body FROM passages WHERE id=? AND part=0 AND removed_at IS NULL").bind(Number(a)).first<{ source_id: string; body: string }>();
+    const can = q && (await readable(app.db, owner)).has(q.source_id);
+    if (!q || !can || !q.body) {
+      await answerCb(pre.notAvailable);
+      return [];
+    }
+    await answerCb();
+    const f = await parseFilters(app.db, await readable(app.db, owner), q.body.slice(0, 500));
+    await openThread(app, { memberId: owner.id, tgId: cb.from.id, question: f.query || q.body.slice(0, 500), readable: f.readable, filters: f.filters, lang: ownerLang });
+    return [];
+  }
+
   const mem = await memberByTg(app.db, cb.from.id);
   if (!mem) {
     await answerCb(pre.notAvailable);
@@ -737,6 +832,11 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
   }
   const m = T(langOf(mem));
   let keys: string[] = [];
+  if (kind === "t") {
+    // The living request card (Нить): ask people, outcome, thanks, and the answer feedback.
+    const toast = (text = "", alert = false) => answerCb(text, alert);
+    return threadAction(app, mem, a, b, data.split(":")[3] ?? "", toast);
+  }
   if (kind === "s") {
     const ok = await answerSuggestion(app.db, mem.id, a, b === "add");
     await answerCb(!ok ? m.notAvailable : b === "add" ? m.suggestAdded : m.suggestDismissed);
@@ -757,9 +857,11 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
     keys = r.keys;
     await answerCb(r.ok ? m.requestCancelled : m.alreadyClosed);
     await clearButtons();
-  } else if (kind === "p" && ["digest", "discoverable", "available", "reminders", "lang"].includes(a)) {
+  } else if (kind === "p" && ["digest", "discoverable", "available", "reminders", "lang", "name"].includes(a)) {
     if (a === "lang") {
       if (b === "en" || b === "ru") await setLanguage(app, mem.id, b);
+    } else if (a === "name") {
+      await app.db.prepare("UPDATE members SET display_name=? WHERE id=?").bind(b === "1" ? (cb.from.first_name ?? null) : null, mem.id).run();
     } else {
       await app.db.prepare(`UPDATE members SET ${a}=? WHERE id=?`).bind(b === "1" ? 1 : 0, mem.id).run();
       if (a === "discoverable") await audit(app.db, "consent.discovery", mem.id, mem.id, { granted: b === "1" });
@@ -772,6 +874,9 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
     }
   } else if (kind === "fm") {
     if (a === "yes") {
+      // Their living cards hold their questions and quotes: remove the messages too (best effort).
+      const cards = await app.db.prepare("SELECT chat_id, message_id FROM threads WHERE member_id=? AND message_id IS NOT NULL").bind(mem.id).all<{ chat_id: number; message_id: number }>();
+      for (const c of cards.results) await app.tg.call("deleteMessage", { chat_id: c.chat_id, message_id: c.message_id }).catch(() => undefined);
       keys = await forgetMissions(app, mem.id);
       const personId = await personForMember(app.db, mem.id);
       if (personId) await forgetPerson(app.db, personId);

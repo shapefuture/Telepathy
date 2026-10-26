@@ -407,15 +407,16 @@ function meView(){var m=S.me;var sw=h("div",null,["digest","discoverable","avail
 
 // ---- desk (owners) ----
 function desk(){var box=h("div",null,h("p",{cls:"muted",text:"…"}));var subs=h("div",{cls:"sub"});
- // A group's own admin (not the operator) manages just its History here.
- if(!S.me.owner){setMain([h("div",{cls:"row"},h("h1",{cls:"grow"},h("span",{cls:"under"},t("dHist"))),art("overload","art-sm"))].concat(deskHist()));return}
+ // A group's own admin (not the operator) sees its members' escalated requests, then its History.
+ if(!S.me.owner){var cbox=h("div",null,h("p",{cls:"muted",text:"…"}));setMain([h("div",{cls:"row"},h("h1",{cls:"grow"},h("span",{cls:"under"},t("desk"))),art("overload","art-sm")),section(t("dReq")),cbox,section(t("dHist"))].concat(deskHist()));
+  get("desk").then(function(d){cbox.replaceChildren.apply(cbox,deskReq(d))}).catch(function(){cbox.replaceChildren(h("p",{cls:"muted",text:t("err")}))});return}
  setMain([h("div",{cls:"row"},h("h1",{cls:"grow"},h("span",{cls:"under"},t("desk"))),art("overload","art-sm")),subs,box]);
  get("desk").then(function(d){function draw(){subs.replaceChildren.apply(subs,[["req","dReq",d.missions.length],["in","dIn",d.inbound.length+d.manual.length],["off","dOff",d.offers.length],["ins","dIns",d.gaps.length],["hist","dHist",0]].map(function(x){
    return h("button",{cls:"chip"+(S.sub===x[0]?" on":""),onclick:function(){S.sub=x[0];draw()}},t(x[1])+(x[2]?" · "+x[2]:""))}));
   box.replaceChildren.apply(box,({req:deskReq,in:deskIn,off:deskOff,ins:deskIns,hist:deskHist})[S.sub](d))}draw()})}
 function deskDo(path,btn){return busy(btn,post("desk/"+path)).then(function(r){toast(r.msg);if(r.ok)haptic("success");desk()})}
 function deskReq(d){if(!d.missions.length)return [empty()];return d.missions.map(function(m){
- var sel=h("select",{style:"width:auto;padding:4px 8px",onchange:function(e){post("desk/tag/"+m.id,{case_type:e.target.value}).then(function(){toast("✓")})}},h("option",{value:"",text:t("caseT")}),
+ var sel=d.club?null:h("select",{style:"width:auto;padding:4px 8px",onchange:function(e){post("desk/tag/"+m.id,{case_type:e.target.value}).then(function(){toast("✓")})}},h("option",{value:"",text:t("caseT")}),
   d.caseTypes.map(function(c){return h("option",{value:c,text:c.replace(/_/g," "),selected:m.case_type===c})}));
  return card(h("div",{cls:"row"},h("b",{text:"#"+m.short}),h("span",{cls:"pill",text:m.statusLabel}),h("span",{cls:"muted grow",text:m.job})),h("div",{cls:"q",text:m.summary}),
   h("div",{cls:"muted",text:m.hits+" "+t("hits")+(m.external?" · ✅ "+t("mayShare"):"")}),h("div",{cls:"btns"},m.actions.map(function(a){

@@ -5,7 +5,8 @@
 
 import { brief } from "./ai/beam";
 import { ensureMember, langOf, memberByTg, readable, type Member } from "./acl";
-import { deskAction, deskActions, exchangeAction, forgetMissions, gapAction, jobLabel, memberAction, offerChoice, rateMission, short } from "./assist/actions";
+import { deskAction, deskActions, exchangeAction, forgetMissions, gapAction, jobLabel, memberAction, offerChoice, rateMission, short, type DeskScope } from "./assist/actions";
+import { clubMissions } from "./assist/club";
 import { addOffer, listOffers, MODES, withdrawOffer, type CommitmentMode } from "./assist/capacity";
 import { bucket, openGaps } from "./assist/gaps";
 import { A } from "./assist/i18n";
@@ -497,9 +498,19 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
     return notFound();
   }
 
-  // ---- operator desk -----------------------------------------------------------------------
+  // ---- desk: the operator's, or a group admin's view of their own groups' escalated requests ----
   if (p[0] !== "desk") return notFound();
-  if (!owner) return out({ error: "owners only" }, undefined, 403);
+  const clubs = owner ? [] : await managedChats(app, user.id);
+  if (!owner && !clubs.length) return out({ error: "owners only" }, undefined, 403);
+  const scope: DeskScope = owner ? "operator" : { clubs };
+  if (method === "GET" && !owner) {
+    const missions = [];
+    for (const x of await clubMissions(db, clubs)) {
+      const d = await deskActions(app, x, a, scope);
+      missions.push({ id: x.id, short: short(x.id), status: x.status, statusLabel: a.status(x.status), job: jobLabel(x.job_code, lang), summary: x.summary, hits: x.local_hits, actions: d.actions });
+    }
+    return out({ club: true, missions });
+  }
   if (method === "GET") {
     const { results: ms } = await db
       .prepare(
@@ -551,9 +562,10 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
   }
   const [, what, id = "", act = "", extra = ""] = p;
   if (what === "mission") {
-    const r = await deskAction(app, id, act, extra, lang);
+    const r = await deskAction(app, id, act, extra, lang, scope);
     return out({ ok: r.ok, msg: r.msg }, r.keys);
   }
+  if (!owner) return out({ error: "owners only" }, undefined, 403);
   if (what === "exchange") {
     const r = await exchangeAction(app, id, act, extra, lang);
     return out({ ok: r.ok, msg: r.msg }, r.keys);

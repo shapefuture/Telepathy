@@ -35,6 +35,16 @@ export async function forgetAdminCache(db: D1Database, chatId: number, tgId: num
   await db.prepare("DELETE FROM chat_admins WHERE chat_id=? AND tg_id=?").bind(chatId, tgId).run();
 }
 
+/** Telegram's own list of a group's admins (creator and administrators; bots left out). Empty when Telegram can't say. */
+export async function chatAdminIds(app: App, chatId: number): Promise<number[]> {
+  try {
+    const list = await app.tg.call<{ user: { id: number; is_bot?: boolean } }[]>("getChatAdministrators", { chat_id: chatId });
+    return Array.isArray(list) ? list.filter((x) => !x.user.is_bot).map((x) => x.user.id) : [];
+  } catch {
+    return [];
+  }
+}
+
 /** Enabled groups this person manages: groups they're in (or connected) where they are an admin. */
 export async function managedChats(app: App, tgId: number): Promise<number[]> {
   const { results } = await app.db

@@ -20,7 +20,7 @@ import { forgetPerson, personForMember } from "./continuity/people";
 import { cmdPassport, CONTINUITY_OWNER, ownerContinuity } from "./continuity/bot";
 import { hydraStatus } from "./hydra/bot";
 import { touchOwners } from "./hydra/notices";
-import { assistCallback, cmdHelpNeed, forgetMissions, listMissions, ownerAssistCommand, OWNER_COMMANDS } from "./assist/bot";
+import { assistCallback, clubDeskCommand, cmdHelpNeed, forgetMissions, listMissions, ownerAssistCommand, OWNER_COMMANDS } from "./assist/bot";
 import { brief } from "./ai/beam";
 import { answer, parseFilters, renderAnswer } from "./search";
 import type { Fetcher, InlineButton, Telegram } from "./telegram";
@@ -491,6 +491,11 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
     if (!isOwner(app, from.id)) return [];
     const owner = await ensureMember(app.db, from.id, "owner", from.language_code);
     return ownerContinuity(app, chat, cmd, args, owner.id);
+  }
+  // /desk for a group admin: the escalated requests of their own groups' members (the operator's is below).
+  if (cmd === "desk" && !isOwner(app, from.id)) {
+    const asker = await knownMember(app, msg);
+    return asker ? clubDeskCommand(app, chat, from.id, langOf(asker)) : [];
   }
   if (OWNER_COMMANDS.has(cmd)) {
     if (!isOwner(app, from.id)) return [];

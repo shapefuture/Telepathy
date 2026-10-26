@@ -25,7 +25,7 @@ async function world() {
 
 describe("mission state machine (D.1)", () => {
   const all = Object.keys({ ...MISSION_TRANSITIONS, closed: 1, cancelled: 1, expired: 1, failed_with_explanation: 1 }) as MissionStatus[];
-  const actors: MissionActor[] = ["member", "operator", "system", "partner"];
+  const actors: MissionActor[] = ["member", "operator", "system", "partner", "club"];
 
   it("terminal states have no exits", () => {
     for (const s of MISSION_TERMINAL) for (const to of all) for (const a of actors) expect(nextMission(s, to, a)).toBe(false);
@@ -39,6 +39,9 @@ describe("mission state machine (D.1)", () => {
     expect(nextMission("routed", "cancelled", "system")).toBe(false);
     expect(nextMission("routed", "expired", "system")).toBe(true);
     expect(nextMission("in_delivery", "cancelled", "member")).toBe(true);
+    expect(nextMission("external_permission_needed", "failed_with_explanation", "club")).toBe(true); // a club says "no provider"
+    expect(nextMission("external_permission_needed", "routed", "club")).toBe(false); // clubs never route
+    expect(nextMission("service_committed", "delivered", "club")).toBe(false); // nor deliver
   });
   it("transition is optimistic: a stale caller can't move it twice", async () => {
     const m = await ensureMember(env.DB, 5);

@@ -26,10 +26,13 @@ import {
   type Partner,
 } from "../federation/gateway";
 import { deliver, liveCommitment, openOffers, release, reserve, type Offer } from "./capacity";
+import { CLUB_ACTS, inClubs, missionClubs } from "./club";
 import { setGapStatus } from "./gaps";
 import { A, type AssistMessages } from "./i18n";
 import { getMission, grantFor, isTerminal, receipt, recordGrant, revokeGrants, transition, type Mission } from "./missions";
-import { b, notifyMember, notifyOwners } from "./notify";
+import { b, notifyIds, notifyMember, notifyOwners } from "./notify";
+import { chatAdminIds } from "../admins";
+import { ownerIds } from "../env";
 
 export const short = (id: string) => id.slice(0, 6);
 export const jobLabel = (code: string, lang: Lang) => (TAXONOMY.get(code) ? labelIn(TAXONOMY.get(code)!, lang) : code);
@@ -48,7 +51,7 @@ export interface Outcome {
 const no = (msg?: string): Outcome => ({ ok: false, msg, keys: [] });
 
 /** Cancel/close: stop the mission, revoke grants, free local slots, withdraw partner exchanges. */
-export async function stopMission(app: App, m: Mission, actor: "member" | "operator", to: "cancelled" | "failed_with_explanation" = "cancelled", reason?: string): Promise<string[] | null> {
+export async function stopMission(app: App, m: Mission, actor: "member" | "operator" | "club", to: "cancelled" | "failed_with_explanation" = "cancelled", reason?: string): Promise<string[] | null> {
   if (m.status === "draft") {
     await app.db.prepare("DELETE FROM missions WHERE id=? AND status='draft'").bind(m.id).run();
     return [];
@@ -79,6 +82,20 @@ export const notifyDesk = (app: App, m: Mission, tag: string) =>
     buttons: [[b("/desk", `d:${m.id}:show`)]],
   }));
 
+/** The admins of the member's own groups hear about an escalated request (they answer their members). */
+export async function notifyClubs(app: App, m: Mission): Promise<string[]> {
+  const owners = ownerIds(app.env);
+  const admins = new Set<number>();
+  for (const chat of await missionClubs(app.db, m.member_id)) for (const id of await chatAdminIds(app, chat)) if (!owners.has(id)) admins.add(id);
+  return notifyIds(app, [...admins], `club:${m.id}:new`, (a) => ({
+    text: a.clubMission(short(m.id), escapeHtml(m.job_code), escapeHtml(m.summary), m.local_hits),
+    buttons: [[b(a.bOpenDesk, `d:${m.id}:show`)]],
+  }));
+}
+
+/** Who acts on the desk: the operator (every mission) or a club's admins (their members' escalated requests). */
+export type DeskScope = "operator" | { clubs: number[] };
+
 // ---- member ------------------------------------------------------------------------------
 
 export type MemberAct = "ok" | "solved" | "more" | "pv" | "allow" | "in" | "x";
@@ -106,7 +123,7 @@ export async function memberAction(app: App, mem: Member, missionId: string, act
     case "more": {
       const moved = await transition(app.db, m.id, "external_permission_needed", "member", { handler: "operator" });
       if (!moved) return no(a.notOpen);
-      return { ok: true, keys: await notifyDesk(app, moved, "new"), partners: await eligiblePartners(app, m) };
+      return { ok: true, keys: [...(await notifyDesk(app, moved, "new")), ...(await notifyClubs(app, moved))], partners: await eligiblePartners(app, m) };
     }
     case "pv": {
       if (m.status !== "external_permission_needed" && m.status !== "no_eligible_provider") return no(a.notOpen);
@@ -158,8 +175,12 @@ export interface DeskAction {
   label: string;
 }
 
-/** What an operator can do with this mission right now (same list for bot buttons and app). */
-export async function deskActions(app: App, m: Mission, a: AssistMessages): Promise<{ external: boolean; actions: DeskAction[] }> {
+/** What the desk can do with this mission right now (same list for bot buttons and app). */
+export async function deskActions(app: App, m: Mission, a: AssistMessages, scope: DeskScope = "operator"): Promise<{ external: boolean; actions: DeskAction[] }> {
+  if (scope !== "operator") {
+    const club: DeskAction[] = (await inClubs(app.db, m, scope.clubs)) ? [{ act: "i", label: a.bIntro }, { act: "np", label: a.bNoProvider }] : [];
+    return { external: false, actions: club };
+  }
   const g = await grantFor(app.db, m.id, "external_discovery");
   const pv = await policyVersion(app.db);
   const external = !!g && !g.revoked_at && g.mission_version === m.version && g.policy_version === pv && g.expires_at > nowIso();
@@ -175,10 +196,11 @@ export async function deskActions(app: App, m: Mission, a: AssistMessages): Prom
   return { external, actions };
 }
 
-export async function deskAction(app: App, missionId: string, act: string, extra: string, lang: Lang): Promise<Outcome & { alert?: boolean }> {
+export async function deskAction(app: App, missionId: string, act: string, extra: string, lang: Lang, scope: DeskScope = "operator"): Promise<Outcome & { alert?: boolean }> {
   const a = A(lang);
   const m = await getMission(app.db, missionId);
   if (!m || isTerminal(m)) return no(a.notOpen);
+  if (scope !== "operator" && (!CLUB_ACTS.has(act) || !(await inClubs(app.db, m, scope.clubs)))) return no(a.notOpen);
   if (act === "a") {
     const offer: Offer | undefined = (await openOffers(app.db, m.job_code)).find((o) => o.id === extra);
     if (!offer) return { ...no(a.capacityFull), alert: true };
@@ -208,7 +230,7 @@ export async function deskAction(app: App, missionId: string, act: string, extra
     return { ok: r.routed > 0, msg: a.routed(r.routed), keys: r.keys, alert: true };
   }
   if (act === "np") {
-    const keys = (await stopMission(app, m, "operator", "failed_with_explanation", "no_provider")) ?? [];
+    const keys = (await stopMission(app, m, scope === "operator" ? "operator" : "club", "failed_with_explanation", "no_provider")) ?? [];
     await receipt(app.db, m.id, { service: "no_provider" });
     return { ok: true, msg: a.done, keys: [...keys, ...(await notifyMember(app, m.member_id, `mnp:${m.id}`, (x) => ({ text: x.noProvider })))] };
   }

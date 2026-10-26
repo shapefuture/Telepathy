@@ -122,7 +122,9 @@ describe("one bot, many communities", () => {
     expect((await api(ALICE, "POST", "history/stage", { chat_id: -1003333333333, page: 0, messages: [] })).status).toBe(403);
     expect((await api(BOB, "GET", "me")).body).toMatchObject({ groupAdmin: false });
     expect((await api(BOB, "GET", "history")).status).toBe(403);
-    expect((await api(ALICE, "GET", "desk")).status).toBe(403); // the operator desk stays the operator's
+    // A group admin sees only the escalated requests of their own group's members, never the operator's console.
+    expect((await api(ALICE, "GET", "desk")).body).toEqual({ club: true, missions: [] });
+    expect((await api(ALICE, "POST", "desk/offer")).status).toBe(403);
   });
 
   it("the operator's MCP server only reads the operator's own groups", async () => {

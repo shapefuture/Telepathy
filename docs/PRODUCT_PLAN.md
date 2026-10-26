@@ -297,6 +297,12 @@ code that does it. Each build step is one commit on this branch, with its tests.
 | 6. Gatherings | «Иду», «Не иду», who's going with reasons, the reminder, the mutual "keep in touch" | `gather.ts` |
 | 7. «Ковчег» | The status line from the daily copy, take everything, call everyone, «Что бот знает обо мне» | `ark.ts` |
 
+**Clubs answer their own members.** When a member asks for more help than the local memory gives,
+the admins of the groups that member belongs to hear about it first (`assist/club.ts`,
+`assist/actions.ts` `notifyClubs`). They see those escalated requests in `/desk` and in the Mini App's
+Пульт, and can start an intro or say "no provider". Routing, offers and delivery stay with the
+operator, and the operator still sees every request.
+
 ### Not built, and why
 
 - **Step 8, later when there is demand** (club subscriptions, MAX, personal agents over MCP and

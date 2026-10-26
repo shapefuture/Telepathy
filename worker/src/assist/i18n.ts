@@ -94,6 +94,10 @@ const EN = {
   thanks: "Thanks, recorded.",
   // operator desk
   deskEmpty: "The console is empty.",
+  clubDeskEmpty: "Nothing from your groups is waiting for you.",
+  clubMission: (id: string, job: string, summary: string, hits: number) =>
+    `<b>#${id}</b> · a member of your group asked for more help · <i>${job}</i>\n<blockquote>${summary}</blockquote>\nLocal matches: ${hits}`,
+  bOpenDesk: "Open",
   deskMission: (id: string, status: string, job: string, summary: string, hits: number, external: boolean) =>
     `<b>#${id}</b> · ${status} · <i>${job}</i>\n<blockquote>${summary}</blockquote>\nLocal matches: ${hits}${external ? " · may ask partner clubs ✅" : ""}`,
   bAssign: (desc: string) => `Assign: ${desc}`,
@@ -193,6 +197,10 @@ const RU: AssistMessages = {
   bNotUseful: "Бесполезно",
   thanks: "Спасибо, записал.",
   deskEmpty: "В Пульте оператора пусто.",
+  clubDeskEmpty: "Из ваших групп сейчас никто не ждёт помощи.",
+  clubMission: (id: string, job: string, summary: string, hits: number) =>
+    `<b>#${id}</b> · участник вашей группы просит больше помощи · <i>${job}</i>\n<blockquote>${summary}</blockquote>\nСовпадений в группах: ${hits}`,
+  bOpenDesk: "Открыть",
   deskMission: (id: string, status: string, job: string, summary: string, hits: number, external: boolean) =>
     `<b>#${id}</b> · ${status} · <i>${job}</i>\n<blockquote>${summary}</blockquote>\nСовпадений в группах: ${hits}${external ? " · можно спросить клубы-партнёры ✅" : ""}`,
   bAssign: (desc: string) => `Назначить: ${desc}`,

@@ -94,10 +94,13 @@ describe("the living card", () => {
     expect((await q<{ status: string }>("SELECT status FROM needs WHERE id=(SELECT need_id FROM intros WHERE id=?)", introId))!.status).toBe("closed");
 
     // 🙏 goes to the helper, anonymously, and the card says so.
+    // 🙏 asks for a few words first; the next private message is them.
     expect(shownButtons(calls, 1).flat().map((b) => b.callback_data)).toContain(`t:${id}:thx`);
     await feed(app, press(1, `t:${id}:thx`));
+    expect(calls.filter((c) => c.method === "sendMessage" && c.params.chat_id === 1).at(-1)!.params.text).toContain("Write a few words");
+    await feed(app, dm(1, "Exactly what I needed, thank you"));
     const thanks = calls.filter((c) => c.method === "sendMessage" && c.params.chat_id === helper).at(-1)!;
-    expect(thanks.params.text).toContain("thanked you");
+    expect(thanks.params.text).toContain("Exactly what I needed, thank you");
     expect(shown(calls, 1)).toContain("Thanks sent.");
     // Pressing an outcome twice is harmless.
     await feed(app, press(1, `t:${id}:o:solved`));

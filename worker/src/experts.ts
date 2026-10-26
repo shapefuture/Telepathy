@@ -82,6 +82,15 @@ export function score(s: Signals): { total: number; components: Record<keyof typ
   return { total: Math.round(total * 10_000) / 10_000, components };
 }
 
+/** How often this member has answered on a topic in the groups we keep: the "why you" on an invite. */
+export async function helpCount(db: D1Database, memberId: string, code: string): Promise<number> {
+  const { results } = await db
+    .prepare("SELECT body FROM passages WHERE author_id=? AND reply_to IS NOT NULL AND part=0 AND removed_at IS NULL AND body IS NOT NULL ORDER BY event_at DESC LIMIT 300")
+    .bind(memberId)
+    .all<{ body: string }>();
+  return results.filter((r) => matchSkills(r.body, 3).includes(code)).length;
+}
+
 const KIND_ORDER = ["weak_conversation_signal", "self_claim", "teaching_contribution", "validated_role", "confirmed_help_outcome"];
 
 export interface Candidate {
@@ -115,12 +124,14 @@ export async function eligibleCandidates(
        FROM members m
        JOIN skills s ON s.member_id = m.id AND s.state = 'confirmed' AND s.code IN (SELECT value FROM json_each(?))
        WHERE m.discoverable = 1 AND m.available = 1 AND m.removed_at IS NULL AND m.collection_opt_out = 0
+         AND NOT (m.quiet_from IS NOT NULL AND ((m.quiet_from <= m.quiet_to AND ? >= m.quiet_from AND ? < m.quiet_to)
+                  OR (m.quiet_from > m.quiet_to AND (? >= m.quiet_from OR ? < m.quiet_to))))
          AND m.id != ?
          AND NOT EXISTS (SELECT 1 FROM intros i WHERE i.candidate_id = m.id AND i.requester_id = ?
                          AND i.status IN ('invited','accepted'))
        GROUP BY m.id`,
     )
-    .bind(weekAgo, requesterId, requesterId, JSON.stringify(codes), requesterId, requesterId)
+    .bind(weekAgo, requesterId, requesterId, JSON.stringify(codes), ...Array(4).fill(new Date(now).getUTCHours()), requesterId, requesterId)
     .all<{ member_id: string; matched: number; kinds: string; pending: number; completed: number; helpful: number; shared: number; req_sources: number }>();
   const out: Candidate[] = [];
   for (const r of results) {

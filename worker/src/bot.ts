@@ -27,7 +27,9 @@ import type { Fetcher, InlineButton, Telegram } from "./telegram";
 import { DefiniteFailure } from "./telegram";
 import { forgetAdminCache, isChatAdminLive } from "./admins";
 import { askToConnect, botUsername, chatFromParam, connectGroup, sendGuide } from "./connect";
-import { openThread, pilotText, resend, threadAction } from "./thread";
+import { answerPending, openThread, pilotText, resend, threadAction } from "./thread";
+import { pulseCard, shareToGroup } from "./pulse";
+import { helpedCount } from "./thread-card";
 import { SETTING_COLUMNS, settingsView, toggleSetting, type SettingColumn } from "./group-settings";
 import { forgottenView } from "./wow";
 import { welcomeJoinRequest, welcomeJoiner } from "./welcome";
@@ -74,7 +76,7 @@ export interface Update {
 /** Kept for tests and docs: the English privacy notice. */
 export const PRIVACY_NOTICE = T("en").privacy;
 
-const PRIVATE_ONLY = new Set(["intro", "expert", "profile", "optin", "optout", "skills", "forget_me", "digest", "requests", "language", "catchup", "events", "pings", "app", "cancel", "desk", "offer", "partner", "fed", "ledger", "passport", "continuity", "destinations", "alert", "drill", "name", "pilot"]);
+const PRIVATE_ONLY = new Set(["intro", "expert", "profile", "optin", "optout", "skills", "forget_me", "digest", "requests", "language", "catchup", "events", "pings", "app", "cancel", "desk", "offer", "partner", "fed", "ledger", "passport", "continuity", "destinations", "alert", "drill", "name", "pilot", "pulse"]);
 const GROUP_TYPES = new Set(["group", "supergroup"]);
 const btn = (text: string, data: string): InlineButton => ({ text, callback_data: data });
 const linkBtn = (text: string, href: string) => ({ text, url: href }) as unknown as InlineButton;
@@ -206,7 +208,10 @@ async function onMessage(app: App, msg: TgMessage, edited: boolean): Promise<str
   // In private, a plain message is a question: no command needed.
   if (!command) {
     const q = (msg.text ?? "").trim();
-    return q && !edited ? privateCommand(app, msg, "ask", q) : [];
+    if (!q || edited) return [];
+    const asker = msg.from ? await memberByTg(app.db, msg.from.id) : null;
+    const words = asker ? await answerPending(app, asker, q) : null; // the words for a 🙏 just pressed
+    return words ?? privateCommand(app, msg, "ask", q);
   }
   return privateCommand(app, msg, command.cmd, command.args);
 }
@@ -382,7 +387,15 @@ async function cmdForgetMessage(app: App, msg: TgMessage): Promise<string[]> {
 
 // ---- private commands -------------------------------------------------------------------
 
-function profileView(mem: Member, skills: { code: string; state: string }[]): { text: string; buttons: InlineButton[][] } {
+/** Quiet hours are stored in UTC; shown in the club's own timezone. */
+function quietLocal(mem: Member, tz: string): string | null {
+  if (mem.quiet_from === null || mem.quiet_from === undefined || mem.quiet_to === null || mem.quiet_to === undefined) return null;
+  const off = Math.round(tzOffsetMinutes(new Date(), tz) / 60);
+  const hh = (utc: number) => String((utc + off + 24) % 24).padStart(2, "0") + ":00";
+  return `${hh(mem.quiet_from)}–${hh(mem.quiet_to)}`;
+}
+
+function profileView(mem: Member, skills: { code: string; state: string }[], helped = 0, tz = "UTC"): { text: string; buttons: InlineButton[][] } {
   const lang = langOf(mem);
   const m = T(lang);
   const list =
@@ -399,7 +412,9 @@ function profileView(mem: Member, skills: { code: string; state: string }[]): { 
       `${m.pReminders}: <b>${oo(mem.reminders)}</b>\n` +
       `${m.pCollection}: <b>${mem.collection_opt_out ? m.pStopped : m.on}</b>\n` +
       `${m.pLanguage}: <b>${lang === "ru" ? "русский" : "English"}</b>\n` +
-      `${m.pSkills}: ${escapeHtml(list)}\n\n${m.addSkillHint}`,
+      `${m.pSkills}: ${escapeHtml(list)}\n` +
+      `${m.pHelped(helped)}\n` +
+      `${m.pQuiet}: <b>${escapeHtml(quietLocal(mem, tz) ?? m.off)}</b>\n\n${m.addSkillHint}`,
     buttons: [
       [btn(mem.digest ? m.bDigestOff : m.bDigestOn, `p:digest:${mem.digest ? 0 : 1}`)],
       [btn(mem.discoverable ? m.bDiscoverOff : m.bDiscoverOn, `p:discoverable:${mem.discoverable ? 0 : 1}`)],
@@ -408,6 +423,7 @@ function profileView(mem: Member, skills: { code: string; state: string }[]): { 
         btn(mem.reminders ? m.bRemindersOff : m.bRemindersOn, `p:reminders:${mem.reminders ? 0 : 1}`),
       ],
       [btn(mem.display_name ? m.bNameOff : m.bNameOn, `p:name:${mem.display_name ? 0 : 1}`)],
+      [btn(mem.quiet_from !== null && mem.quiet_from !== undefined ? m.bQuietOff : m.bQuietOn, `p:quiet:${mem.quiet_from !== null && mem.quiet_from !== undefined ? 0 : 1}`)],
       [btn(lang === "ru" ? "English" : "Русский", `p:lang:${lang === "ru" ? "en" : "ru"}`)],
     ],
   };
@@ -484,6 +500,17 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
   const lang = langOf(mem);
   const m = T(lang);
   if (cmd === "help") return cmdHelpNeed(app, chat, mem, args);
+  if (cmd === "pulse") {
+    if (!isOwner(app, from.id)) return [];
+    const rows = (await app.db.prepare("SELECT id, title FROM sources WHERE enabled=1 AND enabled_by=? ORDER BY title").bind(mem.id).all<{ id: string; title: string | null }>()).results;
+    const since = nowIso(new Date(Date.now() - 7 * DAY));
+    if (!rows.length) await reply(app, chat, pre.pulseNone);
+    for (const r of rows) {
+      const card = await pulseCard(app.db, r.id, r.title ?? "", since, lang);
+      await reply(app, chat, card.text || pre.pulseNone, card.quiet || !card.text ? undefined : [[btn(pre.bPulseShare, `pu:${r.id}`)]]);
+    }
+    return [];
+  }
   if (cmd === "pilot") {
     if (!isOwner(app, from.id)) return [];
     await reply(app, chat, await pilotText(app.db, lang));
@@ -515,7 +542,7 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
       return [];
     }
     case "profile": {
-      const v = profileView(mem, await mySkills(app, mem.id));
+      const v = profileView(mem, await mySkills(app, mem.id), await helpedCount(app.db, mem.id), timezone(app.env));
       await reply(app, chat, v.text, v.buttons);
       return [];
     }
@@ -799,6 +826,17 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
     }
     return [];
   }
+  if (kind === "pu") {
+    const mem2 = await memberByTg(app.db, cb.from.id);
+    const src = await app.db.prepare("SELECT id, enabled_by FROM sources WHERE id=?").bind(a).first<{ id: string; enabled_by: string | null }>();
+    if (!src || !(isOwner(app, cb.from.id) || (mem2 && src.enabled_by === mem2.id))) {
+      await answerCb(pre.notAvailable);
+      return [];
+    }
+    const key = await shareToGroup(app.db, a, nowIso().slice(0, 10));
+    await answerCb(key ? pre.pulseShared : pre.notAvailable);
+    return key ? [key] : [];
+  }
   if (kind === "wow" || kind === "wq") {
     // The owner's card after a history import: list the unanswered questions, open one as a card.
     if (!isOwner(app, cb.from.id)) {
@@ -857,9 +895,14 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
     keys = r.keys;
     await answerCb(r.ok ? m.requestCancelled : m.alreadyClosed);
     await clearButtons();
-  } else if (kind === "p" && ["digest", "discoverable", "available", "reminders", "lang", "name"].includes(a)) {
+  } else if (kind === "p" && ["digest", "discoverable", "available", "reminders", "lang", "name", "quiet"].includes(a)) {
     if (a === "lang") {
       if (b === "en" || b === "ru") await setLanguage(app, mem.id, b);
+    } else if (a === "quiet") {
+      // 22:00–08:00 in the club's timezone, stored in UTC.
+      const off = Math.round(tzOffsetMinutes(new Date(), timezone(app.env)) / 60);
+      const utc = (h: number) => (h - off + 24) % 24;
+      await app.db.prepare("UPDATE members SET quiet_from=?, quiet_to=? WHERE id=?").bind(b === "1" ? utc(22) : null, b === "1" ? utc(8) : null, mem.id).run();
     } else if (a === "name") {
       await app.db.prepare("UPDATE members SET display_name=? WHERE id=?").bind(b === "1" ? (cb.from.first_name ?? null) : null, mem.id).run();
     } else {
@@ -867,7 +910,7 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
       if (a === "discoverable") await audit(app.db, "consent.discovery", mem.id, mem.id, { granted: b === "1" });
     }
     const fresh = (await memberByTg(app.db, cb.from.id))!;
-    const v = profileView(fresh, await mySkills(app, mem.id));
+    const v = profileView(fresh, await mySkills(app, mem.id), await helpedCount(app.db, mem.id), timezone(app.env));
     await answerCb(T(langOf(fresh)).saved);
     if (cb.message) {
       await app.tg.call("editMessageText", { chat_id: cb.message.chat.id, message_id: cb.message.message_id, text: v.text, parse_mode: "HTML", reply_markup: { inline_keyboard: v.buttons } });

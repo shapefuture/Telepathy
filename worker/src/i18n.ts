@@ -181,11 +181,12 @@ const EN = {
   introNoSkill: "I couldn't match that to a skill. Try naming the area, e.g. <code>/intro accountant for a small startup</code>, or see /skills all.",
   introCap: (n: number, cap: number) => `You already have ${n} open requests this week (limit ${cap}). Cancel one with /requests or wait.`,
   introClosedNoMatch: "No available expert accepted your request this time, so it is closed. You can try again later or ask in the community.",
-  introInvite: (labels: string, need: string) =>
+  introInvite: (labels: string, need: string, why: string) =>
     `<b>Introduction request</b>\nA community member is looking for help with: <i>${labels}</i>\n\n<blockquote>${need}</blockquote>\n` +
+    (why ? `${why}\n` : "") +
     "Your identity stays private unless you accept <b>and</b> they confirm. This invitation expires in 72 hours.",
   bAccept: "Accept",
-  bDecline: "Decline",
+  bDecline: "Not now",
   bConfirm: "Confirm & exchange contacts",
   bCancel: "Cancel",
   bHelped: "It helped",
@@ -336,6 +337,30 @@ const EN = {
   bNameOn: "🪪 Show my name",
   bNameOff: "🪪 Hide my name",
   nameUsage: "Use <code>/name on</code> to show your first name on answer cards, or <code>/name off</code> to hide it.",
+  // Expert side (journey 4): why you, pauses, quiet hours, thank-you words
+  introWhy: (label: string, n: number) => `Why you: you've answered about <i>${label}</i> ${n} time(s).`,
+  pauseSuggest: "You've said not now twice in a row. Want a pause? Requests stop until you switch them back on.",
+  bKeepOn: "Keep as it is",
+  pQuiet: "Quiet hours",
+  bQuietOn: "🌙 Quiet 22:00–08:00",
+  bQuietOff: "🌙 Turn quiet hours off",
+  pHelped: (n: number) => `You've helped ${n} people`,
+  thanksAsk: "Write a few words for them. They'll see them. Or tap “No words”.",
+  bNoWords: "No words, just thanks",
+  thanksWithWords: (q: string, words: string, n: number) => `🙏 Someone thanked you for helping with “${q}”: “${words}”. You've helped ${n} people so far.`,
+  // Пульс: the weekly summary of one group (journey 9)
+  pulseTitle: (group: string) => `<b>Pulse · ${group}</b> — last week`,
+  pulseQuestions: (n: number) => `Questions: <b>${n}</b>`,
+  pulseAnswered: (n: number) => `Answered: <b>${n}</b>`,
+  pulseWaiting: (n: number) => `Waiting for an answer: <b>${n}</b>`,
+  pulseSpeed: (h: string) => `Median time to the first answer: <b>${h}</b>`,
+  pulseTop: (name: string, n: number) => `Helps most: <b>${name}</b> (${n})`,
+  pulseQuiet: "A quiet week. Nothing needs your attention ✨",
+  pulseNoHelp: "Nobody has answered yet this week.",
+  bPulseShare: "📣 Share with the group",
+  pulseShared: "Shared with the group.",
+  pulseShare: (group: string, q: number, a: number, helper: string) => `🌰 Last week in ${group}: ${q} question(s), ${a} answered. Thank you, ${helper}!`,
+  pulseNone: "No groups to show a pulse for yet.",
 };
 
 export type Messages = typeof EN;
@@ -497,11 +522,12 @@ const RU: Messages = {
   introNoSkill: "Не удалось сопоставить запрос с навыком. Назовите область, например <code>/intro бухгалтер для небольшого стартапа</code>, или посмотрите /skills all.",
   introCap: (n: number, cap: number) => `У вас уже ${n} открытых запроса на этой неделе (лимит ${cap}). Отмените один через /requests или подождите.`,
   introClosedNoMatch: "На этот раз ни один эксперт не принял запрос, поэтому он закрыт. Попробуйте позже или спросите в сообществе.",
-  introInvite: (labels: string, need: string) =>
+  introInvite: (labels: string, need: string, why: string) =>
     `<b>Запрос на знакомство</b>\nУчастнику сообщества нужна помощь: <i>${labels}</i>\n\n<blockquote>${need}</blockquote>\n` +
+    (why ? `${why}\n` : "") +
     "Вы останетесь анонимны, пока не примете запрос <b>и</b> автор не подтвердит. Приглашение действует 72 часа.",
   bAccept: "Принять",
-  bDecline: "Отклонить",
+  bDecline: "Не сейчас",
   bConfirm: "Подтвердить и обменяться контактами",
   bCancel: "Отмена",
   bHelped: "Помогло",
@@ -649,6 +675,30 @@ const RU: Messages = {
   bNameOn: "🪪 Показывать моё имя",
   bNameOff: "🪪 Скрыть моё имя",
   nameUsage: "Напиши <code>/name on</code>, чтобы в ответах видели твоё имя, или <code>/name off</code>, чтобы скрыть.",
+  // Сторона эксперта (путь 4): почему ты, паузы, тихие часы, слова благодарности
+  introWhy: (label: string, n: number) => `Почему вам: вы отвечали про «${label}» ${n} раз.`,
+  pauseSuggest: "Ты дважды подряд ответил «Не сейчас». Поставить паузу? Запросы перестанут приходить, пока ты сам не включишь их снова.",
+  bKeepOn: "Оставить как есть",
+  pQuiet: "Тихие часы",
+  bQuietOn: "🌙 Тихо с 22:00 до 08:00",
+  bQuietOff: "🌙 Выключить тихие часы",
+  pHelped: (n: number) => `Ты помог ${n} людям`,
+  thanksAsk: "Напиши пару слов для него — он их увидит. Или нажми «Без слов».",
+  bNoWords: "Без слов, просто спасибо",
+  thanksWithWords: (q: string, words: string, n: number) => `🙏 Тебя поблагодарили за помощь с вопросом «${q}»: «${words}». Ты уже помог ${n} людям.`,
+  // Пульс: еженедельная сводка по одной группе (путь 9)
+  pulseTitle: (group: string) => `<b>Пульс · ${group}</b> — за неделю`,
+  pulseQuestions: (n: number) => `Вопросов: <b>${n}</b>`,
+  pulseAnswered: (n: number) => `Получили ответ: <b>${n}</b>`,
+  pulseWaiting: (n: number) => `Ждут ответа: <b>${n}</b>`,
+  pulseSpeed: (h: string) => `Среднее время до первого ответа: <b>${h}</b>`,
+  pulseTop: (name: string, n: number) => `Больше всех помогает: <b>${name}</b> (${n})`,
+  pulseQuiet: "Тихая неделя. Ничего не требует твоего внимания ✨",
+  pulseNoHelp: "На этой неделе ответов пока не было.",
+  bPulseShare: "📣 Поделиться с группой",
+  pulseShared: "Отправлено в группу.",
+  pulseShare: (group: string, q: number, a: number, helper: string) => `🌰 За неделю в «${group}»: вопросов ${q}, ответили на ${a}. Спасибо, ${helper}!`,
+  pulseNone: "Пока нет групп, по которым можно показать пульс.",
 };
 
 export const MESSAGES: Record<Lang, Messages> = { en: EN, ru: RU };

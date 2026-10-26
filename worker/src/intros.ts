@@ -4,7 +4,7 @@
 // on to the next candidate (max 3). Every send goes through the effect ledger.
 
 import { defaultLang } from "./i18n";
-import { eligibleCandidates, labelsFor, matchSkills } from "./experts";
+import { eligibleCandidates, helpCount, labelsFor, matchSkills } from "./experts";
 import { T, type Lang } from "./i18n";
 import { effectStatement } from "./outbox";
 import { syncNeed } from "./thread-card";
@@ -123,6 +123,8 @@ async function pickCandidate(db: D1Database, needId: string, now: string, notify
   const key = `intro:${id}:invite`;
   const cand = await contact(db, c.member_id);
   const cm = T(cand.lang);
+  // "Why you" (plan: journey 4): the expert sees why they were picked, never the asker's name.
+  const why = await helpCount(db, c.member_id, codes[0]!);
   await db.batch([
     db
       .prepare(
@@ -135,7 +137,7 @@ async function pickCandidate(db: D1Database, needId: string, now: string, notify
       .prepare("INSERT INTO audit(at, actor, action, subject, detail) VALUES (?,?,?,?,?)")
       .bind(now, "system", "intro.invite", id, JSON.stringify({ total: c.total, components: c.components })),
     effectStatement(db, key, cand.tg, {
-      text: cm.introInvite(escapeHtml(labelsFor(codes, cand.lang)), escapeHtml(need.text)),
+      text: cm.introInvite(escapeHtml(labelsFor(codes, cand.lang)), escapeHtml(need.text), why ? cm.introWhy(escapeHtml(labelsFor([codes[0]!], cand.lang)), why) : ""),
       buttons: [[btn(cm.bAccept, `i:${id}:accept`), btn(cm.bDecline, `i:${id}:decline`)]],
     }),
   ]);
@@ -185,6 +187,16 @@ async function after(db: D1Database, intro: IntroRow, to: Status, actor: Actor, 
   }
   if (to === "declined") {
     const { keys } = await nextCandidate(db, intro.need_id, now);
+    // "Не сейчас" carries no penalty. Two in a row: offer a pause, once, gently (plan: journey 4).
+    const streak = await db.prepare("SELECT status FROM intros WHERE candidate_id=? ORDER BY created_at DESC, rowid DESC LIMIT 2").bind(intro.candidate_id).all<{ status: string }>();
+    if (streak.results.length === 2 && streak.results.every((r) => r.status === "declined")) {
+      const key = `pause:${intro.candidate_id}:${intro.id}`;
+      const cm = T(cand.lang);
+      await db.batch([
+        effectStatement(db, key, cand.tg, { text: cm.pauseSuggest, buttons: [[btn(cm.bPause, "p:available:0")], [btn(cm.bKeepOn, "p:available:1")]] }),
+      ]);
+      keys.push(key);
+    }
     return { reply: me.introDeclinedReply, keys };
   }
   if (to === "mutually_confirmed") {

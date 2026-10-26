@@ -11,10 +11,10 @@ import { T, defaultLang, type Lang } from "./i18n";
 import { cancelNeed, IntroError, requestIntro } from "./intros";
 import { effectStatement } from "./outbox";
 import { answer, type AnswerStatus, type Quote, type SearchFilters } from "./search";
-import { applyCard, helpedCount, outcomeButtons, OUTCOMES, renderThread, type Outcome, type ThreadRow, type ThreadState } from "./thread-card";
+import { applyCard, btn, helpedCount, outcomeButtons, OUTCOMES, renderThread, type Outcome, type ThreadRow, type ThreadState } from "./thread-card";
 import { DefiniteFailure } from "./telegram";
 import { escapeHtml } from "./text";
-import { newId, nowIso } from "./util";
+import { addMs, HOUR, newId, nowIso } from "./util";
 
 export interface Ask {
   memberId: string;
@@ -208,25 +208,72 @@ export async function threadAction(
     return [];
   }
   if (action === "thx") {
+    // 🙏 asks for a few words first; the next private message is them (see answerPending).
     if (!t.helper_id || t.thanked_at) {
       await toast(t.thanked_at ? m.threadThanksSent : m.notAvailable);
       return [];
     }
-    const helper = await db.prepare("SELECT tg_id, lang FROM members WHERE id=?").bind(t.helper_id).first<{ tg_id: number; lang: Lang | null }>();
-    if (!helper) return [];
-    const hm = T(helper.lang ?? defaultLang());
-    const key = `thanks:${t.id}`;
-    const q = escapeHtml(t.question.slice(0, 120));
-    const n = await helpedCount(db, t.helper_id);
-    await db.batch([
-      db.prepare("UPDATE threads SET thanked_at=?, updated_at=?, rev=rev+1 WHERE id=? AND thanked_at IS NULL").bind(at, at, t.id),
-      effectStatement(db, key, helper.tg_id, { text: hm.thanksReceived(q, n) }),
-    ]);
-    await paint(app, t.id);
+    await db
+      .prepare("INSERT INTO pending_inputs(member_id, kind, ref, expires_at) VALUES (?, 'thanks', ?, ?) ON CONFLICT(member_id) DO UPDATE SET kind='thanks', ref=excluded.ref, expires_at=excluded.expires_at")
+      .bind(mem.id, t.id, addMs(at, HOUR))
+      .run();
+    await app.tg.sendMessage(t.chat_id, m.thanksAsk, { buttons: [[btn(m.bNoWords, `t:${t.id}:thx0`)]] });
+    await toast("");
+    return [];
+  }
+  if (action === "thx0") {
+    if (!t.helper_id || t.thanked_at) {
+      await toast(t.thanked_at ? m.threadThanksSent : m.notAvailable);
+      return [];
+    }
+    const keys = await sendThanks(app, mem, t, null, at);
     await toast(m.threadThanksSent);
-    return [key];
+    return keys;
   }
   return [];
+}
+
+/** The thank-you goes to the helper, anonymously, with the asker's words if they wrote any. */
+async function sendThanks(app: App, mem: Member, t: ThreadRow, words: string | null, at: string): Promise<string[]> {
+  const db = app.db;
+  const helper = await db.prepare("SELECT tg_id, lang FROM members WHERE id=?").bind(t.helper_id).first<{ tg_id: number; lang: Lang | null }>();
+  if (!helper) return [];
+  const hm = T(helper.lang ?? defaultLang());
+  const key = `thanks:${t.id}`;
+  const q = escapeHtml(t.question.slice(0, 120));
+  const n = await helpedCount(db, t.helper_id!);
+  const text = words ? hm.thanksWithWords(q, escapeHtml(words), n) : hm.thanksReceived(q, n);
+  await db.batch([
+    db.prepare("UPDATE threads SET thanked_at=?, updated_at=?, rev=rev+1 WHERE id=? AND thanked_at IS NULL").bind(at, at, t.id),
+    db.prepare("DELETE FROM pending_inputs WHERE member_id=?").bind(mem.id),
+    effectStatement(db, key, helper.tg_id, { text }),
+  ]);
+  await paint(app, t.id);
+  return [key];
+}
+
+/**
+ * The asker's next private message after 🙏 is the thank-you's words, if the prompt is still open
+ * (an hour). Returns the effect keys to dispatch, or null when the message is an ordinary one.
+ */
+export async function answerPending(app: App, mem: Member, text: string, now = new Date()): Promise<string[] | null> {
+  const at = nowIso(now);
+  const pending = await app.db.prepare("SELECT kind, ref, expires_at FROM pending_inputs WHERE member_id=?").bind(mem.id).first<{ kind: string; ref: string; expires_at: string }>();
+  if (!pending) return null;
+  if (pending.kind !== "thanks" || pending.expires_at <= at) {
+    await app.db.prepare("DELETE FROM pending_inputs WHERE member_id=?").bind(mem.id).run();
+    return null;
+  }
+  const t = await ownThread(app.db, pending.ref, mem.id);
+  if (!t || !t.helper_id || t.thanked_at) {
+    await app.db.prepare("DELETE FROM pending_inputs WHERE member_id=?").bind(mem.id).run();
+    return null;
+  }
+  const words = text.trim().slice(0, 300);
+  if (!words) return null;
+  const keys = await sendThanks(app, mem, t, words, at);
+  await app.tg.sendMessage(mem.tg_id, T(langOf(mem)).threadThanksSent);
+  return keys;
 }
 
 /**

@@ -409,7 +409,76 @@ footer a{color:var(--lime);text-decoration:none}
 .flying{position:fixed;left:0;top:0;z-index:160;pointer-events:none;font-size:34px;animation:fly 1.6s cubic-bezier(.2,.6,.3,1) forwards}
 @keyframes fly{from{transform:translate(var(--x),var(--y)) rotate(0)}to{transform:translate(calc(var(--x) + var(--dx)),calc(var(--y) + var(--dy))) rotate(var(--r))}}
 
+/* paradox band: the platform line glitches, the people line holds */
+.paradox{padding:clamp(56px,8vw,96px) 0;text-align:center;overflow:hidden}
+.paradox p{font:900 clamp(34px,7vw,92px)/1 var(--display);letter-spacing:-.04em;margin:0}
+.paradox .shaky{color:#b9b3aa;display:inline-block;position:relative;animation:glitch 3.2s steps(1) infinite}
+.paradox .shaky::before,.paradox .shaky::after{content:attr(data-t);position:absolute;inset:0;opacity:0;animation:ghost 3.2s steps(1) infinite}
+@keyframes ghost{0%,86%,94%,100%{opacity:0}88%,92%{opacity:.85}}
+.paradox .shaky::before{color:var(--pink);clip-path:inset(0 0 55% 0);transform:translate(-3px,0)}
+.paradox .shaky::after{color:var(--sky);clip-path:inset(55% 0 0 0);transform:translate(3px,0)}
+@keyframes glitch{0%,86%,100%{transform:none}88%{transform:translate(4px,-2px) skewX(-8deg)}90%{transform:translate(-5px,1px)}92%{transform:translate(2px,2px) skewX(6deg)}}
+.paradox .steady{display:inline-block;background:var(--lime);border:var(--line);border-radius:18px;padding:.02em .2em .08em;box-shadow:8px 8px 0 var(--ink);rotate:-1.5deg;margin-top:.18em}
+.paradox small{display:block;margin-top:26px;font:700 26px/1.1 var(--hand);color:var(--violet)}
+
+/* never: four things the bot will not do */
+.never{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+.nv{position:relative;border:var(--line);border-radius:22px;background:#fff;box-shadow:var(--shadow);padding:20px 18px 22px}
+.nv .big{font-size:54px;line-height:1;display:inline-grid;place-items:center;width:84px;height:84px;border-radius:50%;background:var(--grey);border:var(--line);position:relative;margin-bottom:16px;filter:grayscale(.4)}
+.nv .big::after{content:"";position:absolute;left:-8px;right:-8px;top:50%;height:6px;background:#E8433A;border:2px solid var(--ink);border-radius:4px;rotate:-35deg}
+.nv h3{font-size:19px;text-decoration:line-through;text-decoration-color:#E8433A;text-decoration-thickness:3px;margin-bottom:10px}
+.nv p{font-size:15.5px;color:#2f2a25}
+.nv:nth-child(1){--rot:-1.5deg}.nv:nth-child(2){--rot:1deg}.nv:nth-child(3){--rot:-.6deg}.nv:nth-child(4){--rot:1.4deg}
+.never-stamp{display:inline-block;margin-top:30px;font:900 15px/1 var(--display);letter-spacing:.1em;text-transform:uppercase;color:#E8433A;border:3px solid #E8433A;border-radius:10px;padding:12px 16px;rotate:-4deg}
+@media (max-width:980px){.never{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:560px){.never{grid-template-columns:1fr;max-width:420px;margin:0 auto}}
+
+/* ladder: contact is not yet connection */
+.ladder{display:grid;grid-template-columns:repeat(4,1fr);gap:0;position:relative;counter-reset:st}
+.rung{position:relative;padding:0 14px}
+.rung .dot{width:62px;height:62px;border-radius:50%;border:var(--line);display:grid;place-items:center;font:900 20px var(--display);background:var(--rc);box-shadow:4px 4px 0 var(--ink);position:relative;z-index:1;margin-bottom:16px}
+.rung::before{content:"";position:absolute;left:46px;right:-14px;top:30px;height:4px;background:repeating-linear-gradient(90deg,var(--ink) 0 10px,transparent 10px 18px)}
+.rung:last-child::before{display:none}
+.rung h3{font-size:20px;margin-bottom:8px}
+.rung p{font-size:15.5px;color:#2f2a25;max-width:26ch}
+.rung:nth-child(1){--rc:var(--grey)}.rung:nth-child(2){--rc:var(--lav)}.rung:nth-child(3){--rc:var(--sky2)}.rung:nth-child(4){--rc:var(--lime)}
+.ladder-note{margin-top:34px;font:700 26px/1.1 var(--hand);color:var(--violet);rotate:-2deg;display:inline-block}
+@media (max-width:860px){.ladder{grid-template-columns:1fr;gap:26px}.rung{display:grid;grid-template-columns:62px 1fr;gap:0 16px;padding:0}.rung .dot{grid-row:span 2;margin:0}
+  .rung::before{left:29px;right:auto;top:62px;bottom:-26px;width:4px;height:auto;background:repeating-linear-gradient(180deg,var(--ink) 0 10px,transparent 10px 18px)}}
+
+/* honesty board */
+.truth{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.col{border:var(--line);border-radius:22px;background:#fff;box-shadow:var(--shadow-sm);padding:18px}
+.chip-s{display:inline-flex;align-items:center;gap:7px;font:800 12.5px/1 var(--display);letter-spacing:.04em;text-transform:uppercase;padding:9px 12px;border-radius:999px;border:2.5px solid var(--ink);margin-bottom:14px}
+.chip-s i{width:9px;height:9px;border-radius:50%;background:currentColor}
+.c-live .chip-s{background:var(--lime)}.c-test .chip-s{background:var(--sky2)}.c-idea .chip-s{background:var(--lav)}.c-later .chip-s{background:var(--grey)}
+.col ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.col li{font-size:15.5px;font-weight:600;line-height:1.3;padding-left:16px;position:relative}
+.col li::before{content:"";position:absolute;left:0;top:.5em;width:7px;height:7px;border-radius:50%;background:var(--ink)}
+.c-later li{color:#6b655d}
+.truth-foot{margin-top:24px;font-size:17px;color:#3a352f}
+@media (max-width:980px){.truth{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:560px){.truth{grid-template-columns:1fr}}
+
+/* mascots: each one has a job */
+.mascot{position:absolute;pointer-events:none;z-index:2}
+.mascot svg{display:block;width:100%;overflow:visible}
+.mascot .lbl{position:absolute;white-space:nowrap;font:700 20px/1 var(--hand);color:var(--violet);rotate:-4deg}
+.snail{width:150px;right:4%;bottom:-6px;animation:crawl 26s linear infinite}
+@keyframes crawl{0%,100%{translate:0 0}50%{translate:-40vw 0}}
+.snail svg{animation:face 26s steps(1) infinite}
+@keyframes face{0%{scale:-1 1}50%{scale:1 1}}
+.snail .lbl{bottom:96%;right:0;color:var(--lime)}
+.frog{width:110px;right:2%;top:-18px}
+.frog .lbl{right:100%;top:6px}
+.bird{width:84px;right:-6px;top:-34px;animation:flap 1.4s ease-in-out infinite}
+@keyframes flap{0%,100%{translate:0 0}50%{translate:0 -8px}}
+.compare-quote{max-width:860px;font:800 clamp(20px,2.4vw,28px)/1.3 var(--display);letter-spacing:-.01em;margin:-18px 0 36px}
+.compare-quote span{background:var(--lime);padding:0 .15em;border-radius:6px}
+@media (max-width:640px){.snail{width:110px}.frog{width:80px;top:-6px}.frog .lbl{display:none}}
+
 @media (prefers-reduced-motion:reduce){
+  .snail,.snail svg,.bird{animation:none!important}
   .wd>span{transform:none!important}
   *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
   .rv,.hero h1 .w,.it,.report li{opacity:1!important;transform:none!important}
@@ -528,6 +597,29 @@ footer a{color:var(--lime);text-decoration:none}
   </div>
 </section>
 
+<!-- ============ PARADOX ============ -->
+<section class="paradox" aria-label="Платформы меняются. Связь остаётся.">
+  <div class="wrap">
+    <p><span class="shaky" data-t="Платформы меняются.">Платформы меняются.</span></p>
+    <p><span class="steady">Связь остаётся.</span></p>
+    <small class="rv">а помощь ходит между сообществами, пока участники остаются дома ♡</small>
+  </div>
+</section>
+
+<!-- ============ NEVER ============ -->
+<section class="sec" style="padding-top:20px">
+  <div class="wrap">
+    <div class="head"><div class="kick rv">по-честному<svg viewBox="0 0 46 22"><path d="M2 12c10-8 18 8 28 0 5-4 9-4 14 0"/></svg></div><h2 class="rv">Четыре вещи, которых бот не сделает никогда</h2></div>
+    <div class="never">
+      <div class="nv sc"><span class="big">🧲</span><h3>Уводить людей к себе</h3><p>Участники остаются в вашем чате. Бот живёт там, где уже живёт сообщество.</p></div>
+      <div class="nv sc"><span class="big">📦</span><h3>Выгружать базу участников</h3><p>В сообщество-партнёр уходит только текст вопроса. Список людей остаётся у вас.</p></div>
+      <div class="nv sc"><span class="big">📢</span><h3>Рекламировать от вашего имени</h3><p>Никакой рекламы ни в группе, ни в личке. Бот говорит, когда это экономит кому-то время.</p></div>
+      <div class="nv sc"><span class="big">🔒</span><h3>Запирать на одной платформе</h3><p>История забирается одним файлом, а участникам можно разослать новый адрес.</p></div>
+    </div>
+    <span class="never-stamp rv">гарантия · подпись · печать</span>
+  </div>
+</section>
+
 <!-- ============ HOW ============ -->
 <section class="sec" id="how">
   <div class="wrap">
@@ -593,7 +685,7 @@ footer a{color:var(--lime);text-decoration:none}
     <div class="people">
       <article class="pcard sc tilt"><div class="pic"><img src="img/art-helper.webp" alt="Ноутбук с ножками даёт пять" loading="lazy" width="720" height="720"></div><div class="body"><h3>Знатоки сообщества</h3><p>Участники сами отмечают, в чём разбираются. Бот зовёт их точечно, учитывает тихие часы, а после двух отказов подряд сам предложит передохнуть.</p><span class="chip">«Не сейчас» без обид</span></div></article>
       <article class="pcard sc tilt" style="--d:.1s"><div class="pic"><img src="img/nexus-lounge.webp" alt="Администратор спокойно работает в кресле, рядом кот и маленький робот" loading="lazy" width="900" height="603"></div><div class="body"><h3>Администраторы видят первыми</h3><p>Если на вопрос никто не ответил, он попадает в Пульт администраторов этого сообщества. Познакомить человека с нужным знатоком можно в одно касание.</p><span class="chip">Пульт сообщества</span></div></article>
-      <article class="pcard sc tilt" style="--d:.2s"><div class="pic"><img src="img/art-people.webp" alt="Люди обнимают большое сердце" loading="lazy" width="720" height="720"></div><div class="body"><h3>Союз сообществ</h3><p>Подружите своё сообщество с соседним. Если у вас нет нужного специалиста, к ним уйдёт только текст вопроса, без имени. Контакты откроются, когда согласятся обе стороны.</p><span class="chip">Помощь засчитывается обоим</span></div></article>
+      <article class="pcard sc tilt" style="--d:.2s;overflow:visible"><div class="mascot bird" aria-hidden="true"><svg class="boil" viewBox="0 0 84 70"><path d="M10 40q10-26 40-22 16 2 24 14-10-2-16 4 6 10-6 18-26 10-42-14z" fill="#FFF8EC" stroke="#141210" stroke-width="3"/><path d="M34 30q8-22 26-20-6 14-20 22" fill="#3BA4FF" stroke="#141210" stroke-width="3" stroke-linejoin="round"/><circle cx="62" cy="30" r="2.8"/><path d="M73 32l9-2-8 6" fill="#FF8A3D" stroke="#141210" stroke-width="2.5" stroke-linejoin="round"/><rect x="28" y="46" width="22" height="15" rx="2" fill="#D7FF3B" stroke="#141210" stroke-width="2.5"/><path d="M28 47l11 8 11-8" fill="none" stroke="#141210" stroke-width="2"/></svg></div><div class="pic" style="border-radius:19px 19px 0 0"><img src="img/art-people.webp" alt="Люди обнимают большое сердце" loading="lazy" width="720" height="720"></div><div class="body"><h3>Союз сообществ</h3><p>Подружите своё сообщество с соседним. Если у вас нет нужного специалиста, к ним уйдёт только текст вопроса, без имени. Контакты откроются, когда согласятся обе стороны.</p><span class="chip">Помощь ходит, люди остаются дома</span></div></article>
     </div>
   </div>
 </section>
@@ -602,6 +694,7 @@ footer a{color:var(--lime);text-decoration:none}
 <section class="sec" style="padding-top:0">
   <div class="wrap">
     <div class="head"><div class="kick rv">а теперь честно<svg viewBox="0 0 46 22"><path d="M2 12c10-8 18 8 28 0 5-4 9-4 14 0"/></svg></div><h2 class="rv">В чём разница?</h2></div>
+    <p class="compare-quote rv">CRM помнит записи. Чат помнит шум. Миндальная связь помнит, <span>кто что знает</span> и куда идёт вопрос.</p>
     <div class="cmp">
       <div class="side old sc tilt" style="--rot:-1deg"><h3>💬 Обычный чат</h3><ul><li>Вопрос тонет за пять минут</li><li>Ответ помнит только тот, кто ответил</li><li>Организатор отвечает за всех</li><li>Закроют чат, и пропадёт всё</li><li>Вместо ответа голосовое на семь минут</li></ul><img src="img/art-lost.webp" alt="" loading="lazy" width="720" height="720"></div>
       <div class="side new sc tilt" style="--rot:1deg"><span class="hand">ваше сообщество.<br>ваши правила.</span><h3>🌰 Миндальная связь</h3><ul><li>Ответ находится в истории за секунды</li><li>Память сообщества доступна каждому</li><li>Помогают те, кто разбирается</li><li>Всё можно забрать одним файлом</li></ul><img src="img/art-freedom.webp" alt="Кот в очках с флагом" loading="lazy" width="720" height="720"></div>
@@ -609,8 +702,23 @@ footer a{color:var(--lime);text-decoration:none}
   </div>
 </section>
 
+<!-- ============ LADDER ============ -->
+<section class="sec" style="padding-top:0">
+  <div class="wrap">
+    <div class="head"><div class="kick rv">связь<svg viewBox="0 0 46 22"><path d="M2 12c10-8 18 8 28 0 5-4 9-4 14 0"/></svg></div><h2 class="rv">Есть контакт ≠ есть связь</h2><p class="rv">Скопировать номера мало. Связь с людьми держится на четырёх ступеньках, и бот помогает пройти каждую.</p></div>
+    <div class="ladder">
+      <div class="rung sc"><span class="dot">01</span><h3>Контакт</h3><p>Человек в чате. Пока чат жив.</p></div>
+      <div class="rung sc"><span class="dot">02</span><h3>Согласие</h3><p>Каждый сам решает, что о нём знает бот, и может всё стереть одной командой.</p></div>
+      <div class="rung sc"><span class="dot">03</span><h3>Новый адрес</h3><p>Если сообщество переезжает, администратор задаёт новое место одной командой.</p></div>
+      <div class="rung sc"><span class="dot">04</span><h3>Достижимость</h3><p>Бот лично напишет каждому участнику, куда идти. Никто не потеряется.</p></div>
+    </div>
+    <span class="ladder-note rv">экспорт контактов ≠ спасённое сообщество</span>
+  </div>
+</section>
+
 <!-- ============ ARK ============ -->
 <section class="sec ark" id="ark">
+  <div class="mascot snail" aria-hidden="true"><span class="lbl">улитка-архивариус: медленно, зато ничего не теряет</span><svg class="boil" viewBox="0 0 150 90"><path d="M8 82h104q20 0 24-14l-6-2q-6 8-20 8H24z" fill="#FFC9A3" stroke="#FFF8EC" stroke-width="3"/><path d="M120 66q2-18 8-30M128 64q8-14 18-22" stroke="#FFF8EC" stroke-width="3" stroke-linecap="round" fill="none"/><circle cx="128" cy="34" r="4" fill="#FFF8EC"/><circle cx="147" cy="40" r="4" fill="#FFF8EC"/><circle cx="62" cy="46" r="34" fill="#7C4DFF" stroke="#FFF8EC" stroke-width="3"/><path d="M62 46m-6 0a6 6 0 1 1 12 0a12 12 0 1 1-24 0a18 18 0 1 1 36 0a24 24 0 1 1-48 0" fill="none" stroke="#D7FF3B" stroke-width="3" stroke-linecap="round"/><rect x="44" y="2" width="30" height="20" rx="3" fill="#D7FF3B" stroke="#FFF8EC" stroke-width="2.5"/><path d="M44 9h30" stroke="#141210" stroke-width="2"/></svg></div>
   <svg class="star boil" style="--s:46px;right:8%;top:10%;--c:#D7FF3B"><use href="#spark"/></svg>
   <svg class="star boil" style="--s:24px;left:5%;bottom:12%;--c:#FF7EC8;--dl:-1s"><use href="#spark"/></svg>
   <div class="wrap ark-grid">
@@ -664,19 +772,21 @@ footer a{color:var(--lime);text-decoration:none}
 <!-- ============ STATUS ============ -->
 <section class="sec" style="padding-top:0">
   <div class="wrap">
-    <div class="head"><div class="kick rv">статус<svg viewBox="0 0 46 22"><path d="M2 12c10-8 18 8 28 0 5-4 9-4 14 0"/></svg></div><h2 class="rv">Честно о том, где мы сейчас</h2></div>
-    <div class="status">
-      <div class="st sc"><b>⚙️ Закрытая бета</b><p>Бот уже работает в Telegram: отвечает по истории, зовёт знатоков, собирает «Пульс». Каждую неделю что-то докручиваем вместе с первыми сообществами.</p></div>
-      <div class="st sc" style="--d:.08s"><b>👋 Кого мы ищем</b><p>Сообщества, клубы и независимые проекты, где вопросы задают чаще, чем успевают отвечать.</p></div>
-      <div class="st sc" style="--d:.16s"><b>💛 Что дальше</b><p>Больше площадок, открытый API и помощники участников, которые спрашивают сообщество с их разрешения.</p></div>
+    <div class="head"><div class="kick rv">статус<svg viewBox="0 0 46 22"><path d="M2 12c10-8 18 8 28 0 5-4 9-4 14 0"/></svg></div><h2 class="rv">Показываем, что реально есть</h2><p class="rv">Без демо-фокусов: каждая функция с честной пометкой.</p></div>
+    <div class="truth">
+      <div class="col c-live sc"><span class="chip-s"><i></i>Работает</span><ul><li>Ответы по истории чата с цитатой и автором</li><li>«Нить»: одна живая карточка на вопрос</li><li>Знатоки с правом сказать «не сейчас»</li><li>«Пульс» по понедельникам</li><li>Союзы сообществ</li><li>Ковчег: выгрузка и созыв всех</li></ul></div>
+      <div class="col c-test sc"><span class="chip-s"><i></i>Проверяется</span><ul><li>Пилот с первыми сообществами</li><li>Подключение в одно касание на живых группах</li></ul></div>
+      <div class="col c-idea sc"><span class="chip-s"><i></i>Концепт</span><ul><li>Личные помощники участников, которые спрашивают сообщество с их разрешения</li></ul></div>
+      <div class="col c-later sc"><span class="chip-s"><i></i>Будущий слой</span><ul><li>Другие мессенджеры, например MAX</li><li>Подписка для сообществ</li></ul></div>
     </div>
+    <p class="truth-foot rv">Ищем сообщества, где вопросы задают чаще, чем успевают отвечать.</p>
   </div>
 </section>
 
 <!-- ============ FAQ ============ -->
 <section class="sec" style="padding-top:0">
   <div class="wrap">
-    <div class="head"><div class="kick rv">вопросы<svg viewBox="0 0 46 22"><path d="M2 12c10-8 18 8 28 0 5-4 9-4 14 0"/></svg></div><h2 class="rv">Что обычно спрашивают <span class="hand" style="color:var(--violet);font-size:.72em;display:inline-block;rotate:-4deg">(да, мы их тоже собрали)</span></h2></div>
+    <div class="head"><div class="mascot frog" aria-hidden="true"><span class="lbl">лягушка согласия говорит только «да» или «нет»</span><svg class="boil" viewBox="0 0 110 90"><ellipse cx="55" cy="60" rx="46" ry="28" fill="#5BE3B0" stroke="#141210" stroke-width="3.5"/><circle cx="33" cy="30" r="15" fill="#5BE3B0" stroke="#141210" stroke-width="3.5"/><circle cx="77" cy="30" r="15" fill="#5BE3B0" stroke="#141210" stroke-width="3.5"/><circle cx="33" cy="30" r="8" fill="#fff" stroke="#141210" stroke-width="2"/><circle cx="77" cy="30" r="8" fill="#fff" stroke="#141210" stroke-width="2"/><circle cx="35" cy="31" r="3.5"/><circle cx="79" cy="31" r="3.5"/><path d="M28 62q27 18 54 0" fill="none" stroke="#141210" stroke-width="3" stroke-linecap="round"/><circle cx="24" cy="54" r="5" fill="#FF7EC8" opacity=".6"/><circle cx="86" cy="54" r="5" fill="#FF7EC8" opacity=".6"/></svg></div><div class="kick rv">вопросы<svg viewBox="0 0 46 22"><path d="M2 12c10-8 18 8 28 0 5-4 9-4 14 0"/></svg></div><h2 class="rv">Что обычно спрашивают <span class="hand" style="color:var(--violet);font-size:.72em;display:inline-block;rotate:-4deg">(да, мы их тоже собрали)</span></h2></div>
     <div class="faq">
       <details class="qa sc"><summary>Бот будет писать в группу без спроса?<i>+</i></summary><div class="a"><div><p>В группе бот молчит, пока его не спросят. Если хотите, он будет подсказывать, что на вопрос уже отвечали: это включается одной командой.</p></div></div></details>
       <details class="qa sc"><summary>Что бот видит и что хранит?<i>+</i></summary><div class="a"><div><p>Только группы, куда его добавили. Каждый участник может посмотреть, что о нём хранится, и удалить это командой /forget_me. Новичкам бот в двух строках объясняет, что хранится и как это стереть.</p></div></div></details>

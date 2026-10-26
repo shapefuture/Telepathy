@@ -91,8 +91,8 @@ nav button.on{background:var(--lime);color:#111110}nav button:active{transform:n
 <script>
 "use strict";
 var tg=window.Telegram&&Telegram.WebApp;if(tg){tg.ready();tg.expand();}
-// Follows Telegram's light or dark theme unless the person picked one in Me.
-function getTheme(){try{var v=localStorage.getItem("theme");if(v==="dark"||v==="light")return v}catch(e){}return tg&&tg.colorScheme==="dark"?"dark":"light"}
+// Light by default, whatever Telegram's theme; the person can switch to dark in Me.
+function getTheme(){try{var v=localStorage.getItem("theme");if(v==="dark"||v==="light")return v}catch(e){}return "light"}
 function applyTheme(th){if(th==="dark")document.documentElement.setAttribute("data-theme","dark");else document.documentElement.removeAttribute("data-theme");
  try{if(tg&&tg.isVersionAtLeast&&tg.isVersionAtLeast("6.1")){var bg=th==="dark"?"#13120f":"#faf8f2";tg.setHeaderColor(bg);tg.setBackgroundColor(bg)}
   if(tg&&tg.isVersionAtLeast&&tg.isVersionAtLeast("7.10")&&tg.setBottomBarColor)tg.setBottomBarColor(th==="dark"?"#13120f":"#faf8f2")}catch(e){}}

@@ -10,8 +10,8 @@ import { escapeHtml, snippet } from "./text";
 
 export const WOW_SAMPLE = 1500;
 
-/** The top topics in the group's stored messages, by how many messages mention them. */
-export async function topTopics(db: D1Database, sourceId: string, lang: Lang, limit = 5): Promise<string[]> {
+/** The topics in a group's stored messages, by how many messages mention them (two at least). */
+export async function topicCounts(db: D1Database, sourceId: string, limit: number): Promise<{ code: string; n: number }[]> {
   const { results } = await db
     .prepare("SELECT body FROM passages WHERE source_id=? AND part=0 AND removed_at IS NULL AND body IS NOT NULL ORDER BY event_at DESC LIMIT ?")
     .bind(sourceId, WOW_SAMPLE)
@@ -22,7 +22,12 @@ export async function topTopics(db: D1Database, sourceId: string, lang: Lang, li
     .filter(([, n]) => n >= 2)
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .slice(0, limit)
-    .map(([code]) => labelIn(TAXONOMY.get(code)!, lang));
+    .map(([code, n]) => ({ code, n }));
+}
+
+/** The top topics in a group, as labels in one language. */
+export async function topTopics(db: D1Database, sourceId: string, lang: Lang, limit = 5): Promise<string[]> {
+  return (await topicCounts(db, sourceId, limit)).map((t) => labelIn(TAXONOMY.get(t.code)!, lang));
 }
 
 /** The questions in a group that nobody replied to. Same definition for the count and the list. */

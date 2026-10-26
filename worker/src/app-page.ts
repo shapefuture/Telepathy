@@ -78,20 +78,29 @@ nav button.on{background:var(--lime);color:#111110}nav button:active{transform:n
 @keyframes pop{from{opacity:0;transform:translate(-50%,10px) scale(.92)}}
 @keyframes spin-in{from{transform:rotate(-110deg) scale(.5)}to{transform:rotate(0) scale(1)}}
 @keyframes sticker-pop{0%,30%{opacity:0;transform:rotate(-14deg) scale(.6)}70%{opacity:1;transform:rotate(-4deg) scale(1.08)}100%{transform:rotate(-7deg) scale(1)}}
+.skel{height:72px;margin:12px 0;border-radius:var(--r);border:2px solid var(--edge);background:linear-gradient(90deg,transparent,var(--edge),transparent) var(--card);background-size:200% 100%;animation:shim 1.2s linear infinite}
+@keyframes shim{from{background-position:120% 0}to{background-position:-120% 0}}
+.thread{transition:transform .4s cubic-bezier(.34,1.56,.64,1),box-shadow .3s}.thread:active{transform:scale(.99)}.thread.focus{outline:3px solid var(--lime);outline-offset:3px}
+.cloud{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:center;padding:18px 6px}
+.star{background:none;color:var(--ink);border:0;box-shadow:none;padding:4px 6px;font-family:var(--fd);font-weight:600;line-height:1.05;transition:transform .35s cubic-bezier(.34,1.56,.64,1)}.star:nth-child(3n+2){color:var(--pri)}.star:nth-child(4n){color:#2a8f5f}.star:active{transform:scale(1.14)}
+@view-transition{navigation:auto}::view-transition-old(root),::view-transition-new(root){animation-duration:.32s}
+.almond{position:fixed;top:-30px;font-size:18px;z-index:10;pointer-events:none;animation:fall 1.5s cubic-bezier(.2,.7,.4,1) forwards}
+@keyframes fall{to{transform:translateY(105vh) rotate(260deg);opacity:0}}
 @media (prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
 </style></head><body><main id="main"><p class="empty">…</p></main><nav id="nav"></nav>
 <script>
 "use strict";
 var tg=window.Telegram&&Telegram.WebApp;if(tg){tg.ready();tg.expand();}
-// Light by default whatever Telegram's theme is; dark only if the person chose it in Profile.
-function getTheme(){try{return localStorage.getItem("theme")==="dark"?"dark":"light"}catch(e){return "light"}}
+// Follows Telegram's light or dark theme unless the person picked one in Me.
+function getTheme(){try{var v=localStorage.getItem("theme");if(v==="dark"||v==="light")return v}catch(e){}return tg&&tg.colorScheme==="dark"?"dark":"light"}
 function applyTheme(th){if(th==="dark")document.documentElement.setAttribute("data-theme","dark");else document.documentElement.removeAttribute("data-theme");
  try{if(tg&&tg.isVersionAtLeast&&tg.isVersionAtLeast("6.1")){var bg=th==="dark"?"#13120f":"#faf8f2";tg.setHeaderColor(bg);tg.setBackgroundColor(bg)}
   if(tg&&tg.isVersionAtLeast&&tg.isVersionAtLeast("7.10")&&tg.setBottomBarColor)tg.setBottomBarColor(th==="dark"?"#13120f":"#faf8f2")}catch(e){}}
 applyTheme(getTheme());
+if(tg&&tg.onEvent)tg.onEvent("themeChanged",function(){applyTheme(getTheme())});
 var H={"x-telegram-init-data":tg?tg.initData:"","content-type":"application/json"};
 var ver=function(v){return tg&&tg.isVersionAtLeast&&tg.isVersionAtLeast(v)};
-var L={en:{home:"Home",ask:"Ask",req:"Requests",ev:"Events",me:"Me",desk:"Desk",hi:"Hi! What do you need?",askPh:"Ask your groups…",search:"Search",
+var L={en:{home:"Home",ask:"Ask",req:"Requests",threads:"Threads",constel:"Constellation",constelHint:"Tap a topic: what the club knows about it, and who knows it.",threadsEmpty:"Nothing in progress. Ask something: it becomes a thread that follows your answer.",pulse:"Pulse",pulseNone:"Your club's pulse arrives on Mondays.",pulseShare:"📣 Share with the group",pulseShared:"Shared with the group.",unionT:"Alliances",unionNone:"No alliances yet.",unionCredit:"helped / helped by",clubs:"Clubs",memberAnon:"Member",member:"member",back:"Back",nothingHere:"Nothing here yet.",ev:"Events",me:"Me",desk:"Desk",hi:"Hi! What do you need?",askPh:"Ask your groups…",search:"Search",
 needHelp:"Need help with something?",newReq:"New request",reqPh:"What do you need? One or two sentences, without contacts or links.",create:"Continue",
 open:"open requests",offers:"offers for you",inv:"intro invitations",catch:"What's new",c12:"12 h",c3:"3 days",cLast:"Since last time",nothingNew:"Nothing new.",
 next:"Coming up",noEv:"No upcoming events in your groups.",ics:"Send calendar file to chat",sent:"Sent to your chat.",allGroups:"All groups",anyTime:"Any time",
@@ -118,7 +127,7 @@ recov:"Recovery codes",recovWhy:"One-time codes to log in without Telegram or em
 receive:"What you receive",t_critical:"Critical notices (address changes, outages)",t_events:"Events",t_requests:"Updates on my requests",t_news:"Community news",t_commercial:"Offers from the community",t_partner_offers:"Offers from partner communities",
 member:"Membership",noMember:"No current membership on record. Your subscriptions stay yours either way.",passFor:"Membership pass for a partner",makePass:"Create pass",passNote:"Valid 7 days, only for this partner, under a pseudonym. Copy it and give it to the partner.",
 portal:"Open the portal (works without Telegram)",export:"Download my data",delPass:"Delete my passport",delPassQ:"Delete your addresses, subscriptions and recovery codes? Your addresses stay blocked from future messages.",remove:"Remove",darkMode:"Dark theme",openAppT:"Open it from the bot",openApp:"This app works inside Telegram. Open the bot's chat and tap the menu button at the bottom left.",notMemberT:"Almost there",notMember:"The bot doesn't know you yet. Write any message in a community group where the bot is switched on, then open the app again.",errT:"Couldn't load",closeApp:"Close",brand:"Миндальная связь",eyebrow:"Your community",homeA:"Ask",homeB:"your people.",homeC:"Find answers together.",band1:"Your people.",band2:"Shared work.",howTitle:"How it works",note:"Less stress. More care for people.",st1h:"You ask",st1p:"“Where's the recording of the meetup?”",st2h:"We search everything",st2p:"Messages, materials and events in your groups.",st3h:"An answer, or the right people",st3p:"If the groups don't know, the request goes to people who can help.",st4h:"You get help fast",st4p:"“Thanks! Exactly what I needed.”",totpTitle:"Authenticator app",totpGo:"Set up",b_active:"together",b_pending:"waiting",heroA:"Your community is ",heroB:"bigger than a chat.",tagline:"Your people. Your rules.",helpSub:"Describe it in a sentence. We'll find people and answers.",paths:"Independent ways to reach you",pathsGoal:"Aim for 3: if one breaks, the others still reach you.",reachUs:"How we reach you",addPath:"Add a way to reach you",suggest:"Suggested next",ntfyHow:"Install the ntfy app and subscribe to this private topic. Then enter the code we send there.",ntfyAdd:"ntfy app",matrixAdd:"Add Matrix",smsAdd:"Add SMS",codeFrom:"Code from the new path",confirmCode:"Confirm",pushPortal:"Browser notifications are set up in the portal",loginWays:"Log in without Telegram",yourId:"Your passport id",totpAdd:"Add an authenticator app",totpKey:"Or enter this key:",totpOk:"Authenticator added.",moreInPortal:"Device key, printed recovery card and guardians are in the portal",buddy:"Buddy",buddyWhy:"Someone who passes critical notices to you, and you to them.",buddyName:"How your buddy knows you",buddyInvite:"Create invite code",buddyCode:"Buddy's code",buddyAccept:"Accept code",buddyGive:"Give this code to your buddy:",end:"End",k_email:"Email",k_telegram:"Telegram",k_webpush:"Browser",k_ntfy:"ntfy",k_matrix:"Matrix",k_sms:"SMS",s_email:"another email",s_webpush:"browser notifications",s_ntfy:"the ntfy app",s_matrix:"Matrix",s_sms:"SMS",s_buddy:"a buddy",s_recovery_card:"a printed recovery card",st_verified:"working",st_pending:"waiting for code",h_failing:"not working",h_dead:"gone",linked:"linked"},
-ru:{home:"Главная",ask:"Поиск",req:"Запросы",ev:"События",me:"Профиль",desk:"Пульт",hi:"Привет! Что нужно?",askPh:"Спросите свои группы…",search:"Искать",
+ru:{home:"Главная",ask:"Спросить",req:"Запросы",threads:"Нити",constel:"Созвездие",constelHint:"Нажми на тему: что о ней знает клуб и кто в этом разбирается.",threadsEmpty:"Пока ничего не открыто. Спроси что-нибудь — это станет нитью, которая ведёт тебя до ответа.",pulse:"Пульс",pulseNone:"Пульс клуба приходит по понедельникам.",pulseShare:"📣 Поделиться с группой",pulseShared:"Отправлено в группу.",unionT:"Союзы",unionNone:"Союзов пока нет.",unionCredit:"помогли / помогли вам",clubs:"Клубы",memberAnon:"Участник",member:"участник",back:"Назад",nothingHere:"Пока здесь пусто.",ev:"События",me:"Я",desk:"Пульт",hi:"Привет! Что нужно?",askPh:"Спросите свои группы…",search:"Искать",
 needHelp:"Нужна помощь?",newReq:"Новый запрос",reqPh:"Что нужно? Одно-два предложения, без контактов и ссылок.",create:"Дальше",
 open:"открытых запросов",offers:"предложений вам",inv:"приглашений",catch:"Что нового",c12:"12 ч",c3:"3 дня",cLast:"С прошлого раза",nothingNew:"Ничего нового.",
 next:"Скоро",noEv:"В ваших группах нет предстоящих событий.",ics:"Прислать файл календаря",sent:"Отправлено в чат.",allGroups:"Все группы",anyTime:"За всё время",
@@ -145,7 +154,7 @@ recov:"Коды восстановления",recovWhy:"Одноразовые �
 receive:"Что вы получаете",t_critical:"Важные уведомления (смена адреса, сбои)",t_events:"События",t_requests:"Новости по моим запросам",t_news:"Новости сообщества",t_commercial:"Предложения сообщества",t_partner_offers:"Предложения партнёрских сообществ",
 member:"Членство",noMember:"Текущее членство не подтверждено. Ваши подписки остаются вашими в любом случае.",passFor:"Пропуск для партнёра",makePass:"Создать пропуск",passNote:"Действует 7 дней, только для этого партнёра, под псевдонимом. Скопируйте и передайте партнёру.",
 portal:"Открыть портал (работает без Telegram)",export:"Скачать мои данные",delPass:"Удалить паспорт",delPassQ:"Удалить ваши адреса, подписки и коды восстановления? Адреса останутся заблокированными для будущих рассылок.",remove:"Удалить",darkMode:"Тёмная тема",openAppT:"Откройте из бота",openApp:"Приложение работает внутри Telegram. Откройте чат с ботом и нажмите кнопку меню слева внизу.",notMemberT:"Почти готово",notMember:"Бот вас ещё не знает. Напишите любое сообщение в группе сообщества, где бот включён, и откройте приложение снова.",errT:"Не удалось загрузить",closeApp:"Закрыть",brand:"Миндальная связь",eyebrow:"Ваше сообщество",homeA:"Спросите",homeB:"своих.",homeC:"Найдём ответ вместе.",band1:"Свои люди.",band2:"Общее дело.",howTitle:"Как это работает",note:"Меньше стресса. Больше заботы о людях.",st1h:"Вы задаёте вопрос",st1p:"«Где найти запись встречи?»",st2h:"Ищем по всей базе",st2p:"Сообщения, материалы и события ваших групп.",st3h:"Отвечаем или подключаем людей",st3p:"Если в группах ответа нет, запрос уходит тем, кто может помочь.",st4h:"Вы быстро получаете помощь",st4p:"«Спасибо! Именно то, что нужно.»",totpTitle:"Приложение-аутентификатор",totpGo:"Подключить",b_active:"вместе",b_pending:"ждём ответа",heroA:"Ваше сообщество ",heroB:"больше, чем чат.",tagline:"Ваши люди. Ваши правила.",helpSub:"Опишите одним предложением. Найдём людей и ответы.",paths:"Независимых путей к вам",pathsGoal:"Цель — 3: если один сломается, остальные дотянутся.",reachUs:"Как мы до вас дотянемся",addPath:"Добавить путь",suggest:"Советуем дальше",ntfyHow:"Установите приложение ntfy и подпишитесь на эту личную тему. Потом введите код, который туда придёт.",ntfyAdd:"Приложение ntfy",matrixAdd:"Добавить Matrix",smsAdd:"Добавить SMS",codeFrom:"Код из нового канала",confirmCode:"Подтвердить",pushPortal:"Уведомления в браузере — настраиваются в портале",loginWays:"Вход без Telegram",yourId:"Ваш ID паспорта",totpAdd:"Подключить приложение-аутентификатор",totpKey:"Или введите ключ:",totpOk:"Аутентификатор подключён.",moreInPortal:"Ключ устройства, печатная карточка и хранители — в портале",buddy:"Напарник",buddyWhy:"Человек, который передаст вам важное — а вы ему.",buddyName:"Как вас знает напарник",buddyInvite:"Создать код приглашения",buddyCode:"Код напарника",buddyAccept:"Принять код",buddyGive:"Передайте этот код напарнику:",end:"Завершить",k_email:"Почта",k_telegram:"Telegram",k_webpush:"Браузер",k_ntfy:"ntfy",k_matrix:"Matrix",k_sms:"SMS",s_email:"ещё одну почту",s_webpush:"уведомления в браузере",s_ntfy:"приложение ntfy",s_matrix:"Matrix",s_sms:"SMS",s_buddy:"напарника",s_recovery_card:"печатную карточку",st_verified:"работает",st_pending:"ждёт код",h_failing:"не работает",h_dead:"отключён",linked:"привязан"}};
-var S={lang:"ru",me:null,tab:"home",sub:"req",draft:null,local:{},prefill:""};
+var S={lang:"ru",me:null,tab:"ask",sub:"req",draft:null,local:{},prefill:""};
 var t=function(k){return (L[S.lang]||L.en)[k]||L.en[k]||k};
 var NL=String.fromCharCode(10);
 var main=document.getElementById("main"),nav=document.getElementById("nav");
@@ -171,7 +180,7 @@ function tint(color){var a=[].slice.call(arguments,1);return h.apply(null,["div"
 var secN=0;function section(title){secN++;return h("h2",{cls:["","mint","orange"][secN%3],text:title})}
 function art(name,cls){return h("img",{src:"/art/"+name+".webp",cls:"art "+(cls||""),alt:"",loading:"lazy",decoding:"async"})}
 function empty(msg){return h("div",{cls:"empty"},svgEl(CAT,"width:88px;margin:0 auto 6px;display:block"),h("div",{text:msg||t("empty")}))}
-function setMain(nodes){secN=0;var list=[topbar()].concat(nodes).filter(Boolean);list.forEach(function(n,i){if(n.style)n.style.setProperty("--i",String(Math.min(i,12)))});main.replaceChildren.apply(main,list);window.scrollTo(0,0)}
+function setMain(nodes){secN=0;var list=[topbar()];if(S.back)list.push(h("button",{cls:"link",text:"← "+t("back"),onclick:function(){go("me")}}));list=list.concat(nodes).filter(Boolean);list.forEach(function(n,i){if(n.style)n.style.setProperty("--i",String(Math.min(i,12)))});main.replaceChildren.apply(main,list);window.scrollTo(0,0)}
 function copy(text){if(navigator.clipboard)navigator.clipboard.writeText(text).then(function(){toast(t("copied"))})}
 
 // ---- doodles (constant SVG, drawn for this app) ----
@@ -197,54 +206,70 @@ var ICONS={home:["M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"],ask:["M4 11a7 7 0 1 0 14 
 function icon(name){var NS="http://www.w3.org/2000/svg";var svg=document.createElementNS(NS,"svg");svg.setAttribute("viewBox","0 0 24 24");svg.setAttribute("width","22");svg.setAttribute("height","22");
  svg.setAttribute("fill","none");svg.setAttribute("stroke","currentColor");svg.setAttribute("stroke-width","2");svg.setAttribute("stroke-linecap","round");svg.setAttribute("stroke-linejoin","round");
  ICONS[name].forEach(function(d){var p=document.createElementNS(NS,"path");p.setAttribute("d",d);svg.append(p)});return svg}
-var TABS=[["home"],["ask"],["req"],["pass"],["me"]];
-function renderNav(){var tabs=TABS.slice();if(S.me&&(S.me.owner||S.me.groupAdmin))tabs.push(["desk"]);nav.replaceChildren.apply(nav,tabs.map(function(x){
- var badge=x[0]==="req"&&S.me?(S.me.counts.offers+S.me.counts.invites):0;
- return h("button",{cls:S.tab===x[0]?"on":"",onclick:function(){haptic("tap");go(x[0])}},icon(x[0]),h("span",null,t(x[0]),badge?h("span",{cls:"badge",text:String(badge)}):null))}))}
-function go(tab){S.tab=tab;renderNav();hideMain();if(tg&&tg.BackButton)tg.BackButton.hide();({home:home,ask:askView,req:reqView,ev:events,me:meView,desk:desk,pass:passport})[tab]()}
+var TABS=[["ask"],["threads"],["me"]];
+function renderNav(){var tabs=TABS.slice();nav.replaceChildren.apply(nav,tabs.map(function(x){
+ var badge=x[0]==="threads"&&S.me?(S.me.counts.offers+S.me.counts.invites):0;
+ return h("button",{cls:S.tab===x[0]?"on":"",onclick:function(){haptic("tap");go(x[0])}},icon(x[0]==="threads"?"req":x[0]),h("span",null,t(x[0]),badge?h("span",{cls:"badge",text:String(badge)}):null))}))}
+function go(tab){S.tab=tab;S.back=["desk","pass","ev","req"].indexOf(tab)>=0;renderNav();hideMain();if(tg&&tg.BackButton)tg.BackButton.hide();var view={ask:askView,threads:threadsView,me:meView,ev:events,req:reqView,desk:desk,pass:passport,constel:constelView}[tab]||askView;if(document.startViewTransition){document.startViewTransition(function(){view()})}else view()}
 var mainCb=null;function hideMain(){if(tg&&tg.MainButton){if(mainCb)tg.MainButton.offClick(mainCb);tg.MainButton.hide()}mainCb=null}
 function mainButton(text,fn){if(!tg||!tg.MainButton||!ver("6.1"))return false;hideMain();mainCb=fn;tg.MainButton.setText(text);tg.MainButton.onClick(fn);tg.MainButton.show();return true}
 function refreshMe(){return get("me").then(function(m){S.me=m;renderNav();return m})}
-function searchBar(value,onGo){var q=h("input",{placeholder:t("askPh"),enterkeyhint:"search",value:value||""});q.addEventListener("keydown",function(e){if(e.key==="Enter")onGo(q.value)});
- var b=h("button",{"aria-label":t("search"),onclick:function(){onGo(q.value)}},"→");return {el:h("div",{cls:"search"},q,b),input:q}}
-
-// ---- home ----
-function home(){var sb=searchBar("",function(v){S.prefill=v;go("ask")});
- var c=S.me.counts;var dig=h("div");
- var tiles=h("div",{cls:"stat"},[[c.requests,"open","c-sky"],[c.offers,"offers","c-lime"],[c.invites,"inv","c-pink"]].map(function(x){return h("div",{cls:"card "+x[2],onclick:function(){go("req")}},h("b",{text:String(x[0])}),h("span",{style:"font-size:13px;font-weight:600",text:t(x[1])}))}));
- var help=h("div",{cls:"card c-bold tilt-l"},h("div",{cls:"row"},h("div",{cls:"grow"},h("div",{cls:"big",text:t("needHelp")}),h("div",{style:"font-size:13px;margin-top:4px",text:t("helpSub")})),art("helper","art-sm")),
-  h("div",{cls:"btns"},h("button",{onclick:function(){S.newReq=true;go("req")}},t("newReq"),h("span",{cls:"arrow"},"→"))));
- var catchBtns=h("div",{cls:"chips"},[["12h","c12"],["3d","c3"],["","cLast"]].map(function(x){return h("button",{cls:"chip",onclick:function(e){busy(e.target,get("catchup?window="+x[0])).then(function(r){dig.replaceChildren(r.html?card(safe(r.html)):empty(t("nothingNew")))})}},t(x[1]))}));
- var evs=h("div");
- setMain([h("div",{cls:"eyebrow",text:t("eyebrow")}),h("h1",null,t("homeA")," ",h("span",{cls:"under"},t("homeB")),h("span",{cls:"small"},h("mark",null,t("homeC")))),sb.el,
-  h("div",{cls:"hero-art"},art("portal")),h("div",{cls:"band"},h("span",null,t("band1")),h("span",{style:"font-size:1.4em"},"✻"),h("span",null,t("band2"))),
-  help,tiles,section(t("catch")),catchBtns,dig,section(t("next")),evs]);
- get("events").then(function(list){evs.replaceChildren.apply(evs,list.length?list.slice(0,3).map(eventCard):[empty(t("noEv"))])})}
-
-// ---- ask ----
-var F={group:"",since:"",file:false},groups=null;
-function askView(){var q=h("input",{placeholder:t("askPh"),value:S.prefill||"",enterkeyhint:"search"});S.prefill="";var res=h("div");
- var chips=h("div",{cls:"chips"});function drawChips(){chips.replaceChildren();var sel=h("select",{cls:"chip",style:"width:auto",onchange:function(e){F.group=e.target.value}},
-   h("option",{value:"",text:t("allGroups")}),(groups||[]).map(function(g){return h("option",{value:g.id,text:g.title,selected:F.group===g.id})}));
-  chips.append(sel);[["","anyTime"],["7d","7d"],["30d","30d"],["365d","365d"]].forEach(function(x){chips.append(h("button",{cls:"chip"+(F.since===x[0]?" on":""),onclick:function(){F.since=x[0];drawChips()}},x[1]==="anyTime"?t("anyTime"):x[1]))});
-  chips.append(h("button",{cls:"chip"+(F.file?" on":""),onclick:function(){F.file=!F.file;drawChips()}},"📎 "+t("withFile")))}
- if(!groups)get("groups").then(function(g){groups=g;drawChips()});drawChips();
- function run(){if(!q.value.trim())return;res.replaceChildren(h("p",{cls:"muted",text:"…"}));
-  busy(null,post("ask",{q:q.value,group:F.group,since:F.since,file:F.file})).then(function(a){res.replaceChildren(answerView(a,q.value))}).catch(function(){res.replaceChildren()})}
+// ---- ask: a search goes straight into a thread (plan: Спросить) ----
+function skel(){return h("div",{cls:"skel"})}
+function askView(){var q=h("input",{placeholder:t("askPh"),value:S.prefill||"",enterkeyhint:"search"});S.prefill="";
+ var row=h("div",{cls:"chips"});var groupsNow=(S.me&&S.me.groups)||[];
+ function drawGroups(){row.replaceChildren();row.append(h("button",{cls:"chip"+(!S.group?" on":""),onclick:function(){S.group="";drawGroups()}},t("allGroups")));
+  groupsNow.forEach(function(g){row.append(h("button",{cls:"chip"+(S.group===g.id?" on":""),onclick:function(){S.group=g.id;drawGroups()}},g.title))})}
+ drawGroups();
+ var hints=h("div",{cls:"chips"});
+ get("constellation").then(function(stars){hints.replaceChildren();(stars||[]).slice(0,6).forEach(function(s){hints.append(h("button",{cls:"chip",onclick:function(){q.value=s.label;q.focus()}},s.label))})}).catch(function(){});
+ var box=h("div");
+ function run(){var v=q.value.trim();if(!v)return;haptic("tap");box.replaceChildren(skel());
+  busy(null,post("thread",{q:v,group:S.group||null})).then(function(r){if(!r.ok){box.replaceChildren(h("p",{cls:"muted",text:t("nothingHere")}));return}S.focus=r.id;haptic("success");go("threads")}).catch(function(){box.replaceChildren()})}
  q.addEventListener("keydown",function(e){if(e.key==="Enter")run()});
- res.append(h("div",{cls:"hero-art"},art("lounge")));
- setMain([h("h1",null,h("span",{cls:"under"},t("ask"))),h("div",{cls:"search"},q,h("button",{"aria-label":t("search"),onclick:run},"→")),chips,res]);if(q.value)run();else q.focus()}
+ get("events").then(function(evs){if(!evs||!evs.length)return;box.replaceChildren(h("h2",{text:t("next")}),evs.slice(0,3).map(function(e){return card(h("b",{text:e.title}),h("div",{cls:"muted",text:new Date(e.starts_at).toLocaleString(S.lang==="ru"?"ru-RU":"en-GB",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}))}))}).catch(function(){});
+ setMain([h("h1",null,h("span",{cls:"under"},t("ask"))),h("div",{cls:"search"},q,h("button",{"aria-label":t("search"),onclick:run},"→")),row,hints,h("p",{cls:"muted",text:t("constelHint")}),h("div",{cls:"btns"},h("button",{cls:"sec",onclick:function(){go("constel")}},t("constel"))),box]);
+ q.focus()}
+
+// ---- threads: each request is its living card, the bot's own card (plan: Нити) ----
+function threadsView(){var box=h("div",null,skel(),skel());setMain([h("h1",null,h("span",{cls:"under"},t("threads"))),box]);
+ get("threads").then(function(list){drawThreads(box,list)}).catch(function(){box.replaceChildren(h("p",{cls:"muted",text:t("err")}))})}
+function drawThreads(box,list){box.replaceChildren();
+ if(!list||!list.length){box.append(empty(t("threadsEmpty")));return}
+ list.forEach(function(th){var body=h("div",{cls:"card thread"+(S.focus===th.id?" focus":"")});
+  if(!th.card){body.append(h("p",{cls:"muted",text:t("nothingHere")}));box.append(body);return}
+  body.append(safe(th.card.html));
+  th.card.buttons.forEach(function(r){body.append(h("div",{cls:"btns"},r.map(function(b){return h("button",{cls:"sec",onclick:function(e){haptic("tap");busy(e.currentTarget,post("press",{data:b.data})).then(function(){haptic("success");if(b.data.slice(-4)===":thx")almonds();return get("threads").then(function(l){drawThreads(box,l)})})}},b.text)})))});
+  box.append(body)});
+ if(S.focus){S.focus=null;setTimeout(function(){var el=document.querySelector(".focus");if(el)el.scrollIntoView({block:"center",behavior:"smooth"})},60)}}
+
+// ---- constellation: the club as a map of topics and people (plan: Созвездие) ----
+function constelView(){var box=h("div",null,skel());setMain([h("h1",null,h("span",{cls:"under"},t("constel"))),h("p",{cls:"muted",text:t("constelHint")}),box]);
+ get("constellation").then(function(stars){box.replaceChildren();var max=Math.max.apply(null,[1].concat((stars||[]).map(function(s){return s.n})));
+  box.append(h("div",{cls:"cloud"},(stars||[]).map(function(s){var k=0.85+1.1*(s.n/max);return h("button",{cls:"star",style:"font-size:"+k.toFixed(2)+"em",onclick:function(){haptic("tap");starView(s)}},s.label)})));
+  if(!stars||!stars.length)box.append(empty());
+  box.append(h("div",{id:"detail"}))}).catch(function(){box.replaceChildren(h("p",{cls:"muted",text:t("err")}))})}
+function starView(s){var d=document.getElementById("detail");if(!d)return;d.replaceChildren(skel());
+ get("constellation/"+s.code).then(function(x){d.replaceChildren(h("h2",{text:x.label}),(x.quotes||[]).length?x.quotes.map(function(q){return card(h("div",{cls:"q",text:q.text}),h("div",{cls:"muted",text:(q.who?q.who.face+" "+(q.who.name||t("memberAnon")):"")+" · "+(q.when||"").slice(0,7)+(q.label?" · "+q.label:"")}))}):empty(),(x.people||[]).length?h("div",{cls:"chips"},x.people.map(function(p){return h("span",{cls:"chip on"},p.face+" "+(p.name||t("member")))})):null)}).catch(function(){d.replaceChildren(h("p",{cls:"muted",text:t("err")}))})}
+
+// A thank-you falls as a few almonds (plan: the motion system)
+function almonds(){for(var i=0;i<14;i++){var d=h("span",{cls:"almond",text:"🌰"});d.style.left=(8+Math.random()*84)+"%";d.style.animationDelay=(Math.random()*0.3)+"s";document.body.append(d);setTimeout(function(x){return function(){x.remove()}}(d),1900)}}
+
+// ---- Я: this club's pulse and alliances, above the settings (plan: Пульс, Союз) ----
+function meExtras(){var box=h("div",{cls:"meextra"});
+ if(S.me&&(S.me.owner||S.me.groupAdmin))box.append(h("div",{cls:"btns"},h("button",{cls:"sec",onclick:function(){go("desk")}},t("desk"))));
+ var pBox=h("div",null,skel());var uBox=h("div",null,skel());
+ get("pulse").then(function(cards){pBox.replaceChildren();if(!cards||!cards.length){pBox.append(h("p",{cls:"muted",text:t("pulseNone")}));return}
+  cards.forEach(function(c){pBox.append(card(h("div",{cls:"safe-html",text:""}),safe(c.html),c.share?h("div",{cls:"btns"},h("button",{cls:"sec",onclick:function(e){busy(e.currentTarget,post("press",{data:"pu:"+c.share})).then(function(){toast(t("pulseShared"))})}},t("pulseShare"))):null))})}).catch(function(){pBox.replaceChildren()});
+ get("union").then(function(u){uBox.replaceChildren();var list=u.alliances||[];if(!list.length)uBox.append(h("p",{cls:"muted",text:t("unionNone")}));
+  list.forEach(function(a){uBox.append(card(h("b",{text:a.mine+" ↔ "+a.other}),h("div",{cls:"muted",text:a.level+" · "+a.status+" · "+t("unionCredit")+": "+a.helped+" / "+a.received})))});
+  (u.clubs||[]).forEach(function(c){uBox.append(h("button",{cls:"sec",onclick:function(e){busy(e.currentTarget,post("press",{data:"uv:"+c.id})).then(function(){toast(t("sent"))})}},"➕ "+c.title))})}).catch(function(){uBox.replaceChildren()});
+ box.append(section(t("pulse")),pBox,section(t("unionT")),uBox);return box}
+
 function quoteCard(x,i,answerId){var meta=[(x.event_at||"").slice(0,10),x.label,x.tag==="canonical"?"⭐":x.tag==="outdated"?"⚠️":null].filter(Boolean).join(" · ");
  return h("div",{cls:"q"},x.text,h("div",{cls:"muted row"},h("span",{cls:"grow",text:meta}),x.url?h("button",{cls:"link",onclick:function(){openUrl(x.url)}},"↗"):null,
   answerId?h("button",{cls:"link",title:t("wrong"),onclick:function(e){vote(answerId,"bad"+i,e.target)}},"⚑"):null))}
 function vote(id,action,btn){busy(btn,post("vote",{answerId:id,action:action})).then(function(){haptic("success");toast(t("thx"))})}
-function answerView(a,q){var box=h("div");if(a.status!=="answered"){box.append(card(art("lost","art-sm"),h("div",{style:"margin-top:8px",text:a.noAnswer||t("noRes")}),h("div",{cls:"btns"},h("button",{onclick:function(){S.newReq=true;S.prefill=q;go("req")}},t("toReq")))));return box}
- if(a.brief)box.append(card(h("div",{text:"💡 "+a.brief}),h("p",{cls:"muted",text:t("aiNote")})));
- if(a.fixes&&a.fixes.length)box.append(h("p",{cls:"muted",text:t("fixed")+" "+a.fixes.map(function(f){return f[0]+" → "+f[1]}).join(", ")}));
- box.append(card(a.quotes.map(function(x,i){return quoteCard(x,i,a.answerId)}),h("div",{cls:"btns"},h("button",{cls:"sec",onclick:function(e){vote(a.answerId,"up",e.target)}},"👍 "+t("helpful")),
-  h("button",{cls:"sec",onclick:function(e){vote(a.answerId,"down",e.target)}},"👎 "+t("notHelpful")),h("button",{cls:"link",onclick:function(){S.newReq=true;S.prefill=q;go("req")}},t("toReq")))));return box}
-
-// ---- requests ----
 function reqView(){var box=h("div",null,h("p",{cls:"muted",text:"…"}));var form=newReqForm();setMain([h("h1",null,h("span",{cls:"under"},t("req"))),form,box]);
  get("requests").then(function(r){var parts=[];
   if(r.intros.length){parts.push(section(t("intros")));r.intros.forEach(function(i){parts.push(introCard(i))})}
@@ -372,7 +397,7 @@ function meView(){var m=S.me;var sw=h("div",null,["digest","discoverable","avail
  function loadSkills(){if(allSkills){dl.replaceChildren.apply(dl,allSkills.map(function(s){return h("option",{value:s.label})}));return}get("skills").then(function(x){allSkills=x;loadSkills()})}loadSkills();
  add.addEventListener("change",function(){var s=(allSkills||[]).find(function(x){return x.label===add.value})||{code:add.value};post("skills",{code:s.code,on:true}).then(function(r){if(r.ok){haptic("success");refreshMe().then(meView)}else toast(t("err"))})});
  var priv=h("div");
- setMain([h("div",{cls:"row"},h("h1",{cls:"grow"},h("span",{cls:"under"},t("me"))),art("people","art-sm")),h("div",{cls:"btns"},h("button",{cls:"sec",onclick:function(){go("ev")}},"📅 "+t("ev"))),section(t("settings")),card(sw),section(t("skills")),card(sk,add,dl),section(t("privacy")),
+ setMain([h("div",{cls:"row"},h("h1",{cls:"grow"},h("span",{cls:"under"},t("me"))),art("people","art-sm")),h("div",{cls:"btns"},h("button",{cls:"sec",onclick:function(){go("ev")}},"📅 "+t("ev")),h("button",{cls:"sec",onclick:function(){go("req")}},t("req")),h("button",{cls:"sec",onclick:function(){go("pass")}},t("pass"))),meExtras(),section(t("settings")),card(sw),section(t("skills")),card(sk,add,dl),section(t("privacy")),
   card(h("button",{cls:"link",onclick:function(){get("privacy").then(function(r){priv.replaceChildren(safe(r.html))})}},t("privacy")+" ›"),priv,
    h("div",{cls:"btns"},h("button",{cls:"danger",onclick:function(e){ask(t("forgetQ")).then(function(ok){if(ok)busy(e.target,post("forget",{confirm:"forget"})).then(function(){toast(t("forgotten"));refreshMe().then(meView)})})}},t("forget"))))])}
 
@@ -473,7 +498,7 @@ window.addEventListener("pagehide",function(){if(HI.imp)HI.imp.close()});
 
 // ---- start ----
 refreshMe().then(function(m){S.lang=m.lang;var sp=m.startParam||"";if(!sp){try{sp=new URLSearchParams(location.search).get("start")||""}catch(e){}}if(!sp&&location.hash)sp=location.hash.slice(1);if(sp==="history")S.sub="hist";
- var tab=({ask:"ask",help:"req",requests:"req",events:"ev",profile:"me",desk:"desk",passport:"pass",history:"desk"})[sp]||"home";
+ var tab=({ask:"ask",help:"req",requests:"threads",threads:"threads",constel:"constel",events:"ev",profile:"me",desk:"desk",passport:"pass",history:"desk"})[sp]||"ask";
  if(sp==="help")S.newReq=true;if(tab==="desk"&&!m.owner&&!m.groupAdmin)tab="home";go(tab)}).catch(function(e){var lc=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user&&tg.initDataUnsafe.user.language_code)||"";S.lang="ru";void lc;
  var k=!tg||!tg.initData||e.status===401?"openApp":e.status===403?"notMember":"err";
  main.replaceChildren(topbar(),h("div",{cls:"card c-lav"},h("div",{cls:"row"},h("div",{cls:"grow"},h("div",{cls:"big",text:t(k+"T")}),h("p",{style:"margin:8px 0 0",text:t(k)})),art("lost","art-sm")),

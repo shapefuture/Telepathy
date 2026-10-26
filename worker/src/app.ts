@@ -27,9 +27,15 @@ import { HISTORY_PAGE_MAX, historyGroups, perDay, resetHistory, stagePage } from
 import { mcpOn, startAuto } from "./history-mcp";
 import { isChatAdmin, managedChats } from "./admins";
 import { answer, parseFilters } from "./search";
-import { createTelegram, type Fetcher } from "./telegram";
+import { createTelegram, type Fetcher, type Telegram } from "./telegram";
 import { audit, DAY, HOUR, localParts, nowIso, safeEqual } from "./util";
 import { PAGE } from "./app-page";
+import { handleUpdate, type Update } from "./bot";
+import { openThread } from "./thread";
+import { renderThread, faceOf, namesFor } from "./thread-card";
+import { pulseCard } from "./pulse";
+import { alliancesOf, clubsOf } from "./alliance";
+import { topicCounts } from "./wow";
 import { hydraAuthed } from "./hydra/portal";
 import { activeAttestations, addEmail, checkCode, ContinuityError, enrolFromTelegram, follows, forgetPerson, newRecoveryCodes, personalExport, personForMember, protection, refreshMembership, revokeEndpoint, setTopic, TOPICS, type Topic } from "./continuity/people";
 import { currentManifest } from "./continuity/identity";
@@ -89,6 +95,13 @@ function memberActs(m: Mission, hasPartners: boolean): string[] {
   if (m.status === "external_permission_needed" || m.status === "no_eligible_provider") return hasPartners ? ["pv", "x"] : ["x"];
   if (m.status === "delivered") return ["rate"];
   return isTerminal(m) ? [] : ["x"];
+}
+
+/** Enabled groups this member can read, by name: the club chips and the group filter. */
+async function groupsOf(db: D1Database, m: Member): Promise<{ id: string; title: string | null }[]> {
+  const ids = [...(await readable(db, m))];
+  if (!ids.length) return [];
+  return (await db.prepare("SELECT id, title FROM sources WHERE enabled=1 AND id IN (SELECT value FROM json_each(?)) ORDER BY title").bind(JSON.stringify(ids)).all<{ id: string; title: string | null }>()).results;
 }
 
 const quotesOut = (qs: { text: string; label: string | null; event_at: string; url: string | null; tag?: string }[]) => qs.map(({ text, label, event_at, url, tag }) => ({ text, label, event_at, url, tag }));
@@ -159,6 +172,8 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
       counts: { requests: n(req!), offers: n(offers!), invites: n(invites!) },
       startParam: user.startParam ?? null,
       brand: app.env.BRAND_NAME || "Миндальная связь",
+      // The clubs this person can read: the tabs' club chips (plan: several clubs, one header each).
+      groups: (await groupsOf(db, m)).map((g) => ({ id: g.id, title: g.title ?? "group" })),
     });
   }
   if (key === "POST settings") {
@@ -250,12 +265,75 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
     return notFound();
   }
 
-  // ---- search ------------------------------------------------------------------------------
-  if (key === "GET groups") {
-    const ids = [...(await readable(db, m))];
-    const { results } = await db.prepare("SELECT id, title, username FROM sources WHERE enabled=1 AND id IN (SELECT value FROM json_each(?)) ORDER BY title").bind(JSON.stringify(ids)).all<{ id: string; title: string | null; username: string | null }>();
-    return out(results.map((r) => ({ id: r.id, title: r.title ?? r.username ?? "group" })));
+  // ---- Нить: living request cards (plan: the main mechanism) ---------------------------------
+  if (key === "GET threads") {
+    const rows = (await db.prepare("SELECT id, state, outcome FROM threads WHERE member_id=? ORDER BY created_at DESC LIMIT 30").bind(m.id).all<{ id: string; state: string; outcome: string | null }>()).results;
+    const cards = [];
+    for (const r of rows) {
+      // The same card the bot shows in the chat, so the app and the chat can't disagree.
+      const c = await renderThread(db, r.id);
+      cards.push({ id: r.id, state: r.state, outcome: r.outcome, card: c ? { html: c.text, buttons: c.buttons.map((row) => row.map((b) => ({ text: b.text, data: b.callback_data }))) } : null });
+    }
+    return out(cards);
   }
+  if (key === "POST thread") {
+    if (!rateOk(user.id, Number(app.env.ASK_RATE_PER_MINUTE ?? "10") || 10)) return out({ error: T(lang).tooMany }, undefined, 429);
+    const allowed = await readable(db, m);
+    const group = typeof body.group === "string" && body.group ? body.group : null;
+    const scope = group ? (allowed.has(group) ? new Set([group]) : new Set<string>()) : allowed;
+    let q = String(body.q ?? "").slice(0, 300);
+    if (typeof body.since === "string" && /^\d{1,3}d$/.test(body.since)) q += ` since:${body.since}`;
+    if (body.file === true) q += " has:file";
+    const f = await parseFilters(db, scope, q);
+    if (!f.query) return out({ ok: false, error: "empty" }, undefined, 400);
+    const opened = await openThread(app, { memberId: m.id, tgId: m.tg_id, question: f.query, readable: f.readable, filters: f.filters, lang, sourceId: group }, new Date());
+    return out({ ok: !!opened, id: opened?.id ?? null, status: opened?.status ?? null });
+  }
+  if (key === "POST press") {
+    // Any button of a card or a message: the bot's own handler runs it, for this signed person only.
+    // The app has no callback to answer, so answers are dropped; the chat carries the messages.
+    const data = String(body.data ?? "").slice(0, 120);
+    if (!data) return out({ ok: false }, undefined, 400);
+    const quiet: App = { ...app, tg: { ...app.tg, call: (method: string, params: Record<string, unknown>) => (method === "answerCallbackQuery" ? Promise.resolve(true) : app.tg.call(method, params)) } as Telegram };
+    const keys = await handleUpdate(quiet, { update_id: 0, callback_query: { id: "app", from: { id: user.id, is_bot: false }, data } } as Update);
+    return out({ ok: true }, keys);
+  }
+
+  // ---- Созвездие: what the clubs talk about, and who knows it (plan: the Mini App) ----------
+  if (key === "GET constellation" && p[1]) {
+    const tax = TAXONOMY.get(p[1]);
+    if (!tax) return notFound();
+    const found = await answer(db, await readable(db, m), tax.en);
+    const authors = [...new Set(found.quotes.map((q) => q.author_id).filter((x): x is string => !!x))];
+    const names = await namesFor(db, authors);
+    return out({
+      label: labelIn(tax, lang),
+      quotes: found.quotes.slice(0, 3).map((q) => ({ text: q.text, label: q.label, when: q.event_at, url: q.url, who: q.author_id ? { face: faceOf(q.author_id), name: names.get(q.author_id) ?? null } : null })),
+      people: authors.map((id) => ({ face: faceOf(id), name: names.get(id) ?? null })),
+    });
+  }
+  if (key === "GET constellation") {
+    const counts = new Map<string, number>();
+    for (const g of await groupsOf(db, m)) for (const c of await topicCounts(db, g.id, 12)) counts.set(c.code, (counts.get(c.code) ?? 0) + c.n);
+    const stars = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 18);
+    return out(stars.map(([code, n]) => ({ code, label: labelIn(TAXONOMY.get(code)!, lang), n })));
+  }
+
+  // ---- Пульс and Союзы: read-only here; the buttons on them go through POST press -----------
+  if (key === "GET pulse") {
+    const rows = (await db.prepare("SELECT id, title FROM sources WHERE enabled=1 AND enabled_by=? ORDER BY title").bind(m.id).all<{ id: string; title: string | null }>()).results;
+    const since = nowIso(new Date(Date.now() - 7 * DAY));
+    const cards = [];
+    for (const r of rows) {
+      const c = await pulseCard(db, r.id, r.title ?? "", since, lang);
+      cards.push({ id: r.id, title: r.title ?? "", html: c.text, quiet: c.quiet, share: c.text && !c.quiet ? r.id : null });
+    }
+    return out(cards);
+  }
+  if (key === "GET union") return out({ alliances: await alliancesOf(db, m.id), clubs: (await clubsOf(db, m.id)).map((c) => ({ id: c.id, title: c.title ?? "group" })) });
+
+  // ---- search ------------------------------------------------------------------------------
+  if (key === "GET groups") return out((await groupsOf(db, m)).map((r) => ({ id: r.id, title: r.title ?? "group" })));
   if (key === "POST ask") {
     if (!rateOk(user.id, Number(app.env.ASK_RATE_PER_MINUTE ?? "10") || 10)) return out({ error: T(lang).tooMany }, undefined, 429);
     // Filters can only narrow what the member may already read.

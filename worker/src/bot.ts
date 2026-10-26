@@ -54,7 +54,7 @@ interface CallbackQuery {
   id: string;
   from: TgUser;
   data?: string;
-  message?: { message_id: number; chat: { id: number; type?: string }; reply_markup?: { inline_keyboard: { text: string; callback_data?: string }[][] } };
+  message?: { message_id: number; chat: { id: number; type?: string; title?: string; username?: string }; reply_markup?: { inline_keyboard: { text: string; callback_data?: string }[][] } };
 }
 interface ChatMemberUpdated {
   chat: { id: number; type: string; title?: string };
@@ -878,7 +878,8 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
     }
     await answerCb();
     await clearButtons();
-    if (!(await enabledSource(app.db, chat.id))) await connectGroup(app, { id: chat.id }, cb.from);
+    // The message carries the group's title: no need to ask Telegram for it again.
+    if (!(await enabledSource(app.db, chat.id))) await connectGroup(app, { id: chat.id, title: chat.title, username: chat.username }, cb.from);
     return [];
   }
   if (kind === "hy") {

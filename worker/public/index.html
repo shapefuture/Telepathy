@@ -183,9 +183,13 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:200;o
 .row1{background:var(--lime)}
 .row2{background:var(--violet);color:#fff;margin-top:-6px}
 .row2 span:nth-child(odd)::after{color:var(--lime)}
-.lane{width:120%;margin-left:-10%}
-.paw{position:absolute;right:6%;top:-40px;width:110px;z-index:4;transform:translateY(-120%) rotate(-20deg);transition:transform .7s var(--spring);pointer-events:none}
-.band.swipe .paw{transform:translateY(10px) rotate(-8deg)}
+.lane{width:120%;margin-left:-10%;position:relative;z-index:2}
+.peek-head,.peek-paws{position:absolute;left:58%;width:90px;pointer-events:none}
+.peek-head{top:2px;height:64px;z-index:1;transform:translateY(66px);transition:transform 1s var(--spring)}
+.peek-paws{top:36px;height:22px;z-index:3;opacity:0;transform:translateY(18px) scale(.6);transition:opacity .25s .35s,transform .8s var(--spring) .35s}
+.band.peek .peek-head{transform:translateY(0)}
+.band.peek .peek-paws{opacity:1;transform:none}
+.peek-head svg,.peek-paws svg{display:block;width:100%;height:100%;overflow:visible}
 
 /* ---------- section scaffolding ---------- */
 section{position:relative}
@@ -347,7 +351,6 @@ section{position:relative}
 .pass li::before{content:"✓";flex:none;width:24px;height:24px;border-radius:50%;background:var(--ink);color:var(--lime);display:grid;place-items:center;font-size:13px}
 .pass .fine{font-size:13.5px;margin-top:14px;color:#2d2924;max-width:52ch}
 .pass-stub{position:relative;background:var(--ink);color:var(--paper);padding:30px 24px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:16px;text-align:center;border-left:3px dashed var(--lime);transform-origin:0 50%;transition:transform .7s var(--spring)}
-.pass:hover .pass-stub{transform:rotate(2.5deg) translateX(4px)}
 .pass-stub::before,.pass-stub::after{content:"";position:absolute;left:-24px;width:44px;height:44px;border-radius:50%;background:var(--paper);border:var(--line)}
 .pass-stub::before{top:-25px}.pass-stub::after{bottom:-25px}
 .stub-k{font:800 11px/1.3 var(--display);letter-spacing:.14em;text-transform:uppercase;color:#a49b8e}
@@ -355,16 +358,16 @@ section{position:relative}
 .price span{font:700 15px/1 var(--body)}
 .stub-joke{font:700 22px/1 var(--hand);color:var(--pink);rotate:-4deg}
 .barcode{width:100%;height:52px;border-radius:4px;background:repeating-linear-gradient(90deg,var(--paper) 0 2px,transparent 2px 5px,var(--paper) 5px 9px,transparent 9px 11px,var(--paper) 11px 12px,transparent 12px 16px)}
-.pass .seal{position:absolute;right:clamp(14px,3vw,30px);top:clamp(14px,3vw,26px);font:900 13px/1.05 var(--display);text-align:center;width:96px;height:96px;border-radius:50%;background:var(--pink);color:var(--ink);border:var(--line);display:grid;place-items:center;padding:10px;animation:spin 18s linear infinite;box-shadow:3px 3px 0 var(--ink)}
+.pass .seal{position:absolute;right:clamp(14px,3vw,30px);top:clamp(14px,3vw,26px);width:104px;height:104px;animation:spin 18s linear infinite;filter:drop-shadow(3px 3px 0 var(--ink))}
+.pass .seal svg{display:block;width:100%;height:100%;overflow:visible}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (max-width:760px){
   .pass{grid-template-columns:1fr}
   .pass-top{padding-right:84px}
   .pass ul{grid-template-columns:1fr}
   .pass .btn{width:100%}
-  .pass .seal{width:76px;height:76px;font-size:11px}
+  .pass .seal{width:80px;height:80px}
   .pass-stub{border-left:0;border-top:3px dashed var(--lime);flex-direction:row;flex-wrap:wrap;justify-content:center;transform-origin:50% 0}
-  .pass:hover .pass-stub{transform:none}
   .pass-stub::before,.pass-stub::after{top:-25px;bottom:auto}
   .pass-stub::before{left:-24px}.pass-stub::after{left:auto;right:-24px}
   .barcode{height:40px}
@@ -575,7 +578,8 @@ footer a{color:var(--lime);text-decoration:none}
 
 <!-- ============ MARQUEE ============ -->
 <div class="band" id="band" aria-hidden="true">
-  <svg class="paw boil" viewBox="0 0 110 120"><path d="M30 0v62c0 30 50 30 50 0V0z" fill="#FF8A3D" stroke="#141210" stroke-width="3.5"/><g fill="#FFC9A3" stroke="#141210" stroke-width="2.5"><ellipse cx="55" cy="78" rx="14" ry="11"/><circle cx="38" cy="60" r="6"/><circle cx="51" cy="54" r="6"/><circle cx="64" cy="54" r="6"/><circle cx="75" cy="61" r="6"/></g></svg>
+  <div class="peek-head"><svg viewBox="0 0 90 64"><path d="M14 26 10 2l20 12M76 26l4-24-20 12" fill="#FF8A3D" stroke="#141210" stroke-width="3" stroke-linejoin="round"/><path d="M8 64V36C8 20 24 10 45 10s37 10 37 26v28z" fill="#FF8A3D" stroke="#141210" stroke-width="3"/><path d="M33 18l3 4M45 14v6M57 18l-3 4" stroke="#141210" stroke-width="2.5" stroke-linecap="round"/><ellipse cx="32" cy="36" rx="6.5" ry="7.5" fill="#fff" stroke="#141210" stroke-width="2.5"/><ellipse cx="58" cy="36" rx="6.5" ry="7.5" fill="#fff" stroke="#141210" stroke-width="2.5"/><circle cx="33" cy="38" r="3.2" fill="#141210"/><circle cx="59" cy="38" r="3.2" fill="#141210"/><path d="M41 45h8l-4 4z" fill="#FF7EC8" stroke="#141210" stroke-width="2"/><path d="M22 46H6M68 46h16" stroke="#141210" stroke-width="2" stroke-linecap="round"/></svg></div>
+  <div class="peek-paws"><svg viewBox="0 0 90 22"><ellipse cx="24" cy="11" rx="14" ry="9" fill="#FF8A3D" stroke="#141210" stroke-width="3"/><ellipse cx="66" cy="11" rx="14" ry="9" fill="#FF8A3D" stroke="#141210" stroke-width="3"/><path d="M20 6v6M26 6v6M62 6v6M68 6v6" stroke="#141210" stroke-width="2" stroke-linecap="round"/></svg></div>
   <div class="lane"><div class="tick row1" data-speed="1" data-rot="-2.2"><span>где ссылка на запись?</span><span>кто знает хорошего бухгалтера?</span><span>во сколько завтра встреча?</span><span>скиньте ещё раз адрес</span><span>а правила чата где?</span><span>можно прийти с другом?</span></div></div>
   <div class="lane"><div class="tick row2" data-speed="-1" data-rot="1.6"><span>отвечали же вчера</span><span>поищите выше</span><span>год назад, Карл</span><span>кто-нибудь?..</span><span>ждун ждёт</span><span>ап</span><span>F</span><span>ап ап</span></div></div>
 </div>
@@ -720,7 +724,7 @@ footer a{color:var(--lime);text-decoration:none}
     <div class="pass sc tilt" id="ticket">
       <div class="pass-main">
         <div class="pass-top"><span class="tag" style="background:#fff"><i></i>Пилот · первые 30 сообществ</span><span class="pass-no">№ 0001</span></div>
-        <div class="seal">месяц<br>бесплатно ✦</div>
+        <div class="seal" aria-label="Месяц бесплатно"><svg viewBox="0 0 104 104" aria-hidden="true"><defs><path id="ring" d="M52 52m-37 0a37 37 0 1 1 74 0a37 37 0 1 1-74 0"/></defs><circle cx="52" cy="52" r="50" fill="#FF7EC8" stroke="#141210" stroke-width="3"/><circle cx="52" cy="52" r="26" fill="#141210"/><text font-family="Unbounded,sans-serif" font-weight="900" font-size="10.5" fill="#141210" letter-spacing="1"><textPath href="#ring" textLength="228" lengthAdjust="spacing">МЕСЯЦ БЕСПЛАТНО ✦ 30 ДНЕЙ ✦</textPath></text><text x="52" y="58" text-anchor="middle" font-family="Unbounded,sans-serif" font-weight="900" font-size="17" fill="#D7FF3B">0 ₽</text></svg></div>
         <h2>Месяц <em>на&nbsp;пробу</em></h2>
         <p class="sub">Подключите бота и посмотрите, сколько вопросов в сообществе закроется само. Он щёлкает их как орешки: профессиональная деформация.</p>
         <ul>
@@ -899,8 +903,9 @@ footer a{color:var(--lime);text-decoration:none}
 
   var anims=ticks.map(function(t){
     var w=t.scrollWidth/2, rot=t.dataset.rot+"deg", sp=+t.dataset.speed;
-    if(reduce||!t.animate){ t.style.transform="rotate("+rot+")"; return null; }
-    var a=t.animate([{transform:"translate3d(0,0,0) rotate("+rot+")"},{transform:"translate3d("+(-w)+"px,0,0) rotate("+rot+")"}],{duration:w/36*1000,iterations:Infinity});
+    t.parentNode.style.transform="rotate("+rot+")"; // tilt the screen-wide lane, not the 5000px ticker (its far-off centre would drop the visible end)
+    if(reduce||!t.animate) return null;
+    var a=t.animate([{transform:"translate3d(0,0,0)"},{transform:"translate3d("+(-w)+"px,0,0)"}],{duration:w/36*1000,iterations:Infinity});
     if(sp<0) a.playbackRate=-1; return a;
   }), lanes=ticks.map(function(t){ return t.parentNode; }), lastBar=-1, lastSolid=null, lastSkew="", lastRate=[], settling=true;
   function frame(){
@@ -915,8 +920,8 @@ footer a{color:var(--lime);text-decoration:none}
     anims.forEach(function(a,i){ if(!a) return; var r=Math.round((0.6+boost*.9)/0.6*dir*(+ticks[i].dataset.speed)*20)/20;
       if(lastRate[i]!==r){ lastRate[i]=r; a.playbackRate=r; } });
     var sk=reduce?"":"skewX("+(Math.round(-vel*.25*10)/10)+"deg)"; if(sk==="skewX(0deg)"||sk==="skewX(-0deg)") sk="";
-    if(sk!==lastSkew){ lastSkew=sk; lanes.forEach(function(l){ l.style.transform=sk; }); }
-    if(!swiped&&!reduce){ var r=band.getBoundingClientRect(); if(r.top<innerHeight*.55&&r.bottom>0){ swiped=true; band.classList.add("swipe"); setTimeout(function(){ band.classList.remove("swipe"); },1300); } }
+    if(sk!==lastSkew){ lastSkew=sk; lanes.forEach(function(l,i){ l.style.transform="rotate("+ticks[i].dataset.rot+"deg) "+sk; }); }
+    if(!swiped&&!reduce){ var r=band.getBoundingClientRect(); if(r.top<innerHeight*.55&&r.bottom>0){ swiped=true; band.classList.add("peek"); } }
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);

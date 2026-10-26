@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Миндальная связь — бот, который помнит ваше сообщество</title>
-<meta name="description" content="Бот для сообществ в Telegram. Помнит всё, что писали в чате, отвечает на вопросы участников и зовёт тех, кто разбирается. Подключается одним касанием.">
-<meta property="og:title" content="Миндальная связь — бот, который помнит ваше сообщество">
-<meta property="og:description" content="Ответ уже был в чате. Бот его найдёт.">
+<title>Миндальная связь — чат, который помогает каждому</title>
+<meta name="description" content="Бот для сообществ в Telegram. Превращает переписку в помощника для каждого участника: находит ответ в истории, зовёт того, кто разбирается, и доводит вопрос до результата.">
+<meta property="og:title" content="Миндальная связь — чат, который помогает каждому">
+<meta property="og:description" content="Ваш чат знает больше, чем кажется. Теперь он помогает.">
 <meta property="og:image" content="img/nexus-portal.webp">
 <meta name="theme-color" content="#FFF8EC">
 <meta name="color-scheme" content="light">
@@ -116,8 +116,8 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:200;o
 
 /* ---------- hero ---------- */
 .hero{position:relative;padding:28px 0 90px}
-.hero .wrap{display:grid;grid-template-columns:1.05fr .95fr;gap:36px;align-items:center}
-.hero h1{font-size:clamp(46px,7.2vw,96px);font-weight:900;margin:22px 0 24px;line-height:.98}
+.hero .wrap{display:grid;grid-template-columns:1.2fr .8fr;gap:36px;align-items:center}
+.hero h1{font-size:clamp(42px,4.7vw,70px);font-weight:900;margin:22px 0 24px;line-height:.98}
 .hero h1 .w{display:inline-block;opacity:0;transform:translateY(.6em) rotate(8deg) scale(.7);transition:opacity .3s, transform 1.1s var(--spring)}
 .hero h1.go .w{opacity:1;transform:none}
 .hero h1 .ch{display:inline-block;will-change:transform}
@@ -128,10 +128,13 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:200;o
 .hl::before{content:"";position:absolute;left:-.12em;right:-.12em;top:.12em;bottom:.02em;background:var(--lime);z-index:-1;transform:rotate(-1.5deg) scaleX(0);transform-origin:0 50%;transition:transform .7s var(--spring) 1.25s;border-radius:6px}
 .hero h1.go .u-orange path{stroke-dashoffset:0}
 .hero h1.go .hl::before{transform:rotate(-1.5deg) scaleX(1)}
-.hero-bolt{left:44%;top:6%}
+.hero-bolt{left:31%;top:2%}
 @media (max-width:980px){.hero-bolt{left:auto;right:5%;top:10px;bottom:auto}}
 @media (max-width:760px){#pilot>.bolt{display:none}}
 .lede{font-size:clamp(18px,1.6vw,21px);max-width:36ch;color:#2b2723}
+.wins{list-style:none;margin:20px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:10px}
+.wins li{font:700 15px/1 var(--body);padding:10px 14px;border:2.5px solid var(--ink);border-radius:999px;background:var(--paper2);box-shadow:3px 3px 0 var(--ink)}
+.wins li:nth-child(1){rotate:-1.5deg;background:var(--sky2)}.wins li:nth-child(2){rotate:1deg;background:var(--lav)}.wins li:nth-child(3){rotate:-.5deg;background:var(--lime)}
 .cta{display:flex;flex-wrap:wrap;gap:14px;margin-top:30px;align-items:center}
 .proof{display:flex;align-items:center;gap:12px;margin-top:24px;font-size:14px;color:var(--muted)}
 .faces{display:flex;flex:none}
@@ -525,8 +528,9 @@ footer a{color:var(--lime);text-decoration:none}
   <div class="wrap">
     <div>
       <span class="tag rv"><i></i>Бот для сообществ в Telegram</span>
-      <h1 id="h1"><span class="w">Ответ</span> <span class="w">уже</span> <span class="w">был</span> <span class="w">в</span> <span class="w u-orange">чате.<svg viewBox="0 0 300 30" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M4 18 C 60 4, 110 28, 160 14 S 250 6, 296 20"/></svg></span><br><span class="w">Бот</span> <span class="w">его</span> <span class="w hl">найдёт.</span></h1>
-      <p class="lede rv" style="--d:.5s">Миндальная связь помнит всё, что писали в вашем сообществе. Участник задаёт вопрос, бот отвечает цитатой из истории чата. Если ответа нет, зовёт того, кто разбирается.</p>
+      <h1 id="h1"><span class="w">Ваш</span> <span class="w">чат</span> <span class="w u-orange">знает<svg viewBox="0 0 300 30" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M4 18 C 60 4, 110 28, 160 14 S 250 6, 296 20"/></svg></span> <span class="w">больше,</span> <span class="w">чем</span> <span class="w">кажется.</span><br><span class="w">Теперь</span> <span class="w">он</span> <span class="w hl">помогает.</span></h1>
+      <p class="lede rv" style="--d:.5s">Миндальная связь превращает переписку сообщества в помощника для каждого участника. Он находит ответ в истории, зовёт того, кто разбирается, и ведёт вопрос, пока задача не решена.</p>
+      <ul class="wins rv" style="--d:.58s"><li>🔎 ответ из истории за секунды</li><li>🙋 знаток сообщества в одно касание</li><li>✅ вопрос доходит до «решено»</li></ul>
       <div class="cta rv" style="--d:.65s">
         <a class="btn mag" href="https://t.me/telepathy_ai_bot?startgroup=landing" target="_blank" rel="noopener">Добавить в свой чат <span class="arr">→</span></a>
         <a class="btn ghost mag" href="#how">Как это работает</a>
@@ -594,15 +598,6 @@ footer a{color:var(--lime);text-decoration:none}
       </div>
       <div class="chaos sc" id="chaos" aria-live="polite"><div class="hint">здесь пока тихо.<br>подозрительно тихо</div><div class="res" id="chaosRes"></div></div>
     </div>
-  </div>
-</section>
-
-<!-- ============ PARADOX ============ -->
-<section class="paradox" aria-label="Платформы меняются. Связь остаётся.">
-  <div class="wrap">
-    <p><span class="shaky" data-t="Платформы меняются.">Платформы меняются.</span></p>
-    <p><span class="steady">Связь остаётся.</span></p>
-    <small class="rv">а помощь ходит между сообществами, пока участники остаются дома ♡</small>
   </div>
 </section>
 
@@ -702,17 +697,12 @@ footer a{color:var(--lime);text-decoration:none}
   </div>
 </section>
 
-<!-- ============ LADDER ============ -->
-<section class="sec" style="padding-top:0">
+<!-- ============ PARADOX ============ -->
+<section class="paradox" aria-label="Платформы меняются. Связь остаётся.">
   <div class="wrap">
-    <div class="head"><div class="kick rv">связь<svg viewBox="0 0 46 22"><path d="M2 12c10-8 18 8 28 0 5-4 9-4 14 0"/></svg></div><h2 class="rv">Есть контакт ≠ есть связь</h2><p class="rv">Скопировать номера мало. Связь с людьми держится на четырёх ступеньках, и бот помогает пройти каждую.</p></div>
-    <div class="ladder">
-      <div class="rung sc"><span class="dot">01</span><h3>Контакт</h3><p>Человек в чате. Пока чат жив.</p></div>
-      <div class="rung sc"><span class="dot">02</span><h3>Согласие</h3><p>Каждый сам решает, что о нём знает бот, и может всё стереть одной командой.</p></div>
-      <div class="rung sc"><span class="dot">03</span><h3>Новый адрес</h3><p>Если сообщество переезжает, администратор задаёт новое место одной командой.</p></div>
-      <div class="rung sc"><span class="dot">04</span><h3>Достижимость</h3><p>Бот лично напишет каждому участнику, куда идти. Никто не потеряется.</p></div>
-    </div>
-    <span class="ladder-note rv">экспорт контактов ≠ спасённое сообщество</span>
+    <p><span class="shaky" data-t="Платформы меняются.">Платформы меняются.</span></p>
+    <p><span class="steady">Связь остаётся.</span></p>
+    <small class="rv">а помощь ходит между сообществами, пока участники остаются дома ♡</small>
   </div>
 </section>
 
@@ -807,7 +797,7 @@ footer a{color:var(--lime);text-decoration:none}
   <div class="wrap">
     <div>
       <span class="shout rv">Люди важнее платформ.</span>
-      <h2 class="rv">Пусть ваше сообщество <span class="pop">помнит всё</span></h2>
+      <h2 class="rv">Пусть ваш чат <span class="pop">помогает каждому</span></h2>
       <p class="rv">Одно касание, и следующий вопрос в чате получит ответ. Вжух.</p>
       <div class="cta rv"><a class="btn lime mag" href="https://t.me/telepathy_ai_bot?startgroup=landing" target="_blank" rel="noopener">Добавить в свой чат <span class="arr">→</span></a><a class="btn ghost mag" href="https://t.me/telepathy_ai_bot" target="_blank" rel="noopener">Написать боту</a></div>
     </div>

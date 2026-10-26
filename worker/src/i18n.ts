@@ -440,6 +440,22 @@ const EN = {
   onbSaved: (label: string) => `Noted: ${label}. If someone needs this, I'll let you know.`,
   onbMatch: (label: string) => `Someone here knows ${label} well. Shall I ask them, with their consent? An introduction happens only if they agree.`,
   bAskThem: "🙋 Ask",
+  // Gatherings (journey 8)
+  gatherGo: "✅ I'm going",
+  gatherNo: "🤷 Not this time",
+  gatherWhoBtn: "👥 Who's going",
+  gatherSaved: "Noted. I'll remind you two hours before.",
+  gatherNobody: "Nobody has said they're going yet.",
+  gatherWhoHead: (n: number) => `Going: ${n}.`,
+  gatherSharedSkill: (label: string) => `you both know ${label}`,
+  gatherAlsoGoing: "also going",
+  gatherWhoLine: (who: string, why: string) => `• ${who} — ${why}`,
+  gatherGone: "This one has changed. Open /events again.",
+  gatherWantSaved: "Noted. If they want it too, I'll let you both know.",
+  gatherMutual: "🤝 You both want to keep in touch. Contacts below.",
+  gatherMutualHere: "🤝 It's mutual. I've sent you each other's contact.",
+  gatherRemind: (title: string) => `⏰ In about two hours: ${title}. You said you're going.`,
+  gatherAfterAsk: (title: string) => `How was ${title}? Who would you like to see again? It opens only if they want it too.`,
 };
 
 export type Messages = typeof EN;
@@ -857,6 +873,22 @@ const RU: Messages = {
   onbSaved: (label: string) => `Записал: ${label}. Если кому-то это понадобится, я дам знать.`,
   onbMatch: (label: string) => `Здесь есть человек, который хорошо разбирается в «${label}». Спросить его? Знакомство — только если он согласится.`,
   bAskThem: "🙋 Спросить",
+  // Встречи (путь 8)
+  gatherGo: "✅ Иду",
+  gatherNo: "🤷 Не в этот раз",
+  gatherWhoBtn: "👥 Кто будет",
+  gatherSaved: "Записал. Напомню за два часа.",
+  gatherNobody: "Пока никто не написал, что придёт.",
+  gatherWhoHead: (n: number) => `Придут: ${n}.`,
+  gatherSharedSkill: (label: string) => `вы оба про «${label}»`,
+  gatherAlsoGoing: "тоже идёт",
+  gatherWhoLine: (who: string, why: string) => `• ${who} — ${why}`,
+  gatherGone: "Это уже не актуально. Открой /events заново.",
+  gatherWantSaved: "Записал. Если и он захочет — я сообщу вам обоим.",
+  gatherMutual: "🤝 Вы оба хотите оставаться на связи. Контакты ниже.",
+  gatherMutualHere: "🤝 Взаимно! Я отправил вам контакты друг друга.",
+  gatherRemind: (title: string) => `⏰ Примерно через два часа: ${title}. Ты написал, что идёшь.`,
+  gatherAfterAsk: (title: string) => `Как прошло «${title}»? Кого хочешь увидеть снова? Контакт откроется, только если и он захочет.`,
 };
 
 export const MESSAGES: Record<Lang, Messages> = { en: EN, ru: RU };

@@ -34,6 +34,7 @@ import { pulseCard, shareToGroup } from "./pulse";
 import { helpedCount } from "./thread-card";
 import { SETTING_COLUMNS, settingsView, toggleSetting, type SettingColumn } from "./group-settings";
 import { forgottenView } from "./wow";
+import { eventByShort, fullKey, rsvp, shortKey, wantToSee, whoGoes } from "./gather";
 import { welcomeJoinRequest, welcomeJoiner } from "./welcome";
 import { escapeHtml } from "./text";
 import { audit, DAY, HOUR, localParts, nowIso, tzOffsetMinutes } from "./util";
@@ -674,6 +675,11 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
         return `• ${fmt.format(new Date(e.starts_at))} — ${url ? `<a href="${escapeHtml(url)}">${escapeHtml(e.title)}</a>` : escapeHtml(e.title)}`;
       });
       await reply(app, chat, `${m.eventsTitle}\n${lines.join("\n")}`);
+      // Each of the next few gets its own card: I'm going, not this time, who's going (journey 8).
+      for (const e of evs.slice(0, 4)) {
+        const k = shortKey(e.source_id, e.msg_id);
+        await reply(app, chat, `<b>${escapeHtml(e.title)}</b>\n${escapeHtml(fmt.format(new Date(e.starts_at)))}`, [[btn(m.gatherGo, `rv:${k}:go`), btn(m.gatherNo, `rv:${k}:no`)], [btn(m.gatherWhoBtn, `rw:${k}`)]]);
+      }
       await app.tg.sendFile(chat, "telepathy-events.ics", toIcs(evs), "text/calendar", m.eventsIcs);
       return [];
     }
@@ -852,6 +858,40 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
     await answerCb(ok ? pre.recorded : pre.alreadyResolved);
     await clearButtons();
     return [];
+  }
+  if (kind === "rv" || kind === "rw" || kind === "wn") {
+    // Gatherings (journey 8): «Иду» / «Не иду», who's going, and "I'd like to see them again".
+    const mem = await memberByTg(app.db, cb.from.id);
+    if (!mem) {
+      await answerCb(pre.notAvailable);
+      return [];
+    }
+    const lang = langOf(mem);
+    const ev = await eventByShort(app.db, a, await readable(app.db, mem));
+    if (!ev) {
+      await answerCb(pre.notAvailable);
+      return [];
+    }
+    const key = fullKey(ev.source_id, ev.msg_id);
+    if (kind === "rv") {
+      if (b !== "go" && b !== "no") {
+        await answerCb(pre.notAvailable);
+        return [];
+      }
+      await rsvp(app.db, mem.id, key, b === "go" ? "going" : "not", nowIso());
+      await answerCb(T(lang).saved);
+      if (b === "go") await app.tg.sendMessage(cb.from.id, T(lang).gatherSaved);
+      return [];
+    }
+    if (kind === "rw") {
+      await answerCb();
+      await app.tg.sendMessage(cb.from.id, await whoGoes(app.db, key, mem, lang));
+      return [];
+    }
+    await answerCb();
+    const r = await wantToSee(app, mem, key, b, nowIso());
+    await app.tg.sendMessage(cb.from.id, r.text);
+    return r.keys;
   }
   if (kind === "gd") {
     // Done on a line of «Главное» (plan: journey 7): it doesn't come back, and its button leaves the card.

@@ -6,3 +6,4 @@ import/
 .dev.vars
 backfill/
 *.session
+public/history/

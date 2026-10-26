@@ -25,6 +25,7 @@ import { brief } from "./ai/beam";
 import { answer, parseFilters, renderAnswer } from "./search";
 import type { Fetcher, InlineButton, Telegram } from "./telegram";
 import { DefiniteFailure } from "./telegram";
+import { startAuto } from "./history-mcp";
 import { welcomeJoinRequest, welcomeJoiner } from "./welcome";
 import { escapeHtml } from "./text";
 import { audit, DAY, HOUR, localParts, newId, nowIso, tzOffsetMinutes } from "./util";
@@ -291,7 +292,14 @@ async function cmdEnable(app: App, msg: TgMessage, args: string): Promise<string
   await reply(app, msg.chat.id, m.enabled(vis));
   // The command guide goes to the admin privately, not to the whole group.
   try {
-    await app.tg.sendMessage(msg.from!.id, m.adminGuide(escapeHtml(msg.chat.title ?? "")));
+    // Past messages too, unless already loaded: by itself through the owner's MCP server when
+    // one is configured, otherwise with a button for the app.
+    const loaded = await app.db.prepare("SELECT 1 FROM history_jobs WHERE source_id=? AND done_at IS NOT NULL").bind(id).first();
+    const auto = !loaded && (await startAuto(app.db, app.env, id)) > 0;
+    const origin = appOrigin(app);
+    const buttons = origin && !loaded && !auto ? [[{ text: m.historyButton, web_app: { url: `${origin}/app?start=history` } } as unknown as InlineButton]] : undefined;
+    const extra = loaded ? "" : auto ? m.historyAuto : m.historyOffer(!!origin);
+    await app.tg.sendMessage(msg.from!.id, m.adminGuide(escapeHtml(msg.chat.title ?? "")) + extra, { buttons });
   } catch (e) {
     if (!(e instanceof DefiniteFailure)) throw e; // they never opened the bot privately: nothing to do
   }

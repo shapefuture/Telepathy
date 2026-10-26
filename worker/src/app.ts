@@ -23,6 +23,8 @@ import { act as introAct, cancelNeed } from "./intros";
 import { citation } from "./ingest";
 import { dispatchPending } from "./outbox";
 import { forgetMember } from "./rights";
+import { HISTORY_PAGE_MAX, historyGroups, perDay, resetHistory, stagePage } from "./history";
+import { mcpOn, startAuto } from "./history-mcp";
 import { answer, parseFilters } from "./search";
 import { createTelegram, type Fetcher } from "./telegram";
 import { audit, DAY, HOUR, localParts, nowIso, safeEqual } from "./util";
@@ -108,7 +110,8 @@ export async function handleApp(req: Request, env: Env, fetcher?: Fetcher, net?:
   if (req.method === "POST") {
     try {
       const text = await req.text();
-      if (text.length > 8192) return json({ error: "too large" }, 413);
+      // History pages carry up to 100 messages; everything else is a small form.
+      if (text.length > (url.pathname === "/app/api/history/stage" ? 1_200_000 : 8192)) return json({ error: "too large" }, 413);
       body = text ? (JSON.parse(text) as Record<string, unknown>) : {};
     } catch {
       return json({ error: "bad json" }, 400);
@@ -374,6 +377,26 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
     return out({ ok: r.ok }, r.keys);
   }
 
+  // ---- history import (owners): the browser reads Telegram, we only store the pages ------------
+  if (p[0] === "history") {
+    if (!owner) return out({ error: "owners only" }, undefined, 403);
+    if (key === "GET history") return out({ groups: await historyGroups(app.env, db), perDay: perDay(app.env), pageMax: HISTORY_PAGE_MAX, mcp: mcpOn(app.env) });
+    const chatId = Number(body.chat_id);
+    if (!Number.isSafeInteger(chatId)) return out({ error: "bad chat" }, undefined, 400);
+    if (key === "POST history" && p[1] === "stage") {
+      const r = await stagePage(db, user.id, chatId, body.page, body.messages, body.done === true);
+      return out(r, undefined, r.ok ? 200 : r.error === "not_enabled" ? 404 : 400);
+    }
+    if (key === "POST history" && (p[1] === "reset" || p[1] === "auto")) {
+      // With the MCP server configured, a (re)start is read in the background right away.
+      const ok = p[1] === "reset" ? await resetHistory(db, chatId) : true;
+      const src = await db.prepare("SELECT id FROM sources WHERE chat_id=? AND enabled=1").bind(chatId).first<{ id: string }>();
+      const auto = !!src && (await startAuto(db, app.env, src.id)) > 0;
+      return out({ ok, auto });
+    }
+    return notFound();
+  }
+
   // ---- operator desk -----------------------------------------------------------------------
   if (p[0] !== "desk") return notFound();
   if (!owner) return out({ error: "owners only" }, undefined, 403);
@@ -460,4 +483,6 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
   return notFound();
 }
 
-const CSP = "default-src 'none'; script-src 'self' 'unsafe-inline' https://telegram.org; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'";
+// The owner-only history import (/history/history.js) needs WebAssembly for MTProto crypto and a
+// WebSocket to Telegram's own web endpoints (*.web.telegram.org); nothing else is reachable.
+const CSP = "default-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://telegram.org; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' wss://*.web.telegram.org; img-src 'self' data:; base-uri 'none'; form-action 'none'";

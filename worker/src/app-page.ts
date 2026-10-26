@@ -105,7 +105,7 @@ rateQ:"Was the help useful?",history:"History",noReq:"No requests yet.",intros:"
 noresp:"It didn't happen",invite:"Someone asks for your help",waiting:"Waiting for your confirmation",settings:"Settings",digest:"Daily digest",discoverable:"Discoverable as expert",
 available:"Available for introductions",reminders:"Reminders",routing:"Pings about unanswered questions",lang:"Language",skills:"Your skills",addSkill:"Add a skill…",
 privacy:"Privacy",forget:"Delete all my data",forgetQ:"Delete your stored messages, skills and requests, and stop storing new ones? This can't be undone.",
-forgotten:"Deleted.",needs:"Open intro requests",withdraw:"Withdraw",dReq:"Requests",dIn:"From partners",dOff:"Offers",dIns:"Insights",hits:"local matches",
+forgotten:"Deleted.",needs:"Open intro requests",withdraw:"Withdraw",dReq:"Requests",dIn:"From partners",dOff:"Offers",dIns:"Insights",dHist:"History",hAuto:"Reading automatically",hAutoStart:"Load automatically",hQueued:"Saving in the background",hDays:"days left",hSec:"s",hTitle:"Past messages",hIntro:"I only see messages written after the group was connected. To add the older ones, sign in to your Telegram here once: this screen reads the whole group in a few seconds and hands it to me. Then you can close it — I save everything in the background and message you when it's done. The sign-in lives only in this screen and is closed as soon as reading ends.",hStored:"in the bot",hDoneT:"Loaded",hStart:"Load past messages",hCont:"Continue",hAgain:"Load again",hKeysT:"Step 1 of 3 · Telegram app keys",hKeys1:"Open my.telegram.org and sign in with your phone number.",hKeys2:"Tap API development tools. Fill in any app title and short name (e.g. Telepathy).",hKeys3:"Copy api_id and api_hash here. They stay on this device.",hOpen:"Open my.telegram.org",hNext:"Next",hPhoneT:"Step 2 of 3 · Your phone number",hPhoneH:"In international format, e.g. +7 900 123 45 67. Use the account that is in the group.",hCodeT:"Step 3 of 3 · Code",hCodeH:"Telegram has sent you a login code. Enter it here.",hPwT:"Cloud password",hPwH:"Two-step verification is on. Enter your cloud password.",hLoading:"Loading…",hRead:"Reading",hReached:"Read in",hStop:"Stop",hFinished:"You can close the app now. I'll save everything in the background and message you when it's done.",hStopped:"Stopped. Tap Continue to read the rest — what's read is kept.",hClosed:"Your Telegram sign-in here is closed.",hKeep:"A few seconds — keep this screen open.",hNoGroups:"No connected groups yet. Send /enable in a group first.",e_API_ID_INVALID:"api_id or api_hash doesn't fit. Check them on my.telegram.org.",e_PHONE_NUMBER_INVALID:"This phone number doesn't look right.",e_PHONE_CODE_INVALID:"The code doesn't fit. Try again.",e_PHONE_CODE_EXPIRED:"The code has expired. Start again.",e_PASSWORD_HASH_INVALID:"Wrong password.",e_FLOOD:"Telegram asks to wait a little. Try again in a few minutes.",e_PEER:"Your account doesn't see this group. Sign in with an account that is a member.",hits:"local matches",
 mayShare:"may ask partners",caseT:"Case type",manual:"Carry by hand",copy:"Copy",copied:"Copied",markSent:"Marked sent",addOffer:"Publish an offer",
 skill:"Skill",slots:"Slots",mode:"Terms",price:"Price, e.g. 49.90EUR",desc:"Description",publish:"Publish",used:"used",report:"Stages",gaps:"Unserved needs (5+ members)",
 gapAct:"Create capacity",dismiss:"Dismiss",ledger:"Ledger (+ = partner owes you)",health:"Health",fedOff:"Partner gateway is off.",contact:"Contact",
@@ -132,7 +132,7 @@ rateQ:"Помощь была полезной?",history:"История",noReq:"
 noresp:"Не состоялось",invite:"Вас просят помочь",waiting:"Ждёт вашего подтверждения",settings:"Настройки",digest:"Ежедневная сводка",discoverable:"Видимость как эксперта",
 available:"Доступен для знакомств",reminders:"Напоминания",routing:"Вопросы без ответа",lang:"Язык",skills:"Ваши навыки",addSkill:"Добавить навык…",
 privacy:"Конфиденциальность",forget:"Удалить все мои данные",forgetQ:"Удалить ваши сообщения, навыки и запросы и больше не сохранять новые? Это необратимо.",
-forgotten:"Удалено.",needs:"Открытые запросы на знакомство",withdraw:"Снять",dReq:"Запросы",dIn:"От партнёров",dOff:"Предложения",dIns:"Аналитика",hits:"совпадений",
+forgotten:"Удалено.",needs:"Открытые запросы на знакомство",withdraw:"Снять",dReq:"Запросы",dIn:"От партнёров",dOff:"Предложения",dIns:"Аналитика",dHist:"История",hAuto:"Читаю автоматически",hAutoStart:"Загрузить автоматически",hQueued:"Сохраняю в фоне",hDays:"дн. осталось",hSec:"с",hTitle:"Старые сообщения",hIntro:"Я вижу только то, что написали после подключения группы. Чтобы добавить прошлые сообщения, один раз войди здесь в свой Telegram: этот экран прочитает всю группу за несколько секунд и передаст её мне. Потом его можно закрыть — я сохраню всё в фоне и напишу, когда закончу. Вход живёт только на этом экране и закрывается сразу, как чтение закончится.",hStored:"в базе бота",hDoneT:"Загружено",hStart:"Загрузить старые сообщения",hCont:"Продолжить",hAgain:"Загрузить заново",hKeysT:"Шаг 1 из 3 · Ключи приложения Telegram",hKeys1:"Открой my.telegram.org и войди по номеру телефона.",hKeys2:"Нажми API development tools. Впиши любое название и короткое имя (например, Telepathy).",hKeys3:"Скопируй сюда api_id и api_hash. Они останутся только на этом устройстве.",hOpen:"Открыть my.telegram.org",hNext:"Дальше",hPhoneT:"Шаг 2 из 3 · Номер телефона",hPhoneH:"В международном формате, например +7 900 123 45 67. Нужен аккаунт, который состоит в группе.",hCodeT:"Шаг 3 из 3 · Код",hCodeH:"Telegram прислал тебе код для входа. Введи его здесь.",hPwT:"Облачный пароль",hPwH:"Включена двухэтапная проверка. Введи облачный пароль.",hLoading:"Загружаю…",hRead:"Читаю",hReached:"Прочитано за",hStop:"Остановить",hFinished:"Можно закрыть приложение. Я сохраню всё в фоне и напишу, когда закончу.",hStopped:"Остановлено. Нажми «Продолжить», чтобы дочитать, — прочитанное сохранится.",hClosed:"Вход в Telegram на этом экране закрыт.",hKeep:"Несколько секунд — не закрывай этот экран.",hNoGroups:"Пока нет подключённых групп. Сначала отправь /enable в группе.",e_API_ID_INVALID:"api_id или api_hash не подходят. Проверь их на my.telegram.org.",e_PHONE_NUMBER_INVALID:"Похоже, номер набран неверно.",e_PHONE_CODE_INVALID:"Код не подошёл. Попробуй ещё раз.",e_PHONE_CODE_EXPIRED:"Код устарел. Начни заново.",e_PASSWORD_HASH_INVALID:"Пароль не подошёл.",e_FLOOD:"Telegram просит немного подождать. Попробуй через несколько минут.",e_PEER:"Твой аккаунт не видит эту группу. Войди аккаунтом, который в ней состоит.",hits:"совпадений",
 mayShare:"можно спросить партнёров",caseT:"Тип случая",manual:"Передать вручную",copy:"Копировать",copied:"Скопировано",markSent:"Отправлено",addOffer:"Опубликовать предложение",
 skill:"Навык",slots:"Мест",mode:"Условия",price:"Цена, напр. 49.90EUR",desc:"Описание",publish:"Опубликовать",used:"занято",report:"Этапы",gaps:"Неудовлетворённые запросы (5+)",
 gapAct:"Создать предложение",dismiss:"Скрыть",ledger:"Учёт (+ = партнёр должен вам)",health:"Состояние",fedOff:"Шлюз партнёров выключен.",contact:"Контакт",
@@ -379,9 +379,9 @@ function meView(){var m=S.me;var sw=h("div",null,["digest","discoverable","avail
 // ---- desk (owners) ----
 function desk(){var box=h("div",null,h("p",{cls:"muted",text:"…"}));var subs=h("div",{cls:"sub"});
  setMain([h("div",{cls:"row"},h("h1",{cls:"grow"},h("span",{cls:"under"},t("desk"))),art("overload","art-sm")),subs,box]);
- get("desk").then(function(d){function draw(){subs.replaceChildren.apply(subs,[["req","dReq",d.missions.length],["in","dIn",d.inbound.length+d.manual.length],["off","dOff",d.offers.length],["ins","dIns",d.gaps.length]].map(function(x){
+ get("desk").then(function(d){function draw(){subs.replaceChildren.apply(subs,[["req","dReq",d.missions.length],["in","dIn",d.inbound.length+d.manual.length],["off","dOff",d.offers.length],["ins","dIns",d.gaps.length],["hist","dHist",0]].map(function(x){
    return h("button",{cls:"chip"+(S.sub===x[0]?" on":""),onclick:function(){S.sub=x[0];draw()}},t(x[1])+(x[2]?" · "+x[2]:""))}));
-  box.replaceChildren.apply(box,({req:deskReq,in:deskIn,off:deskOff,ins:deskIns})[S.sub](d))}draw()})}
+  box.replaceChildren.apply(box,({req:deskReq,in:deskIn,off:deskOff,ins:deskIns,hist:deskHist})[S.sub](d))}draw()})}
 function deskDo(path,btn){return busy(btn,post("desk/"+path)).then(function(r){toast(r.msg);if(r.ok)haptic("success");desk()})}
 function deskReq(d){if(!d.missions.length)return [empty()];return d.missions.map(function(m){
  var sel=h("select",{style:"width:auto;padding:4px 8px",onchange:function(e){post("desk/tag/"+m.id,{case_type:e.target.value}).then(function(){toast("✓")})}},h("option",{value:"",text:t("caseT")}),
@@ -414,8 +414,62 @@ function deskIns(d){var r=d.report;var out=[section(t("report")),card(r.stages.l
  out.push(section(t("ledger")),card(d.ledger.length?d.ledger.map(function(x){return h("div",{cls:"row"},h("span",{cls:"grow",text:x.partner}),h("b",{text:x.amount}))}):empty()));
  out.push(section(t("health")),card(Object.keys(d.health).map(function(k){return h("div",{cls:"row"},h("span",{cls:"grow muted",text:k}),h("span",{text:String(d.health[k])}))})));return out}
 
+// ---- desk: past messages. The owner signs in to Telegram in this screen only (history.js, loaded
+// on demand); the login is kept in memory and closed when loading stops. Messages go to our API.
+var HI={imp:null,busy:false};
+function hErr(e){var m=String((e&&e.message)||e||"");if(m.indexOf("FLOOD")>=0)return t("e_FLOOD");
+ var k="e_"+m.split(" ")[0];var u=m.toUpperCase();return L[S.lang][k]||(u.indexOf("PEER")>=0||u.indexOf("CHANNEL")>=0||u.indexOf("CHAT")>=0?t("e_PEER"):t("err")+" "+m)}
+function hDate(sec){try{return new Date(sec*1000).toLocaleDateString(S.lang==="ru"?"ru-RU":"en-GB",{day:"numeric",month:"long",year:"numeric"})}catch(e){return ""}}
+function hNum(n){try{return Number(n).toLocaleString(S.lang==="ru"?"ru-RU":"en-GB")}catch(e){return String(n)}}
+function hStore(k,v){try{if(v===undefined)return localStorage.getItem(k)||"";localStorage.setItem(k,v)}catch(e){return ""}}
+function deskHist(){var box=h("div",null,h("p",{cls:"muted",text:"…"}));get("history").then(function(d){hList(box,d)}).catch(function(){box.replaceChildren(h("p",{cls:"muted",text:t("err")}))});return [box]}
+function hList(box,d){var out=[card(h("b",{text:t("hTitle")}),h("p",{cls:"muted",style:"margin:6px 0 0",text:t("hIntro")}))];
+ if(!d.groups.length)out.push(empty(t("hNoGroups")));
+ var again=function(){get("history").then(function(x){hList(box,x)})};
+ d.groups.forEach(function(g){var queued=g.read&&!g.done&&g.pending>0;
+  var go1=function(){if(HI.busy){toast(t("hKeep"));return}hSignIn(box,function(){hRun(box,g)})};
+  // With the owner's MCP server configured, (re)starting needs no sign-in: the bot reads by itself.
+  var start=function(path){post(path,{chat_id:g.chatId}).then(function(r){if(r.auto){haptic("success");again()}else{g.pages=[];g.done=false;go1()}})};
+  var btn=g.auto||queued?null:g.done?h("button",{cls:"sec",onclick:function(){start("history/reset")}},t("hAgain")):
+   d.mcp&&!g.staged&&!g.pages.length?h("button",{onclick:function(){start("history/auto")}},t("hAutoStart")):
+   h("button",{onclick:go1},g.pages.length?t("hCont"):t("hStart"));
+  out.push(card(h("div",{cls:"row"},h("b",{cls:"grow",text:g.title}),g.done?h("span",{cls:"pill",text:"✓ "+t("hDoneT")}):g.auto?h("span",{cls:"pill",text:t("hAuto")}):queued?h("span",{cls:"pill",text:t("hQueued")}):null),
+  h("div",{cls:"muted",text:hNum(g.stored)+" "+t("hStored")+(queued?" · "+hNum(g.pending)+" · "+g.days+" "+t("hDays"):g.auto&&g.staged?" · "+t("hRead")+": "+hNum(g.staged):"")}),
+  btn?h("div",{cls:"btns"},btn):null))});
+ box.replaceChildren.apply(box,out)}
+function hInput(ph,type,val){return h("input",{placeholder:ph,type:type||"text",value:val||"",autocomplete:"off"})}
+function hStep(box,title,hint,inputs,onNext,extra){var err=h("div",{cls:"muted",style:"color:#d33"});var btn=h("button",{onclick:function(){err.textContent="";btn.disabled=true;
+  Promise.resolve().then(onNext).catch(function(e){err.textContent=hErr(e)}).finally(function(){btn.disabled=false})}},t("hNext"));
+ box.replaceChildren(card(h("b",{text:title}),hint?h("div",{cls:"muted",style:"margin:6px 0"},hint):null,extra||null,inputs.map(function(i){return h("div",{style:"margin-top:6px"},i)}),err,h("div",{cls:"btns"},btn,h("button",{cls:"sec",onclick:function(){hEnd();desk()}},t("cancel")))));if(inputs[0])inputs[0].focus()}
+function hSignIn(box,then){if(HI.imp&&HI.imp.signedIn)return then();
+ var id=hInput("api_id","text",hStore("tp_api_id")),hash=hInput("api_hash","text",hStore("tp_api_hash"));
+ var how=h("ol",{style:"margin:6px 0;padding-left:20px"},h("li",{text:t("hKeys1")}),h("li",{text:t("hKeys2")}),h("li",{text:t("hKeys3")}));
+ hStep(box,t("hKeysT"),null,[id,hash],function(){var apiId=Number(id.value.trim()),apiHash=hash.value.trim();if(!apiId||apiHash.length<20)throw new Error("API_ID_INVALID");
+  hStore("tp_api_id",String(apiId));hStore("tp_api_hash",apiHash);
+  return import("/history/history.js").then(function(mod){if(HI.imp)HI.imp.close();HI.imp=mod.createImporter(apiId,apiHash);hPhone(box,then)})},
+  h("div",null,how,h("button",{cls:"link",onclick:function(){openUrl("https://my.telegram.org/apps")}},t("hOpen")+" →")))}
+function hPhone(box,then){var ph=hInput("+7 900 123 45 67","tel");hStep(box,t("hPhoneT"),t("hPhoneH"),[ph],function(){return HI.imp.sendCode(ph.value).then(function(){HI.imp.signedIn?then():hCode(box,then)})})}
+function hCode(box,then){var c=hInput("12345","text");c.setAttribute("inputmode","numeric");
+ hStep(box,t("hCodeT"),t("hCodeH"),[c],function(){return HI.imp.signIn(c.value).then(function(r){r==="password"?hPw(box,then):then()})})}
+function hPw(box,then){var pw=hInput("","password");hStep(box,t("hPwT"),t("hPwH"),[pw],function(){return HI.imp.password(pw.value).then(then)})}
+function hEnd(){if(tg&&tg.disableClosingConfirmation)try{tg.disableClosingConfirmation()}catch(e){}var imp=HI.imp;HI.imp=null;HI.busy=false;return imp?imp.close():Promise.resolve()}
+function hRun(box,g){var stat=h("div",{cls:"big",text:t("hLoading")}),bar=h("div",{style:"height:8px;width:0;background:#8b5cf6;border-radius:4px;transition:width .2s"}),ctl=new AbortController();
+ var stop=h("button",{cls:"sec",onclick:function(){stop.disabled=true;ctl.abort()}},t("hStop"));
+ box.replaceChildren(card(h("b",{text:g.title}),stat,h("div",{style:"margin:8px 0;height:8px;border:1.5px solid #16141A;border-radius:6px;overflow:hidden"},bar),h("p",{cls:"muted",text:t("hKeep")}),h("div",{cls:"btns"},stop)));
+ HI.busy=true;if(tg&&tg.enableClosingConfirmation)try{tg.enableClosingConfirmation()}catch(e){}
+ var t0=Date.now();
+ var fin=function(title,note){box.replaceChildren(card(h("b",{text:title}),note?h("div",{cls:"muted",style:"margin-top:6px",text:note}):null,h("div",{cls:"btns"},h("button",{cls:"sec",onclick:function(){desk()}},"OK"))))};
+ HI.imp.run(g.chatId,g.pages||[],g.keepFrom||0,function(page){return post("history/stage",page)},function(done,total){var pct=total?Math.min(100,Math.round(done*100/total)):0;
+   stat.textContent=t("hRead")+": "+pct+"%";bar.style.width=pct+"%"},ctl.signal)
+  .then(function(outcome){haptic(outcome==="done"?"success":"warning");return hEnd().then(function(){return outcome})})
+  .then(function(outcome){toast(t("hClosed"));var sec=Math.max(1,Math.round((Date.now()-t0)/1000));
+   outcome==="done"?fin("✅ "+t("hReached")+" "+sec+" "+t("hSec"),t("hFinished")):fin(t("hStopped"))})
+  .catch(function(e){var msg=hErr(e);hEnd().finally(function(){fin(t("hStopped"),msg)})})}
+window.addEventListener("pagehide",function(){if(HI.imp)HI.imp.close()});
+
 // ---- start ----
-refreshMe().then(function(m){S.lang=m.lang;var sp=m.startParam||"";if(!sp&&location.hash)sp=location.hash.slice(1);var tab=({ask:"ask",help:"req",requests:"req",events:"ev",profile:"me",desk:"desk",passport:"pass"})[sp]||"home";
+refreshMe().then(function(m){S.lang=m.lang;var sp=m.startParam||"";if(!sp){try{sp=new URLSearchParams(location.search).get("start")||""}catch(e){}}if(!sp&&location.hash)sp=location.hash.slice(1);if(sp==="history")S.sub="hist";
+ var tab=({ask:"ask",help:"req",requests:"req",events:"ev",profile:"me",desk:"desk",passport:"pass",history:"desk"})[sp]||"home";
  if(sp==="help")S.newReq=true;if(tab==="desk"&&!m.owner)tab="home";go(tab)}).catch(function(e){var lc=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user&&tg.initDataUnsafe.user.language_code)||"";S.lang="ru";void lc;
  var k=!tg||!tg.initData||e.status===401?"openApp":e.status===403?"notMember":"err";
  main.replaceChildren(topbar(),h("div",{cls:"card c-lav"},h("div",{cls:"row"},h("div",{cls:"grow"},h("div",{cls:"big",text:t(k+"T")}),h("p",{style:"margin:8px 0 0",text:t(k)})),art("lost","art-sm")),

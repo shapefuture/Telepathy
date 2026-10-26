@@ -25,7 +25,8 @@ import { brief } from "./ai/beam";
 import { answer, parseFilters, renderAnswer } from "./search";
 import type { Fetcher, InlineButton, Telegram } from "./telegram";
 import { DefiniteFailure } from "./telegram";
-import { startAuto } from "./history-mcp";
+import { forgetAdminCache, isChatAdminLive } from "./admins";
+import { askToConnect, chatFromParam, connectGroup, sendGuide } from "./connect";
 import { welcomeJoinRequest, welcomeJoiner } from "./welcome";
 import { escapeHtml } from "./text";
 import { audit, DAY, HOUR, localParts, newId, nowIso, tzOffsetMinutes } from "./util";
@@ -115,18 +116,9 @@ const appOrigin = (app: App) => (app.env.PUBLIC_URL ?? "").replace(/\/$/, "");
 const isOwner = (app: App, userId?: number) => userId !== undefined && ownerIds(app.env).has(userId);
 const rateLimit = (app: App) => Number(app.env.ASK_RATE_PER_MINUTE ?? "10") || 10;
 
-async function isChatAdmin(app: App, chatId: number, userId: number): Promise<boolean> {
-  try {
-    const cm = await app.tg.call<{ status: string }>("getChatMember", { chat_id: chatId, user_id: userId });
-    return cm.status === "creator" || cm.status === "administrator";
-  } catch {
-    return false;
-  }
-}
-
-/** Configured owner AND current chat admin: two independent checks. */
+/** Each community manages itself: a group's own Telegram admins run its group commands (live check). */
 async function ownerInGroup(app: App, msg: TgMessage): Promise<boolean> {
-  return !!msg.from && isOwner(app, msg.from.id) && (await isChatAdmin(app, msg.chat.id, msg.from.id));
+  return !!msg.from && !msg.sender_chat && (await isChatAdminLive(app, msg.chat.id, msg.from.id));
 }
 
 const reply = (app: App, chatId: number, text: string, buttons?: InlineButton[][], replyTo?: number) =>
@@ -269,40 +261,12 @@ async function groupAsk(app: App, msg: TgMessage, question: string): Promise<str
 
 async function cmdEnable(app: App, msg: TgMessage, args: string): Promise<string[]> {
   if (!(await ownerInGroup(app, msg))) return []; // silent: don't advertise admin commands
-  const m = T(await langForUser(app, msg.from));
   const vis = (args.trim().toUpperCase() || "MEMBER_CONSENTED") as Visibility;
   if (!VISIBILITIES.includes(vis)) {
-    await reply(app, msg.chat.id, m.visibilityMust(VISIBILITIES.join(", ")));
+    await reply(app, msg.chat.id, T(await langForUser(app, msg.from)).visibilityMust(VISIBILITIES.join(", ")));
     return [];
   }
-  const owner = await ensureMember(app.db, msg.from!.id, "owner");
-  const existing = await app.db.prepare("SELECT id FROM sources WHERE chat_id=?").bind(msg.chat.id).first<{ id: string }>();
-  const id = existing?.id ?? newId();
-  await app.db.batch([
-    app.db
-      .prepare(
-        "INSERT INTO sources(id, chat_id, title, username, visibility, enabled, enabled_by, enabled_at) VALUES (?,?,?,?,?,1,?,?) " +
-          "ON CONFLICT(chat_id) DO UPDATE SET enabled=1, visibility=excluded.visibility, title=excluded.title, " +
-          "username=excluded.username, enabled_by=excluded.enabled_by, enabled_at=excluded.enabled_at",
-      )
-      .bind(id, msg.chat.id, msg.chat.title ?? null, msg.chat.username ?? null, vis, owner.id, nowIso()),
-    grantStatement(app.db, id, owner.id),
-  ]);
-  await audit(app.db, "source.enable", owner.id, id, { visibility: vis });
-  await reply(app, msg.chat.id, m.enabled(vis));
-  // The command guide goes to the admin privately, not to the whole group.
-  try {
-    // Past messages too, unless already loaded: by itself through the owner's MCP server when
-    // one is configured, otherwise with a button for the app.
-    const loaded = await app.db.prepare("SELECT 1 FROM history_jobs WHERE source_id=? AND done_at IS NOT NULL").bind(id).first();
-    const auto = !loaded && (await startAuto(app.db, app.env, id)) > 0;
-    const origin = appOrigin(app);
-    const buttons = origin && !loaded && !auto ? [[{ text: m.historyButton, web_app: { url: `${origin}/app?start=history` } } as unknown as InlineButton]] : undefined;
-    const extra = loaded ? "" : auto ? m.historyAuto : m.historyOffer(!!origin);
-    await app.tg.sendMessage(msg.from!.id, m.adminGuide(escapeHtml(msg.chat.title ?? "")) + extra, { buttons });
-  } catch (e) {
-    if (!(e instanceof DefiniteFailure)) throw e; // they never opened the bot privately: nothing to do
-  }
+  await connectGroup(app, msg.chat, msg.from!, vis);
   return [];
 }
 
@@ -433,10 +397,18 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
   const from = msg.from!;
   const pre = T(await langForUser(app, from));
   switch (cmd) {
-    case "start":
+    case "start": {
+      // From a group's "open my guide" link: that group's admin guide, privately.
+      const group = chatFromParam(args);
+      const src = group !== null ? await enabledSource(app.db, group) : null;
+      if (src && (await isChatAdminLive(app, src.chat_id, from.id))) {
+        await sendGuide(app, from, { id: src.chat_id, title: src.title ?? undefined }, src.id);
+        return [];
+      }
       // One short message: what I do, where things work (owners: their tools). Private, so only them.
-      await reply(app, chat, pre.start + pre.whereMember + (isOwner(app, from.id) ? pre.whereOwner : ""));
+      await reply(app, chat, pre.start + pre.whereMember + (isOwner(app, from.id) ? pre.whereOwner : pre.whereGroupAdmin));
       return [];
+    }
     case "help":
       if (args.trim()) break; // "/help <need>" opens a mission below
       await reply(app, chat, pre.help);
@@ -729,6 +701,19 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
   };
   if (["m", "o", "r", "d", "x", "g"].includes(kind ?? "")) return assistCallback(app, cb, await memberByTg(app.db, cb.from.id), data);
   const pre = T(await langForUser(app, cb.from));
+  if (kind === "cn") {
+    // "Connect" under the bot's hello in a group it was added to by a non-admin.
+    const chat = cb.message?.chat;
+    if (!chat || !["group", "supergroup"].includes(chat.type ?? "")) return answerCb().then(() => []);
+    if (!(await isChatAdminLive(app, chat.id, cb.from.id))) {
+      await answerCb(pre.onlyAdminsConnect, true);
+      return [];
+    }
+    await answerCb();
+    await clearButtons();
+    if (!(await enabledSource(app.db, chat.id))) await connectGroup(app, { id: chat.id }, cb.from);
+    return [];
+  }
   if (kind === "hy") {
     // Hydra status button on incident notices (owners only).
     await answerCb();
@@ -810,7 +795,14 @@ async function onBotMembership(app: App, ev: ChatMemberUpdated): Promise<string[
   if (["left", "kicked"].includes(ev.new_chat_member.status)) {
     const r = await app.db.prepare("UPDATE sources SET enabled=0 WHERE chat_id=? AND enabled=1").bind(ev.chat.id).run();
     if (r.meta.changes) await audit(app.db, "source.disable", "system", String(ev.chat.id), { reason: "bot removed" });
+    return [];
   }
+  // Added to a group: an admin adding it is the whole setup; anyone else gets a button for an admin.
+  const added = inChat(ev.new_chat_member) && !inChat(ev.old_chat_member);
+  if (!added || !["group", "supergroup"].includes(ev.chat.type) || ev.from.is_bot) return [];
+  if (await enabledSource(app.db, ev.chat.id)) return [];
+  if (await isChatAdminLive(app, ev.chat.id, ev.from.id)) await connectGroup(app, ev.chat, ev.from);
+  else await askToConnect(app, ev.chat.id);
   return [];
 }
 
@@ -819,6 +811,7 @@ const IN = ["member", "administrator", "creator", "restricted"];
 // A restricted person who leaves stays "restricted" with is_member false (Bot API ChatMemberRestricted).
 const inChat = (cm?: { status: string; is_member?: boolean }) => !!cm && IN.includes(cm.status) && !(cm.status === "restricted" && cm.is_member === false);
 async function onChatMember(app: App, ev: ChatMemberUpdated): Promise<string[]> {
+  if (ev.old_chat_member?.status !== ev.new_chat_member.status) await forgetAdminCache(app.db, ev.chat.id, ev.new_chat_member.user.id);
   const src = await enabledSource(app.db, ev.chat.id);
   const m = src ? await memberByTg(app.db, ev.new_chat_member.user.id) : null;
   if (src && m) {

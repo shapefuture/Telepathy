@@ -124,7 +124,8 @@ export async function eligibleCandidates(
     .all<{ member_id: string; matched: number; kinds: string; pending: number; completed: number; helpful: number; shared: number; req_sources: number }>();
   const out: Candidate[] = [];
   for (const r of results) {
-    if (exclude.has(r.member_id) || r.pending >= EXPERT_WEEKLY_CAP) continue;
+    // One bot serves many communities: only introduce people who share at least one group.
+    if (exclude.has(r.member_id) || r.pending >= EXPERT_WEEKLY_CAP || r.shared === 0) continue;
     const kinds = (r.kinds ?? "self_claim").split(",");
     const bestKind = kinds.reduce((a, b) => (KIND_ORDER.indexOf(b) > KIND_ORDER.indexOf(a) ? b : a));
     const { total, components } = score({

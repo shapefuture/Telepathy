@@ -84,15 +84,17 @@ export function cleanMessages(raw: unknown, max = HISTORY_PAGE_MAX): HistoryMess
 }
 
 /** Enabled groups with their import progress, for the History screen. */
-export async function historyGroups(env: Env, db: D1Database, now = new Date()) {
+export async function historyGroups(env: Env, db: D1Database, now = new Date(), chats?: number[]) {
   const { results } = await db
     .prepare(
       "SELECT s.id, s.chat_id, s.title, s.retention_days, j.staged, j.imported, j.read_at, j.done_at, j.mcp_offset, " +
         "(SELECT COUNT(*) FROM passages p WHERE p.source_id=s.id AND p.removed_at IS NULL) AS stored, " +
         "(SELECT COALESCE(SUM(n),0) FROM history_pages h WHERE h.source_id=s.id AND h.body IS NOT NULL) AS pending, " +
         "(SELECT json_group_array(page) FROM history_pages h WHERE h.source_id=s.id) AS pages " +
-        "FROM sources s LEFT JOIN history_jobs j ON j.source_id=s.id WHERE s.enabled=1 ORDER BY s.enabled_at",
+        "FROM sources s LEFT JOIN history_jobs j ON j.source_id=s.id WHERE s.enabled=1 " +
+        "AND (?1 IS NULL OR s.chat_id IN (SELECT value FROM json_each(?1))) ORDER BY s.enabled_at",
     )
+    .bind(chats ? JSON.stringify(chats) : null)
     .all<{ chat_id: number; title: string | null; retention_days: number; staged: number | null; imported: number | null; read_at: string | null; done_at: string | null; mcp_offset: number | null; stored: number; pending: number; pages: string }>();
   const cap = perDay(env);
   const left = Math.max(0, cap - (await usedToday(db, today(now))));

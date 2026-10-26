@@ -70,7 +70,7 @@ const EN = {
     "/retention 365 — keep only the last year (0 — everything)\n" +
     "/disable — disconnect the group\n\n" +
     "As a reply: /canonical — best answer, /notevent — not an event.\n" +
-    "Everything else is here, in private: /status, /desk, /help.",
+    "Past messages and help: here, in private — /app and /help.",
   welcomeDm: (title: string) =>
     `👋 Hi! I'm the assistant of <b>${title}</b>.\n\n` +
     "I'll help you find your way around this community and find anything that was ever discussed here. And if needed, I'll find the person who knows the answer to your question.\n\n" +
@@ -78,6 +78,16 @@ const EN = {
   welcomeGroup: (name: string) =>
     `👋 ${name}, welcome! I'll help you find anything that was ever discussed here, and if needed, the person who knows the answer. Start a private chat with me to begin.`,
   welcomeButton: "Start a chat",
+  connected: (vis: string) =>
+    "✨ I'm connected to this group. Anyone here can now ask me about anything discussed in it — /ask right here, or privately. " +
+    "To search, I keep the group's messages: /privacy in a private chat with me explains how, and /forget_me deletes your data." +
+    (vis === "MEMBER_CONSENTED" ? "" : ` (Visibility: ${vis}.)`),
+  guideInGroup: (name: string) => `${name}, your settings and the button to load past messages are waiting in a private chat with me.`,
+  guideButton: "⚙️ Open settings",
+  askToConnect: "👋 Hi! I help this group find anything that was ever discussed here — and the person who knows the answer. To start, a group admin taps the button.",
+  connectButton: "✨ Connect",
+  onlyAdminsConnect: "Only a group admin can connect me.",
+  whereGroupAdmin: "\n\n🛠 <b>Run a community?</b>\nAdd me to your group — that's the whole setup.",
   historyOffer: (button: boolean) =>
     "\n\n📜 <b>Older messages</b>\nRight now I only know what's written from today on. " +
     (button ? "Tap the button below and I'll load the group's past messages too — it takes a few seconds, then I finish in the background." : "To load the group's past messages too, open the app → Desk → History."),
@@ -93,9 +103,6 @@ const EN = {
   welcomeUsage: "Usage: /welcome on or /welcome off (owner, in an enabled group).",
   welcomeOn: "Welcome is <b>on</b>: new members get a short intro from me, privately when Telegram allows it.",
   welcomeOff: "Welcome is <b>off</b> in this group.",
-  enabled: (vis: string) =>
-    `Telepathy is now <b>collecting</b> this chat (visibility: ${vis}, full history kept). ` +
-    "Members can search it with /ask, here or in a DM with the bot. DM the bot /privacy for details or /forget_me to delete your data.",
   disabled: "Telepathy stopped collecting this chat. Existing messages are excluded from all answers.",
   retentionUsage: "Usage: /retention &lt;days 1..3650&gt; to purge older messages, or /retention 0 to keep full history.",
   retentionKeepAll: "Full history will be kept. Nothing is purged automatically.",
@@ -321,7 +328,7 @@ const RU: Messages = {
     "/retention 365 — хранить только последний год (0 — всё)\n" +
     "/disable — отключить группу\n\n" +
     "Ответом на сообщение: /canonical — лучший ответ, /notevent — это не событие.\n" +
-    "Всё остальное — здесь, в личке: /status, /desk, /help.",
+    "Старые сообщения и помощь — здесь, в личке: /app и /help.",
   welcomeDm: (title: string) =>
     `👋 Привет! Я помощник сообщества <b>${title}</b>.\n\n` +
     "Я помогу тебе ориентироваться в этом сообществе и найти любую информацию, которая когда-то обсуждалась. А если потребуется — найду человека, который знает ответ на твой вопрос.\n\n" +
@@ -329,6 +336,16 @@ const RU: Messages = {
   welcomeGroup: (name: string) =>
     `👋 ${name}, добро пожаловать! Я помогу найти любую информацию, которая здесь когда-то обсуждалась, а если потребуется — человека, который знает ответ. Создай личный чат со мной, чтобы начать.`,
   welcomeButton: "Начать",
+  connected: (vis: string) =>
+    "✨ Я подключился к этой группе. Теперь любой участник может спросить меня о том, что здесь обсуждали, — /ask прямо здесь или в личке. " +
+    "Чтобы искать, я сохраняю сообщения группы: как именно — /privacy в личке со мной, удалить свои данные — /forget_me." +
+    (vis === "MEMBER_CONSENTED" ? "" : ` (Видимость: ${vis}.)`),
+  guideInGroup: (name: string) => `${name}, настройки и кнопка для загрузки старых сообщений ждут тебя у меня в личке.`,
+  guideButton: "⚙️ Открыть настройки",
+  askToConnect: "👋 Привет! Я помогаю найти всё, что здесь когда-либо обсуждали, — и человека, который знает ответ. Чтобы начать, админ группы нажимает кнопку.",
+  connectButton: "✨ Подключить",
+  onlyAdminsConnect: "Подключить меня может только админ группы.",
+  whereGroupAdmin: "\n\n🛠 <b>Ведёшь сообщество?</b>\nДобавь меня в свою группу — это вся настройка.",
   historyOffer: (button: boolean) =>
     "\n\n📜 <b>Старые сообщения</b>\nСейчас я знаю только то, что напишут начиная с сегодня. " +
     (button ? "Нажми кнопку ниже — и я загружу прошлые сообщения группы. Это займёт несколько секунд, остальное я сделаю сам в фоне." : "Чтобы я загрузил и прошлые сообщения группы, открой приложение → Пульт → История."),
@@ -344,9 +361,6 @@ const RU: Messages = {
   welcomeUsage: "Использование: /welcome on или /welcome off (владелец, в подключённой группе).",
   welcomeOn: "Приветствие <b>включено</b>: новые участники получат от меня короткое интро — лично, когда Telegram это позволяет.",
   welcomeOff: "Приветствие в этой группе <b>выключено</b>.",
-  enabled: (vis: string) =>
-    `Миндальная связь теперь <b>сохраняет</b> этот чат (видимость: ${vis}, история хранится полностью). ` +
-    "Участники могут искать по нему через /ask здесь или в личке с ботом. Подробности — /privacy в личке с ботом, удалить свои данные — /forget_me.",
   disabled: "Миндальная связь больше не сохраняет этот чат. Уже сохранённые сообщения исключены из всех ответов.",
   retentionUsage: "Использование: /retention &lt;дни 1..3650&gt; — удалять старые сообщения, или /retention 0 — хранить всю историю.",
   retentionKeepAll: "История будет храниться полностью. Ничего не удаляется автоматически.",

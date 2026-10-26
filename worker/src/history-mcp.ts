@@ -18,17 +18,21 @@ const MAX_ERRORS = 10; // ten failed minutes in a row: stop and offer the app in
 
 export const mcpOn = (env: Env): boolean => !!env.TG_MCP_KEY && (!!env.TG_MCP || !!env.TG_MCP_URL);
 
-/** Queue every enabled group (or one) that has no import yet for reading through MCP. */
+/**
+ * Queue every enabled group (or one) that has no import yet for reading through MCP. Only groups
+ * the operator connected: the MCP server reads with the operator's own Telegram account, which
+ * isn't in other communities' groups (their admins load history in the app instead).
+ */
 export async function startAuto(db: D1Database, env: Env, sourceId?: string, now = new Date()): Promise<number> {
   if (!mcpOn(env)) return 0;
-  const fallbackOwner = [...ownerIds(env)][0] ?? 0;
   const r = await db
     .prepare(
       "INSERT OR IGNORE INTO history_jobs(source_id, owner_tg, mcp_offset, updated_at) " +
-        "SELECT s.id, COALESCE(m.tg_id, ?1), 0, ?2 FROM sources s LEFT JOIN members m ON m.id=s.enabled_by " +
-        "WHERE s.enabled=1 AND (?3 IS NULL OR s.id=?3) AND NOT EXISTS (SELECT 1 FROM history_jobs j WHERE j.source_id=s.id)",
+        "SELECT s.id, m.tg_id, 0, ?1 FROM sources s JOIN members m ON m.id=s.enabled_by " +
+        "WHERE s.enabled=1 AND (?2 IS NULL OR s.id=?2) AND m.tg_id IN (SELECT value FROM json_each(?3)) " +
+        "AND NOT EXISTS (SELECT 1 FROM history_jobs j WHERE j.source_id=s.id)",
     )
-    .bind(fallbackOwner, nowIso(now), sourceId ?? null)
+    .bind(nowIso(now), sourceId ?? null, JSON.stringify([...ownerIds(env)]))
     .run();
   return r.meta.changes;
 }

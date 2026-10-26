@@ -66,12 +66,15 @@
     // no app needed: set the TG_MCP_KEY secret (a read-only key from its POST /keys/history). The
     // TG_MCP service binding above reaches it on this account; on another account, remove that
     // binding and set its https origin here instead.
-    "TG_MCP_URL": ""
+    "TG_MCP_URL": "",
+    // Optional: your Telegram app's api_id (my.telegram.org; api_hash is the TG_API_HASH secret).
+    // With both set, group admins load past messages in the app with just phone + code.
+    "TG_API_ID": ""
   },
   // Secrets (set with `wrangler secret put NAME`, never committed):
   //   BOT_TOKEN, WEBHOOK_SECRET, ADMIN_TOKEN, OWNER_IDS, FEDERATION_PRIVATE_KEY (only with federation),
   //   CONTINUITY_KEY, IDENTITY_ONLINE_KEY, EMAIL_API_KEY (only with continuity)
-  //   TG_MCP_KEY (only with TG_MCP_URL: automatic history import)
+  //   TG_MCP_KEY (only with TG_MCP_URL: automatic history import), TG_API_HASH (with TG_API_ID)
   //   Hydra, each optional: EMAIL_B_API_KEY, EMAIL_WEBHOOK_SECRET, VAPID_PRIVATE_KEY, MATRIX_ACCESS_TOKEN,
   //   SMS_ACCOUNT_SID, SMS_AUTH_TOKEN, SMS_FROM, MASTODON_TOKEN, BLUESKY_APP_PASSWORD, and the escrow
   //   target secrets named in ESCROW_TARGETS

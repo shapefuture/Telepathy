@@ -25,6 +25,7 @@ import { dispatchPending } from "./outbox";
 import { forgetMember } from "./rights";
 import { HISTORY_PAGE_MAX, historyGroups, perDay, resetHistory, stagePage } from "./history";
 import { mcpOn, startAuto } from "./history-mcp";
+import { isChatAdmin, managedChats } from "./admins";
 import { answer, parseFilters } from "./search";
 import { createTelegram, type Fetcher } from "./telegram";
 import { audit, DAY, HOUR, localParts, nowIso, safeEqual } from "./util";
@@ -149,6 +150,8 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
     return out({
       lang,
       owner,
+      // Admins of a connected group get the desk tab with that group's History.
+      groupAdmin: owner || (await managedChats(app, user.id)).length > 0,
       label: app.env.COMMUNITY_LABEL || "Community",
       flags: Object.fromEntries(FLAGS.map((f) => [f, !!m[f as keyof Member]])),
       skills,
@@ -377,12 +380,24 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
     return out({ ok: r.ok }, r.keys);
   }
 
-  // ---- history import (owners): the browser reads Telegram, we only store the pages ------------
+  // ---- history import: the operator for every group, each group's admins for their own --------
+  // The browser reads Telegram with the admin's own login; we only store the pages.
   if (p[0] === "history") {
-    if (!owner) return out({ error: "owners only" }, undefined, 403);
-    if (key === "GET history") return out({ groups: await historyGroups(app.env, db), perDay: perDay(app.env), pageMax: HISTORY_PAGE_MAX, mcp: mcpOn(app.env) });
+    if (key === "GET history") {
+      const chats = owner ? undefined : await managedChats(app, user.id);
+      if (chats && !chats.length) return out({ error: "group admins only" }, undefined, 403);
+      return out({
+        groups: await historyGroups(app.env, db, new Date(), chats),
+        perDay: perDay(app.env),
+        pageMax: HISTORY_PAGE_MAX,
+        mcp: owner && mcpOn(app.env),
+        // The operator's Telegram app keys, if set: admins then sign in with just phone + code.
+        api: app.env.TG_API_ID && app.env.TG_API_HASH ? { id: Number(app.env.TG_API_ID), hash: app.env.TG_API_HASH } : null,
+      });
+    }
     const chatId = Number(body.chat_id);
     if (!Number.isSafeInteger(chatId)) return out({ error: "bad chat" }, undefined, 400);
+    if (!owner && !(await isChatAdmin(app, chatId, user.id))) return out({ error: "group admins only" }, undefined, 403);
     if (key === "POST history" && p[1] === "stage") {
       const r = await stagePage(db, user.id, chatId, body.page, body.messages, body.done === true);
       return out(r, undefined, r.ok ? 200 : r.error === "not_enabled" ? 404 : 400);

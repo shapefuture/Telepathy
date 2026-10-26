@@ -8,6 +8,7 @@ import { nowIso } from "./util";
 export interface TgUser {
   id: number;
   is_bot?: boolean;
+  first_name?: string;
   language_code?: string;
   username?: string;
 }

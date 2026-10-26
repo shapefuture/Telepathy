@@ -35,6 +35,7 @@ import { helpedCount } from "./thread-card";
 import { SETTING_COLUMNS, settingsView, toggleSetting, type SettingColumn } from "./group-settings";
 import { forgottenView } from "./wow";
 import { eventByShort, fullKey, rsvp, shortKey, wantToSee, whoGoes } from "./gather";
+import { arkLine, callEveryone, exportFor, forgetPart, knowsCard } from "./ark";
 import { welcomeJoinRequest, welcomeJoiner } from "./welcome";
 import { escapeHtml } from "./text";
 import { audit, DAY, HOUR, localParts, nowIso, tzOffsetMinutes } from "./util";
@@ -79,7 +80,7 @@ export interface Update {
 /** Kept for tests and docs: the English privacy notice. */
 export const PRIVACY_NOTICE = T("en").privacy;
 
-const PRIVATE_ONLY = new Set(["intro", "expert", "profile", "optin", "optout", "skills", "forget_me", "digest", "requests", "language", "catchup", "events", "pings", "app", "cancel", "desk", "offer", "partner", "fed", "ledger", "passport", "continuity", "destinations", "alert", "drill", "name", "pilot", "pulse", "union", "bridges"]);
+const PRIVATE_ONLY = new Set(["intro", "expert", "profile", "optin", "optout", "skills", "forget_me", "digest", "requests", "language", "catchup", "events", "pings", "app", "cancel", "desk", "offer", "partner", "fed", "ledger", "passport", "continuity", "destinations", "alert", "drill", "name", "pilot", "pulse", "union", "bridges", "ark", "move", "knows"]);
 const GROUP_TYPES = new Set(["group", "supergroup"]);
 const btn = (text: string, data: string): InlineButton => ({ text, callback_data: data });
 const linkBtn = (text: string, href: string) => ({ text, url: href }) as unknown as InlineButton;
@@ -512,6 +513,38 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
   const lang = langOf(mem);
   const m = T(lang);
   if (cmd === "help") return cmdHelpNeed(app, chat, mem, args);
+  if (cmd === "knows") {
+    const who = await memberByTg(app.db, from.id);
+    if (!who) return [];
+    const v = await knowsCard(app.db, who.id, lang);
+    await reply(app, chat, v.text, v.buttons);
+    return [];
+  }
+  if (cmd === "ark" || cmd === "move") {
+    // Ковчег (journey 10): the owner's clubs, the last copy, taking everything, and calling everyone.
+    if (!isOwner(app, from.id)) return [];
+    const who = await ensureMember(app.db, from.id, "owner", from.language_code);
+    const clubs = (await app.db.prepare("SELECT id, title FROM sources WHERE enabled=1 AND enabled_by=? ORDER BY title").bind(who.id).all<{ id: string; title: string | null }>()).results;
+    if (cmd === "move") {
+      const url = args.trim();
+      if (!url) {
+        await reply(app, chat, pre.arkMoveUsage);
+        return [];
+      }
+      if (!/^https:\/\/[^\s<>"]{4,200}$/i.test(url)) {
+        await reply(app, chat, pre.arkMoveBad);
+        return [];
+      }
+      for (const c of clubs) await app.db.prepare("INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(`ark.move.${c.id}`, url).run();
+      await audit(app.db, "ark.move", who.id, "clubs", { clubs: clubs.length });
+      await reply(app, chat, pre.arkMoveSet(escapeHtml(url)));
+      return [];
+    }
+    const line = await arkLine(app.db, app.env, lang);
+    await reply(app, chat, line);
+    for (const c of clubs) await reply(app, chat, escapeHtml(c.title ?? ""), [[btn(pre.bArkTake, `ak:${c.id}:take`), btn(pre.bArkCall, `ak:${c.id}:call`)]]);
+    return [];
+  }
   if (cmd === "union") {
     const who = await memberByTg(app.db, from.id);
     if (!who) return [];
@@ -892,6 +925,40 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
     const r = await wantToSee(app, mem, key, b, nowIso());
     await app.tg.sendMessage(cb.from.id, r.text);
     return r.keys;
+  }
+  if (kind === "ak") {
+    // Ковчег (owner): take everything in an open file, or call everyone to the new address.
+    const mem = await memberByTg(app.db, cb.from.id);
+    const own = mem && isOwner(app, cb.from.id) ? await app.db.prepare("SELECT 1 FROM sources WHERE id=? AND enabled_by=?").bind(a, mem.id).first() : null;
+    if (!mem || !own) {
+      await answerCb(pre.notAvailable);
+      return [];
+    }
+    if (b === "take") {
+      const out = await exportFor(app.db, mem.id, new Date());
+      await app.tg.sendFile(cb.from.id, "telepathy-export.json", out.json, "application/json", pre.arkTaken(out.messages));
+      await answerCb(pre.arkTaken(out.messages));
+      return [];
+    }
+    const called = await callEveryone(app.db, a, nowIso().slice(0, 10));
+    if (!called.url) {
+      await answerCb(pre.arkNoMoveUrl, true);
+      return [];
+    }
+    await answerCb(pre.arkCalled(called.keys.length));
+    return called.keys;
+  }
+  if (kind === "kn") {
+    // What the bot knows about me: remove one part of it (messages go with /forget_me).
+    const mem = await memberByTg(app.db, cb.from.id);
+    if (!mem || !(await forgetPart(app.db, mem.id, a))) {
+      await answerCb(pre.notAvailable);
+      return [];
+    }
+    await answerCb(pre.knowsDone);
+    const v = await knowsCard(app.db, mem.id, langOf(mem));
+    await app.tg.sendMessage(cb.from.id, v.text, { buttons: v.buttons });
+    return [];
   }
   if (kind === "gd") {
     // Done on a line of «Главное» (plan: journey 7): it doesn't come back, and its button leaves the card.

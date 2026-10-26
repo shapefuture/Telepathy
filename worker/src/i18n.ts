@@ -456,6 +456,30 @@ const EN = {
   gatherMutualHere: "🤝 It's mutual. I've sent you each other's contact.",
   gatherRemind: (title: string) => `⏰ In about two hours: ${title}. You said you're going.`,
   gatherAfterAsk: (title: string) => `How was ${title}? Who would you like to see again? It opens only if they want it too.`,
+  // Ковчег (journey 10)
+  arkNotSet: "Ковчег: copies aren't set up yet. The operator can connect them.",
+  arkSafe: (date: string) => `Ковчег: your community is safe. Last copy: ${date}.`,
+  arkNoCopy: "Ковчег: set up, but no copy has been made yet.",
+  arkCall: (url: string) => `The community has moved. Here is the new address: ${url}`,
+  bArkTake: "📦 Take everything",
+  bArkCall: "📣 Call everyone",
+  arkMoveUsage: "Usage: <code>/move https://new-address</code>. Everyone in your clubs is told the new address when you tap “Call everyone”.",
+  arkMoveBad: "That isn't a secure address. Use one that starts with https://.",
+  arkMoveSet: (url: string) => `New address saved: ${url}`, // the caller escapes it
+  arkNoMoveUrl: "Set the new address first with /move.",
+  arkCalled: (n: number) => `Telling ${n} people.`,
+  arkTaken: (n: number) => `Exported ${n} messages from your clubs.`,
+  knowsTitle: "<b>What I know about you</b>",
+  knowsMessages: (n: number) => `Messages you wrote, kept: <b>${n}</b>`,
+  knowsSkills: (n: number) => `Skills on your profile: <b>${n}</b>`,
+  knowsThreads: (n: number) => `Requests you opened: <b>${n}</b>`,
+  knowsRsvps: (n: number) => `Gatherings you answered for: <b>${n}</b>`,
+  knowsIntros: (n: number) => `Introductions and requests: <b>${n}</b>`,
+  knowsHowTo: "Each line above can be removed with its button. Your messages go with /forget_me.",
+  bKnowSkills: "🗑 Remove my skills",
+  bKnowThreads: "🗑 Remove my requests",
+  bKnowRsvps: "🗑 Remove my gatherings",
+  knowsDone: "Removed.",
 };
 
 export type Messages = typeof EN;
@@ -889,6 +913,30 @@ const RU: Messages = {
   gatherMutualHere: "🤝 Взаимно! Я отправил вам контакты друг друга.",
   gatherRemind: (title: string) => `⏰ Примерно через два часа: ${title}. Ты написал, что идёшь.`,
   gatherAfterAsk: (title: string) => `Как прошло «${title}»? Кого хочешь увидеть снова? Контакт откроется, только если и он захочет.`,
+  // Ковчег (путь 10)
+  arkNotSet: "Ковчег: копии ещё не настроены. Оператор может их подключить.",
+  arkSafe: (date: string) => `Ковчег: ваше сообщество в безопасности. Последняя копия: ${date}.`,
+  arkNoCopy: "Ковчег: настроен, но копия ещё не создавалась.",
+  arkCall: (url: string) => `Сообщество переехало. Новый адрес: ${url}`,
+  bArkTake: "📦 Забрать всё",
+  bArkCall: "📣 Позвать всех",
+  arkMoveUsage: "Использование: <code>/move https://новый-адрес</code>. Когда нажмёшь «Позвать всех», все в твоих клубах узнают новый адрес.",
+  arkMoveBad: "Это не безопасный адрес. Нужен адрес, который начинается с https://.",
+  arkMoveSet: (url: string) => `Новый адрес сохранён: ${url}`, // the caller escapes it
+  arkNoMoveUrl: "Сначала укажи новый адрес через /move.",
+  arkCalled: (n: number) => `Сообщаю ${n} людям.`,
+  arkTaken: (n: number) => `Выгружено сообщений из твоих клубов: ${n}.`,
+  knowsTitle: "<b>Что я знаю о тебе</b>",
+  knowsMessages: (n: number) => `Сообщения, которые ты написал и я сохранил: <b>${n}</b>`,
+  knowsSkills: (n: number) => `Навыков в профиле: <b>${n}</b>`,
+  knowsThreads: (n: number) => `Запросов, которые ты открыл: <b>${n}</b>`,
+  knowsRsvps: (n: number) => `Встреч, на которые ты ответил: <b>${n}</b>`,
+  knowsIntros: (n: number) => `Знакомств и запросов на знакомство: <b>${n}</b>`,
+  knowsHowTo: "Каждую строку можно убрать её кнопкой. Твои сообщения уходят с /forget_me.",
+  bKnowSkills: "🗑 Убрать мои навыки",
+  bKnowThreads: "🗑 Убрать мои запросы",
+  bKnowRsvps: "🗑 Убрать мои встречи",
+  knowsDone: "Удалено.",
 };
 
 export const MESSAGES: Record<Lang, Messages> = { en: EN, ru: RU };

@@ -36,6 +36,7 @@ import { renderThread, faceOf, namesFor } from "./thread-card";
 import { pulseCard } from "./pulse";
 import { alliancesOf, clubsOf } from "./alliance";
 import { topicCounts } from "./wow";
+import { arkLine, knowsCard } from "./ark";
 import { hydraAuthed } from "./hydra/portal";
 import { activeAttestations, addEmail, checkCode, ContinuityError, enrolFromTelegram, follows, forgetPerson, newRecoveryCodes, personalExport, personForMember, protection, refreshMembership, revokeEndpoint, setTopic, TOPICS, type Topic } from "./continuity/people";
 import { currentManifest } from "./continuity/identity";
@@ -329,6 +330,12 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
       cards.push({ id: r.id, title: r.title ?? "", html: c.text, quiet: c.quiet, share: c.text && !c.quiet ? r.id : null });
     }
     return out(cards);
+  }
+  if (key === "GET ark") return out({ line: owner ? await arkLine(db, app.env, lang) : null });
+  if (key === "GET knows") {
+    // What the bot knows about this person, with a button per removable part (the same card as /knows).
+    const c = await knowsCard(db, m.id, lang);
+    return out({ html: c.text, buttons: c.buttons.map((row) => row.map((b) => ({ text: b.text, data: b.callback_data }))) });
   }
   if (key === "GET union") return out({ alliances: await alliancesOf(db, m.id), clubs: (await clubsOf(db, m.id)).map((c) => ({ id: c.id, title: c.title ?? "group" })) });
 

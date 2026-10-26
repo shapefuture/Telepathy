@@ -21,6 +21,9 @@
   // Builds public/history/ (the owner's in-browser history import, see docs/DEPLOY_CLOUDFLARE.md).
   "build": { "command": "npm run build:history" },
   "ai": { "binding": "AI" },
+  // The owner's Telegram MCP Worker (shapefuture/telegram_mcp) on the same account, for the
+  // automatic history import (src/history-mcp.ts). Unused until the TG_MCP_KEY secret is set.
+  "services": [{ "binding": "TG_MCP", "service": "telegram-mcp-saas" }],
   "triggers": { "crons": ["* * * * *"] },
   "vars": {
     "COMMUNITY_LABEL": "Community",
@@ -60,9 +63,9 @@
     "ESCROW_RECIPIENTS": "",
     "ESCROW_TARGETS": "[]",
     // Optional: your Telegram MCP server (shapefuture/telegram_mcp) reads past messages by itself,
-    // no app needed. Set its https origin here and the TG_MCP_KEY secret (a read-only key from its
-    // POST /keys/history). If both Workers are on one Cloudflare account, also add the binding:
-    //   "services": [{ "binding": "TG_MCP", "service": "telegram-mcp-saas" }]
+    // no app needed: set the TG_MCP_KEY secret (a read-only key from its POST /keys/history). The
+    // TG_MCP service binding above reaches it on this account; on another account, remove that
+    // binding and set its https origin here instead.
     "TG_MCP_URL": ""
   },
   // Secrets (set with `wrangler secret put NAME`, never committed):

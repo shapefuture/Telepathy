@@ -10,6 +10,8 @@ export default defineConfig(async () => {
         wrangler: { configPath: "./wrangler.jsonc" },
         remoteBindings: false, // the AI binding is remote-only; tests use a stand-in
         miniflare: {
+          // The MCP Worker named in wrangler.jsonc isn't part of the tests; history-mcp tests inject their own.
+          serviceBindings: { TG_MCP: () => new Response("no MCP server in tests", { status: 503 }) },
           bindings: {
             TEST_MIGRATIONS: migrations,
             BOT_TOKEN: "123456:TEST",

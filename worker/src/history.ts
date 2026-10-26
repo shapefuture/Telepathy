@@ -45,6 +45,21 @@ const today = (now: Date) => now.toISOString().slice(0, 10);
 const posInt = (v: unknown) => (Number.isSafeInteger(v) && (v as number) > 0 ? (v as number) : null);
 const keepFromOf = (retentionDays: number, now: Date) => (retentionDays > 0 ? Math.floor((now.getTime() - retentionDays * DAY) / 1000) : 0);
 
+/**
+ * Basic groups (ids above -10^12; supergroups are -100… with 10+ more digits) number messages per account: the bot's live copy of a
+ * message has a different id than the one the owner's account reads, so ids can't dedupe them.
+ * The bot has stored everything since the group was first enabled, so history stops there.
+ * Supergroups share one numbering, and INSERT OR IGNORE already skips messages the bot has.
+ */
+/** Bot API ids of supergroups and channels are -10^12 - their channel id. */
+export const SUPERGROUP_MAX = -1_000_000_000_000;
+
+export function liveFrom(chatId: number, firstEnabledIso: string): number {
+  if (chatId <= SUPERGROUP_MAX) return Number.POSITIVE_INFINITY;
+  const t = Date.parse(firstEnabledIso);
+  return Number.isFinite(t) ? Math.floor(t / 1000) : Number.POSITIVE_INFINITY;
+}
+
 /** Drops anything malformed instead of failing the page: one odd message shouldn't stop an import. */
 export function cleanMessages(raw: unknown, max = HISTORY_PAGE_MAX): HistoryMessage[] {
   if (!Array.isArray(raw)) return [];
@@ -187,14 +202,17 @@ export async function ingestHistory(app: App, now = new Date()): Promise<number>
   for (let i = 0; i < PAGES_PER_RUN; i++) {
     const p = await db
       .prepare(
-        "SELECT h.source_id, h.page, h.body, s.retention_days FROM history_pages h JOIN sources s ON s.id=h.source_id " +
+        "SELECT h.source_id, h.page, h.body, s.retention_days, s.chat_id, s.enabled_at, " +
+          "(SELECT MIN(at) FROM audit WHERE action='source.enable' AND subject=s.id) AS first_enable " +
+          "FROM history_pages h JOIN sources s ON s.id=h.source_id " +
           "WHERE h.body IS NOT NULL AND s.enabled=1 ORDER BY h.source_id, h.page DESC LIMIT 1",
       )
-      .first<{ source_id: string; page: number; body: string; retention_days: number }>();
+      .first<{ source_id: string; page: number; body: string; retention_days: number; chat_id: number; enabled_at: string; first_enable: string | null }>();
     if (!p || (await usedToday(db, day)) >= perDay(app.env)) break;
     // Re-check at store time: /forget_me and /retention may have changed since the page was read.
     const keepFrom = keepFromOf(p.retention_days, now);
-    const msgs = cleanMessages(JSON.parse(p.body)).filter((m) => m.date >= keepFrom);
+    const before = liveFrom(p.chat_id, p.first_enable ?? p.enabled_at);
+    const msgs = cleanMessages(JSON.parse(p.body)).filter((m) => m.date >= keepFrom && m.date < before);
     const n = msgs.length ? await storeMessages(db, p.source_id, msgs, now) : 0;
     stored += n;
     await db.batch([

@@ -9,7 +9,7 @@ import type { App } from "../src/bot";
 import type { Env } from "../src/env";
 
 const E = env as unknown as Env;
-const MCP = { ...E, TG_MCP_URL: "https://mcp.example", TG_MCP_KEY: "tmcp_00000000-0000-0000-0000-000000000000" };
+const MCP = { ...E, TG_MCP: undefined, TG_MCP_URL: "https://mcp.example", TG_MCP_KEY: "tmcp_00000000-0000-0000-0000-000000000000" };
 const T0 = Math.floor(Date.now() / 1000) - 200 * 86_400;
 const q = <T>(sql: string) => env.DB.prepare(sql).first<T>();
 

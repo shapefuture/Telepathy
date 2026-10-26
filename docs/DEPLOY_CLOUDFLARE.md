@@ -90,13 +90,15 @@ anywhere.
      -H "content-type: application/json" -d '{"chats": ["-1001234567890"]}'
    ```
    Never give the bot your full key, which can also send and delete messages.
-2. In `worker/wrangler.jsonc` set `"TG_MCP_URL": "https://<mcp-worker>"`. If both Workers are
-   on the same Cloudflare account, also add
-   `"services": [{ "binding": "TG_MCP", "service": "telegram-mcp-saas" }]`, because Cloudflare
-   blocks one Worker from fetching another Worker's workers.dev address on the same account.
+2. `worker/wrangler.jsonc` already binds `TG_MCP` to the `telegram-mcp-saas` Worker on the same
+   account. If yours runs on another account, remove that `services` entry and set
+   `"TG_MCP_URL": "https://<mcp-worker>"` instead.
 3. `npx wrangler secret put TG_MCP_KEY` (paste the read-only key), then `npm run deploy`.
 
-From then on, `/enable` starts the import by itself. Groups that were already enabled are picked
+From then on, `/enable` starts the import by itself. In **basic groups** (ids that aren't
+`-100…`), every account numbers messages in its own sequence, so the import stops at the moment
+the group was first enabled. The bot already has everything after that, and this keeps messages
+from appearing twice. Groups that were already enabled are picked
 up within 10 minutes. The every-minute cron reads 500 messages a minute through the MCP server,
 stores them as described below, and messages you when it's done. The History screen shows
 **Читаю автоматически**. If the server fails 10 minutes in a row, the bot stops, tells you, and

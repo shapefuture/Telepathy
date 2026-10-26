@@ -144,7 +144,7 @@ describe("history import", () => {
     const { app } = testApp();
     await enableGroup(app);
     await env.DB.prepare("UPDATE sources SET retention_days=10").run();
-    expect((await stagePage(env.DB, OWNER, GROUP, 0, [{ ...msg(1, "too old", 7777), date: now - 20 * day }, { ...msg(2, "recent", 7777), date: now - day }], false))).toMatchObject({ ok: true, pending: 1 });
+    expect((await stagePage(env.DB, OWNER, GROUP, 0, [{ ...msg(1, "too old", 7777), date: now - 20 * day }, { ...msg(2, "recent", 7777), date: now - 2 * day }], false))).toMatchObject({ ok: true, pending: 1 });
     await env.DB.prepare("UPDATE sources SET retention_days=1").run(); // tightened before storing
     await drain(app);
     expect(await q("SELECT COUNT(*) AS n FROM passages")).toEqual({ n: 0 });

@@ -22,6 +22,10 @@ export interface Env {
   /** Owner's Telegram MCP server (shapefuture/telegram_mcp) for reading past messages without the
    *  app: its https origin, or the TG_MCP service binding when both Workers share an account. */
   TG_MCP_URL?: string;
+  /** Your Telegram app's api_id/api_hash (my.telegram.org). Optional: with them, group admins load
+   *  past messages in the app with just their phone number and code. TG_API_HASH is a secret. */
+  TG_API_ID?: string;
+  TG_API_HASH?: string;
   /** Secret: a read-only key from POST /keys/history on that server (export_history only). */
   TG_MCP_KEY?: string;
   /** Service binding to the MCP Worker (same-account workers.dev fetches are blocked: error 1042). */

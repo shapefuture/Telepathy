@@ -8,6 +8,7 @@ import { nowIso } from "./util";
 export interface TgUser {
   id: number;
   is_bot?: boolean;
+  first_name?: string;
   language_code?: string;
   username?: string;
 }
@@ -51,11 +52,18 @@ export async function enabledSource(db: D1Database, chatId: number): Promise<Sou
   return db.prepare("SELECT * FROM sources WHERE chat_id=? AND enabled=1").bind(chatId).first<Source>();
 }
 
+/**
+ * Bot API ids of supergroups and channels are -100 followed by their channel id, so they are at most
+ * -10^12. A basic group's id is smaller in magnitude, even when it happens to start with "-100".
+ */
+export const SUPERGROUP_MAX = -1_000_000_000_000;
+export const isSupergroupId = (chatId: number): boolean => chatId <= SUPERGROUP_MAX;
+
 export function citation(chatId: number, msgId: number, username: string | null, topicId?: number | null): string | null {
   if (username) return `https://t.me/${username}/${msgId}`;
-  const s = String(chatId);
-  if (!s.startsWith("-100")) return null; // basic groups have no message links
-  return topicId ? `https://t.me/c/${s.slice(4)}/${topicId}/${msgId}` : `https://t.me/c/${s.slice(4)}/${msgId}`;
+  if (!isSupergroupId(chatId)) return null; // basic groups have no message links
+  const s = String(chatId).slice(4); // without the -100 prefix
+  return topicId ? `https://t.me/c/${s}/${topicId}/${msgId}` : `https://t.me/c/${s}/${msgId}`;
 }
 
 const iso = (unix: number): string => nowIso(new Date(unix * 1000));

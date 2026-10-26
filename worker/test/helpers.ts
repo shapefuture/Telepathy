@@ -6,7 +6,7 @@ import { dispatchPending } from "../src/outbox";
 import type { Fetcher } from "../src/telegram";
 
 export const OWNER = 1000;
-export const GROUP = -1001234;
+export const GROUP = -1001234567890;
 
 export interface Call {
   method: string;
@@ -118,6 +118,18 @@ export async function webhook(body: unknown, secret = "test-webhook-secret", fet
     env,
     fetcher,
   );
+}
+
+/** The text a chat shows now: its last message, or the last edit of a card there. */
+export function shown(calls: Call[], chatId: number): string {
+  const last = [...calls].reverse().find((c) => (c.method === "sendMessage" || c.method === "editMessageText") && c.params.chat_id === chatId);
+  return String(last?.params.text ?? "");
+}
+
+/** The buttons under what a chat shows now. */
+export function shownButtons(calls: Call[], chatId: number): { text: string; callback_data: string }[][] {
+  const last = [...calls].reverse().find((c) => (c.method === "sendMessage" || c.method === "editMessageText") && c.params.chat_id === chatId);
+  return (last?.params.reply_markup?.inline_keyboard ?? []) as { text: string; callback_data: string }[][];
 }
 
 /** Owner enables the test group. */

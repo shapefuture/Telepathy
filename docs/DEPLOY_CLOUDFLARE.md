@@ -9,7 +9,8 @@ reminders, the daily digest and optional retention. There is no server to run.
 - A Cloudflare account (free plan is enough to start).
 - Node.js 22 and this repository.
 - A bot from @BotFather. In BotFather run `/setprivacy` → **Disable**, so the bot can see group
-  messages. Run `/setjoingroups` → Disable after you've added it to your groups.
+  messages. Keep `/setjoingroups` → **Enable**, so other communities can add it (see
+  "Many communities" below). Disable it only if the bot should serve your own groups alone.
 - Your numeric Telegram user id (for example from @userinfobot).
 
 ## 1. First deployment (about 15 minutes)
@@ -73,6 +74,30 @@ curl -X POST https://telepathy.<you>.workers.dev/admin/setup \
 
 Full history is kept by default. `/retention 365` (in the group) purges older messages daily,
 and `/retention 0` returns to keep-all.
+
+## Many communities on one bot
+
+Any community can use your bot, and setting it up takes them one step: **a group admin adds
+the bot to the group.**
+
+- **Connecting:** the bot connects itself, tells the group what it does (and how to opt out
+  with `/forget_me`), and sends that admin their guide privately. If the admin has never
+  written to the bot, a button in the group opens the guide. If someone who isn't an admin adds
+  it, a **Подключить** button appears that only an admin can press. `/enable` still works too.
+- **Who manages what:** a group's own Telegram admins manage that group. That covers its
+  settings (`/welcome`, `/hints`, `/routing`, `/retention`, `/disable`), removing messages, and
+  loading its past messages in the app (Пульт → История). You stay the operator
+  (`OWNER_IDS`) for the bot as a whole: the desk, partners and `/status`. Being the operator
+  gives no rights inside a group where you aren't an admin.
+- **Members stay apart:** people only search groups they belong to, and experts are only
+  suggested to people who share a group with them.
+- **Past messages:** the group's admin taps the button in their guide, signs in with their own
+  Telegram, and reading takes seconds. Set your Telegram app keys once
+  (`TG_API_ID` in `vars`, `npx wrangler secret put TG_API_HASH`, both from
+  <https://my.telegram.org>), and admins only need their phone number and the login code.
+  Your MCP server reads only your own groups, because it signs in as you.
+- **One thing that is still shared:** help requests (`/help …`) from every community arrive at
+  your desk.
 
 ## 3. Import past history
 
@@ -277,3 +302,37 @@ npm run db:migrate:remote && npm run deploy
 | in-process worker loop | cron trigger every minute |
 
 The Python implementation in `src/telepathy/` stays in the repo as the self-hosted alternative.
+
+## 13. Commands and cards in the product release
+
+Owners of a club (the person who connected the group):
+
+- `/settings` in the group: one card of toggles (answer repeated questions, ask people who know, welcome newcomers). Admins tap to change.
+- `/pulse`: last week's summary for each club. It also arrives each Monday at the digest hour, and "Share with the group" posts a line without private details.
+- `/union`: alliances with partner clubs, with credit both ways. Invite a club with the link it gives you.
+- `/ark`: the copy line, "Take everything" (the club's memory as one JSON file), and "Call everyone" once `/move https://new-address` is set.
+- `/knows`: what the bot keeps about you, with a button to remove each part.
+- `/name on` shows your first name on answer cards (off by default).
+
+Operator (the owner IDs in `OWNER_IDS`):
+
+- `/pilot`: requests, answers from memory, people asked, outcomes, and the median time to the first answer.
+- `/bridges`: requests sent to partner clubs, with "Send to the club again" and "Close".
+
+## 14. The landing page
+
+The landing page is served by this same Worker, so it takes no extra Worker slot. It is a static
+asset: `worker/public/index.html` with its pictures in `worker/public/img/`, answered at `/`
+without running Worker code. Every other path (`/telegram`, `/app`, `/health`, …) still reaches
+the Worker, and `npm run deploy` (or the deploy workflow) publishes the page with it.
+
+The page is edited in the `telepathy-landing` repository (`public/telepathy-nexus.html`, which
+Vercel also serves). After changing it there, copy it here:
+
+```sh
+cp ../telepathy-landing/public/telepathy-nexus.html worker/public/index.html
+cp ../telepathy-landing/public/img/*.webp worker/public/img/
+```
+
+To put it on a domain of its own, add a custom domain to the Worker in the Cloudflare dashboard
+(Workers & Pages → telepathy → Settings → Domains & Routes).

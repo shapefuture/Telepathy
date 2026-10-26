@@ -5,7 +5,8 @@
 
 import { brief } from "./ai/beam";
 import { ensureMember, langOf, memberByTg, readable, type Member } from "./acl";
-import { deskAction, deskActions, exchangeAction, forgetMissions, gapAction, jobLabel, memberAction, offerChoice, rateMission, short } from "./assist/actions";
+import { deskAction, deskActions, exchangeAction, forgetMissions, gapAction, jobLabel, memberAction, offerChoice, rateMission, short, type DeskScope } from "./assist/actions";
+import { clubMissions } from "./assist/club";
 import { addOffer, listOffers, MODES, withdrawOffer, type CommitmentMode } from "./assist/capacity";
 import { bucket, openGaps } from "./assist/gaps";
 import { A } from "./assist/i18n";
@@ -25,10 +26,18 @@ import { dispatchPending } from "./outbox";
 import { forgetMember } from "./rights";
 import { HISTORY_PAGE_MAX, historyGroups, perDay, resetHistory, stagePage } from "./history";
 import { mcpOn, startAuto } from "./history-mcp";
+import { isChatAdmin, managedChats } from "./admins";
 import { answer, parseFilters } from "./search";
-import { createTelegram, type Fetcher } from "./telegram";
+import { createTelegram, type Fetcher, type Telegram } from "./telegram";
 import { audit, DAY, HOUR, localParts, nowIso, safeEqual } from "./util";
 import { PAGE } from "./app-page";
+import { handleUpdate, type Update } from "./bot";
+import { openThread } from "./thread";
+import { renderThread, faceOf, namesFor } from "./thread-card";
+import { pulseCard } from "./pulse";
+import { alliancesOf, clubsOf } from "./alliance";
+import { topicCounts } from "./wow";
+import { arkLine, knowsCard } from "./ark";
 import { hydraAuthed } from "./hydra/portal";
 import { activeAttestations, addEmail, checkCode, ContinuityError, enrolFromTelegram, follows, forgetPerson, newRecoveryCodes, personalExport, personForMember, protection, refreshMembership, revokeEndpoint, setTopic, TOPICS, type Topic } from "./continuity/people";
 import { currentManifest } from "./continuity/identity";
@@ -90,6 +99,13 @@ function memberActs(m: Mission, hasPartners: boolean): string[] {
   return isTerminal(m) ? [] : ["x"];
 }
 
+/** Enabled groups this member can read, by name: the club chips and the group filter. */
+async function groupsOf(db: D1Database, m: Member): Promise<{ id: string; title: string | null }[]> {
+  const ids = [...(await readable(db, m))];
+  if (!ids.length) return [];
+  return (await db.prepare("SELECT id, title FROM sources WHERE enabled=1 AND id IN (SELECT value FROM json_each(?)) ORDER BY title").bind(JSON.stringify(ids)).all<{ id: string; title: string | null }>()).results;
+}
+
 const quotesOut = (qs: { text: string; label: string | null; event_at: string; url: string | null; tag?: string }[]) => qs.map(({ text, label, event_at, url, tag }) => ({ text, label, event_at, url, tag }));
 
 export async function handleApp(req: Request, env: Env, fetcher?: Fetcher, net?: Fetcher): Promise<Response> {
@@ -149,6 +165,8 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
     return out({
       lang,
       owner,
+      // Admins of a connected group get the desk tab with that group's History.
+      groupAdmin: owner || (await managedChats(app, user.id)).length > 0,
       label: app.env.COMMUNITY_LABEL || "Community",
       flags: Object.fromEntries(FLAGS.map((f) => [f, !!m[f as keyof Member]])),
       skills,
@@ -156,6 +174,8 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
       counts: { requests: n(req!), offers: n(offers!), invites: n(invites!) },
       startParam: user.startParam ?? null,
       brand: app.env.BRAND_NAME || "Миндальная связь",
+      // The clubs this person can read: the tabs' club chips (plan: several clubs, one header each).
+      groups: (await groupsOf(db, m)).map((g) => ({ id: g.id, title: g.title ?? "group" })),
     });
   }
   if (key === "POST settings") {
@@ -247,12 +267,81 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
     return notFound();
   }
 
-  // ---- search ------------------------------------------------------------------------------
-  if (key === "GET groups") {
-    const ids = [...(await readable(db, m))];
-    const { results } = await db.prepare("SELECT id, title, username FROM sources WHERE enabled=1 AND id IN (SELECT value FROM json_each(?)) ORDER BY title").bind(JSON.stringify(ids)).all<{ id: string; title: string | null; username: string | null }>();
-    return out(results.map((r) => ({ id: r.id, title: r.title ?? r.username ?? "group" })));
+  // ---- Нить: living request cards (plan: the main mechanism) ---------------------------------
+  if (key === "GET threads") {
+    const rows = (await db.prepare("SELECT id, state, outcome FROM threads WHERE member_id=? ORDER BY created_at DESC LIMIT 30").bind(m.id).all<{ id: string; state: string; outcome: string | null }>()).results;
+    const cards = [];
+    for (const r of rows) {
+      // The same card the bot shows in the chat, so the app and the chat can't disagree.
+      const c = await renderThread(db, r.id);
+      cards.push({ id: r.id, state: r.state, outcome: r.outcome, card: c ? { html: c.text, buttons: c.buttons.map((row) => row.map((b) => ({ text: b.text, data: b.callback_data }))) } : null });
+    }
+    return out(cards);
   }
+  if (key === "POST thread") {
+    if (!rateOk(user.id, Number(app.env.ASK_RATE_PER_MINUTE ?? "10") || 10)) return out({ error: T(lang).tooMany }, undefined, 429);
+    const allowed = await readable(db, m);
+    const group = typeof body.group === "string" && body.group ? body.group : null;
+    const scope = group ? (allowed.has(group) ? new Set([group]) : new Set<string>()) : allowed;
+    let q = String(body.q ?? "").slice(0, 300);
+    if (typeof body.since === "string" && /^\d{1,3}d$/.test(body.since)) q += ` since:${body.since}`;
+    if (body.file === true) q += " has:file";
+    const f = await parseFilters(db, scope, q);
+    if (!f.query) return out({ ok: false, error: "empty" }, undefined, 400);
+    const opened = await openThread(app, { memberId: m.id, tgId: m.tg_id, question: f.query, readable: f.readable, filters: f.filters, lang, sourceId: group }, new Date());
+    return out({ ok: !!opened, id: opened?.id ?? null, status: opened?.status ?? null });
+  }
+  if (key === "POST press") {
+    // Any button of a card or a message: the bot's own handler runs it, for this signed person only.
+    // The app has no callback to answer, so answers are dropped; the chat carries the messages.
+    const data = String(body.data ?? "").slice(0, 120);
+    if (!data) return out({ ok: false }, undefined, 400);
+    const quiet: App = { ...app, tg: { ...app.tg, call: (method: string, params: Record<string, unknown>) => (method === "answerCallbackQuery" ? Promise.resolve(true) : app.tg.call(method, params)) } as Telegram };
+    const keys = await handleUpdate(quiet, { update_id: 0, callback_query: { id: "app", from: { id: user.id, is_bot: false }, data } } as Update);
+    return out({ ok: true }, keys);
+  }
+
+  // ---- Созвездие: what the clubs talk about, and who knows it (plan: the Mini App) ----------
+  if (key === "GET constellation" && p[1]) {
+    const tax = TAXONOMY.get(p[1]);
+    if (!tax) return notFound();
+    const found = await answer(db, await readable(db, m), tax.en);
+    const authors = [...new Set(found.quotes.map((q) => q.author_id).filter((x): x is string => !!x))];
+    const names = await namesFor(db, authors);
+    return out({
+      label: labelIn(tax, lang),
+      quotes: found.quotes.slice(0, 3).map((q) => ({ text: q.text, label: q.label, when: q.event_at, url: q.url, who: q.author_id ? { face: faceOf(q.author_id), name: names.get(q.author_id) ?? null } : null })),
+      people: authors.map((id) => ({ face: faceOf(id), name: names.get(id) ?? null })),
+    });
+  }
+  if (key === "GET constellation") {
+    const counts = new Map<string, number>();
+    for (const g of await groupsOf(db, m)) for (const c of await topicCounts(db, g.id, 12)) counts.set(c.code, (counts.get(c.code) ?? 0) + c.n);
+    const stars = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 18);
+    return out(stars.map(([code, n]) => ({ code, label: labelIn(TAXONOMY.get(code)!, lang), n })));
+  }
+
+  // ---- Пульс and Союзы: read-only here; the buttons on them go through POST press -----------
+  if (key === "GET pulse") {
+    const rows = (await db.prepare("SELECT id, title FROM sources WHERE enabled=1 AND enabled_by=? ORDER BY title").bind(m.id).all<{ id: string; title: string | null }>()).results;
+    const since = nowIso(new Date(Date.now() - 7 * DAY));
+    const cards = [];
+    for (const r of rows) {
+      const c = await pulseCard(db, r.id, r.title ?? "", since, lang);
+      cards.push({ id: r.id, title: r.title ?? "", html: c.text, quiet: c.quiet, share: c.text && !c.quiet ? r.id : null });
+    }
+    return out(cards);
+  }
+  if (key === "GET ark") return out({ line: owner ? await arkLine(db, app.env, lang) : null });
+  if (key === "GET knows") {
+    // What the bot knows about this person, with a button per removable part (the same card as /knows).
+    const c = await knowsCard(db, m.id, lang);
+    return out({ html: c.text, buttons: c.buttons.map((row) => row.map((b) => ({ text: b.text, data: b.callback_data }))) });
+  }
+  if (key === "GET union") return out({ alliances: await alliancesOf(db, m.id), clubs: (await clubsOf(db, m.id)).map((c) => ({ id: c.id, title: c.title ?? "group" })) });
+
+  // ---- search ------------------------------------------------------------------------------
+  if (key === "GET groups") return out((await groupsOf(db, m)).map((r) => ({ id: r.id, title: r.title ?? "group" })));
   if (key === "POST ask") {
     if (!rateOk(user.id, Number(app.env.ASK_RATE_PER_MINUTE ?? "10") || 10)) return out({ error: T(lang).tooMany }, undefined, 429);
     // Filters can only narrow what the member may already read.
@@ -377,12 +466,24 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
     return out({ ok: r.ok }, r.keys);
   }
 
-  // ---- history import (owners): the browser reads Telegram, we only store the pages ------------
+  // ---- history import: the operator for every group, each group's admins for their own --------
+  // The browser reads Telegram with the admin's own login; we only store the pages.
   if (p[0] === "history") {
-    if (!owner) return out({ error: "owners only" }, undefined, 403);
-    if (key === "GET history") return out({ groups: await historyGroups(app.env, db), perDay: perDay(app.env), pageMax: HISTORY_PAGE_MAX, mcp: mcpOn(app.env) });
+    if (key === "GET history") {
+      const chats = owner ? undefined : await managedChats(app, user.id);
+      if (chats && !chats.length) return out({ error: "group admins only" }, undefined, 403);
+      return out({
+        groups: await historyGroups(app.env, db, new Date(), chats),
+        perDay: perDay(app.env),
+        pageMax: HISTORY_PAGE_MAX,
+        mcp: owner && mcpOn(app.env),
+        // The operator's Telegram app keys, if set: admins then sign in with just phone + code.
+        api: app.env.TG_API_ID && app.env.TG_API_HASH ? { id: Number(app.env.TG_API_ID), hash: app.env.TG_API_HASH } : null,
+      });
+    }
     const chatId = Number(body.chat_id);
     if (!Number.isSafeInteger(chatId)) return out({ error: "bad chat" }, undefined, 400);
+    if (!owner && !(await isChatAdmin(app, chatId, user.id))) return out({ error: "group admins only" }, undefined, 403);
     if (key === "POST history" && p[1] === "stage") {
       const r = await stagePage(db, user.id, chatId, body.page, body.messages, body.done === true);
       return out(r, undefined, r.ok ? 200 : r.error === "not_enabled" ? 404 : 400);
@@ -397,9 +498,19 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
     return notFound();
   }
 
-  // ---- operator desk -----------------------------------------------------------------------
+  // ---- desk: the operator's, or a group admin's view of their own groups' escalated requests ----
   if (p[0] !== "desk") return notFound();
-  if (!owner) return out({ error: "owners only" }, undefined, 403);
+  const clubs = owner ? [] : await managedChats(app, user.id);
+  if (!owner && !clubs.length) return out({ error: "owners only" }, undefined, 403);
+  const scope: DeskScope = owner ? "operator" : { clubs };
+  if (method === "GET" && !owner) {
+    const missions = [];
+    for (const x of await clubMissions(db, clubs)) {
+      const d = await deskActions(app, x, a, scope);
+      missions.push({ id: x.id, short: short(x.id), status: x.status, statusLabel: a.status(x.status), job: jobLabel(x.job_code, lang), summary: x.summary, hits: x.local_hits, actions: d.actions });
+    }
+    return out({ club: true, missions });
+  }
   if (method === "GET") {
     const { results: ms } = await db
       .prepare(
@@ -451,9 +562,10 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
   }
   const [, what, id = "", act = "", extra = ""] = p;
   if (what === "mission") {
-    const r = await deskAction(app, id, act, extra, lang);
+    const r = await deskAction(app, id, act, extra, lang, scope);
     return out({ ok: r.ok, msg: r.msg }, r.keys);
   }
+  if (!owner) return out({ error: "owners only" }, undefined, 403);
   if (what === "exchange") {
     const r = await exchangeAction(app, id, act, extra, lang);
     return out({ ok: r.ok, msg: r.msg }, r.keys);

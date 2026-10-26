@@ -31,7 +31,9 @@ describe("digest (K14: visible to all, opt-in)", () => {
     expect(r.keys).toHaveLength(1);
     const payload = (await env.DB.prepare("SELECT payload FROM effects").first<{ payload: string }>())!.payload;
     expect(payload).toContain("dentist");
-    expect(payload).toContain("Open questions (1)");
+    // «Главное»: a person sees their own unanswered question, with a Done button for it (plan: journey 7).
+    expect(payload).toContain("Your question, still unanswered");
+    expect(payload).toContain("gd:");
     // Second run: no duplicates, then done.
     expect((await digestStep(env.DB, now, "UTC", 0)).done).toBe(true);
     expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM effects WHERE key LIKE 'digest:%'").first<{ n: number }>())!.n).toBe(1);

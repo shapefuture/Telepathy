@@ -4,9 +4,10 @@
 // on to the next candidate (max 3). Every send goes through the effect ledger.
 
 import { defaultLang } from "./i18n";
-import { eligibleCandidates, labelsFor, matchSkills } from "./experts";
+import { eligibleCandidates, helpCount, labelsFor, matchSkills } from "./experts";
 import { T, type Lang } from "./i18n";
 import { effectStatement } from "./outbox";
+import { syncNeed } from "./thread-card";
 import { escapeHtml } from "./text";
 import { DAY, HOUR, addMs, audit, newId, nowIso } from "./util";
 
@@ -92,6 +93,11 @@ export async function requestIntro(
 }
 
 async function nextCandidate(db: D1Database, needId: string, now: string, notifyNone = true): Promise<{ introId: string | null; keys: string[] }> {
+  const r = await pickCandidate(db, needId, now, notifyNone);
+  return { introId: r.introId, keys: [...r.keys, ...(await syncNeed(db, needId, now))] };
+}
+
+async function pickCandidate(db: D1Database, needId: string, now: string, notifyNone: boolean): Promise<{ introId: string | null; keys: string[] }> {
   const need = await db.prepare("SELECT * FROM needs WHERE id=?").bind(needId).first<{ member_id: string; text: string; skills_json: string; status: string; expires_at: string }>();
   if (!need || !["open", "matching"].includes(need.status)) return { introId: null, keys: [] };
   const tried = new Set(
@@ -117,6 +123,8 @@ async function nextCandidate(db: D1Database, needId: string, now: string, notify
   const key = `intro:${id}:invite`;
   const cand = await contact(db, c.member_id);
   const cm = T(cand.lang);
+  // "Why you" (plan: journey 4): the expert sees why they were picked, never the asker's name.
+  const why = await helpCount(db, c.member_id, codes[0]!);
   await db.batch([
     db
       .prepare(
@@ -129,7 +137,7 @@ async function nextCandidate(db: D1Database, needId: string, now: string, notify
       .prepare("INSERT INTO audit(at, actor, action, subject, detail) VALUES (?,?,?,?,?)")
       .bind(now, "system", "intro.invite", id, JSON.stringify({ total: c.total, components: c.components })),
     effectStatement(db, key, cand.tg, {
-      text: cm.introInvite(escapeHtml(labelsFor(codes, cand.lang)), escapeHtml(need.text)),
+      text: cm.introInvite(escapeHtml(labelsFor(codes, cand.lang)), escapeHtml(need.text), why ? cm.introWhy(escapeHtml(labelsFor([codes[0]!], cand.lang)), why) : ""),
       buttons: [[btn(cm.bAccept, `i:${id}:accept`), btn(cm.bDecline, `i:${id}:decline`)]],
     }),
   ]);
@@ -156,7 +164,8 @@ export async function act(db: D1Database, introId: string, memberId: string, act
     .run();
   if (!r.meta.changes) return { reply: me.alreadyHandled, keys: [] };
   await audit(db, `intro.${event}`, memberId, introId);
-  return after(db, intro, to, actor, now);
+  const done = await after(db, intro, to, actor, now);
+  return { reply: done.reply, keys: [...done.keys, ...(await syncNeed(db, intro.need_id, now))] };
 }
 
 async function after(db: D1Database, intro: IntroRow, to: Status, actor: Actor, now: string): Promise<{ reply: string; keys: string[] }> {
@@ -178,6 +187,16 @@ async function after(db: D1Database, intro: IntroRow, to: Status, actor: Actor, 
   }
   if (to === "declined") {
     const { keys } = await nextCandidate(db, intro.need_id, now);
+    // "Не сейчас" carries no penalty. Two in a row: offer a pause, once, gently (plan: journey 4).
+    const streak = await db.prepare("SELECT status FROM intros WHERE candidate_id=? ORDER BY created_at DESC, rowid DESC LIMIT 2").bind(intro.candidate_id).all<{ status: string }>();
+    if (streak.results.length === 2 && streak.results.every((r) => r.status === "declined")) {
+      const key = `pause:${intro.candidate_id}:${intro.id}`;
+      const cm = T(cand.lang);
+      await db.batch([
+        effectStatement(db, key, cand.tg, { text: cm.pauseSuggest, buttons: [[btn(cm.bPause, "p:available:0")], [btn(cm.bKeepOn, "p:available:1")]] }),
+      ]);
+      keys.push(key);
+    }
     return { reply: me.introDeclinedReply, keys };
   }
   if (to === "mutually_confirmed") {
@@ -217,6 +236,7 @@ export async function cancelNeed(db: D1Database, requesterId: string, needId: st
     .prepare("UPDATE needs SET status='cancelled' WHERE id=? AND member_id=? AND status IN ('open','matching','no_match')")
     .bind(needId, requesterId)
     .run();
+  keys.push(...(await syncNeed(db, needId, now)));
   return { ok: res.meta.changes > 0 || live.results.length > 0, keys };
 }
 
@@ -236,7 +256,10 @@ export async function expireDue(db: D1Database, now = nowIso()): Promise<string[
     await audit(db, "intro.expire", "system", intro.id);
     keys.push(...(await nextCandidate(db, intro.need_id, now)).keys);
   }
+  // Only requests that expire in this sweep get a card edit; older expired ones were already shown.
+  const expiring = await db.prepare("SELECT id FROM needs WHERE status IN ('open','matching') AND expires_at <= ?").bind(now).all<{ id: string }>();
   await db.prepare("UPDATE needs SET status='expired' WHERE status IN ('open','matching') AND expires_at <= ?").bind(now).run();
+  for (const n of expiring.results) keys.push(...(await syncNeed(db, n.id, now)));
   return keys;
 }
 

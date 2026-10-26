@@ -20,9 +20,13 @@ export type MissionStatus =
   | "expired"
   | "failed_with_explanation";
 
-export type MissionActor = "member" | "operator" | "system" | "partner";
+/** "club": the admins of the member's own group, who answer their members before the operator does. */
+export type MissionActor = "member" | "operator" | "system" | "partner" | "club";
 
 export const MISSION_TERMINAL: ReadonlySet<MissionStatus> = new Set(["closed", "cancelled", "expired", "failed_with_explanation"]);
+
+/** Escalated requests that a person must answer: the member asked for more than the local memory gives. */
+export const MISSION_NEEDS_DESK: ReadonlySet<MissionStatus> = new Set(["external_permission_needed", "no_eligible_provider"]);
 
 /** Statuses where external offers may still be pending; a consent revocation invalidates them. */
 export const MISSION_EXTERNAL: ReadonlySet<MissionStatus> = new Set(["routed", "offers_available", "provider_selected", "pending_final_approvals"]);
@@ -56,7 +60,7 @@ export const MISSION_TRANSITIONS: Partial<Record<MissionStatus, { to: MissionSta
 const STOPS: Record<"cancelled" | "expired" | "failed_with_explanation", MissionActor[]> = {
   cancelled: ["member", "operator"],
   expired: ["system"],
-  failed_with_explanation: ["operator", "system"],
+  failed_with_explanation: ["operator", "system", "club"],
 };
 
 export function nextMission(from: MissionStatus, to: MissionStatus, actor: MissionActor): boolean {

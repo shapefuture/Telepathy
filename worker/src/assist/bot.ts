@@ -18,7 +18,9 @@ import { A, type AssistMessages } from "./i18n";
 import { defaultLang } from "../i18n";
 import { createDraft, getMission, isTerminal, MissionError, openMissions, report, type Mission } from "./missions";
 import { b } from "./notify";
-import { deskAction, deskActions, exchangeAction, forgetMissions, gapAction, jobLabel, memberAction, offerChoice, rateMission, short, type Outcome } from "./actions";
+import { deskAction, deskActions, exchangeAction, forgetMissions, gapAction, jobLabel, memberAction, offerChoice, rateMission, short, type DeskScope, type Outcome } from "./actions";
+import { clubMissions, inClubs } from "./club";
+import { managedChats } from "../admins";
 import { balances, formatAmount, parsePrice, recent, reverse } from "./ledger";
 import { bucket, openGaps } from "./gaps";
 import { applyRotation, refreshPartner, verifyRotation, type RotationProof } from "../federation/keys";
@@ -56,8 +58,8 @@ export async function listMissions(app: App, chat: number, mem: Member): Promise
 
 export { forgetMissions };
 
-async function deskCard(app: App, m: Mission, a: AssistMessages, lang: Lang): Promise<{ text: string; buttons: InlineButton[][] }> {
-  const { external, actions } = await deskActions(app, m, a);
+async function deskCard(app: App, m: Mission, a: AssistMessages, lang: Lang, scope: DeskScope = "operator"): Promise<{ text: string; buttons: InlineButton[][] }> {
+  const { external, actions } = await deskActions(app, m, a, scope);
   const buttons: InlineButton[][] = [];
   const rest: InlineButton[] = [];
   for (const x of actions) {
@@ -93,10 +95,14 @@ export async function assistCallback(app: App, cb: Cb, mem: Member | null, data:
   };
 
   if (kind === "g" || kind === "d" || kind === "x") {
-    if (!isOwner(app, cb.from.id)) {
+    // Desk buttons: the operator, or a group admin for the escalated requests of their own members.
+    const operator = isOwner(app, cb.from.id);
+    const clubs = !operator && kind === "d" ? await managedChats(app, cb.from.id) : [];
+    if (!operator && !clubs.length) {
       await toast();
       return [];
     }
+    const scope: DeskScope = operator ? "operator" : { clubs };
     if (kind === "g") {
       const r = await gapAction(app, id, act, lang);
       if (r.ok && act === "off") await send(app, chat, a.gapOfferHint(escapeHtml(id)));
@@ -105,14 +111,15 @@ export async function assistCallback(app: App, cb: Cb, mem: Member | null, data:
     if (kind === "x") return done(await exchangeAction(app, id, act, extra, lang));
     if (act === "show") {
       const m = await getMission(app.db, id);
-      await toast(m ? "" : a.notOpen);
-      if (m && !isTerminal(m)) {
-        const c = await deskCard(app, m, a, lang);
+      const visible = !!m && (scope === "operator" || (await inClubs(app.db, m, scope.clubs)));
+      await toast(visible ? "" : a.notOpen);
+      if (visible && m && !isTerminal(m)) {
+        const c = await deskCard(app, m, a, lang, scope);
         await send(app, chat, c.text, c.buttons.length ? c.buttons : undefined);
       }
       return [];
     }
-    return done(await deskAction(app, id, act, extra, lang));
+    return done(await deskAction(app, id, act, extra, lang, scope));
   }
   if (!mem) {
     await toast(a.notOpen);
@@ -161,6 +168,20 @@ export async function assistCallback(app: App, cb: Cb, mem: Member | null, data:
     await send(app, chat, a.onDesk(n > 0), n ? [[b(a.bPreview, `m:${id}:pv`)]] : undefined);
   }
   return r.keys;
+}
+
+/** /desk for a group admin: the escalated requests of members of their own groups. */
+export async function clubDeskCommand(app: App, chat: number, tgId: number, lang: Lang): Promise<string[]> {
+  const a = A(lang);
+  const clubs = await managedChats(app, tgId);
+  if (!clubs.length) return [];
+  const ms = await clubMissions(app.db, clubs);
+  if (!ms.length) await send(app, chat, a.clubDeskEmpty);
+  for (const m of ms) {
+    const c = await deskCard(app, m, a, lang, { clubs });
+    await send(app, chat, c.text, c.buttons.length ? c.buttons : undefined);
+  }
+  return [];
 }
 
 /** Owner commands in private chat. */

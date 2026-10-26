@@ -13,6 +13,8 @@ import { T } from "./i18n";
 import { DefiniteFailure, type InlineButton } from "./telegram";
 import { escapeHtml } from "./text";
 import { audit, DAY, localParts, nowIso } from "./util";
+import { wowCard } from "./wow";
+import { SUPERGROUP_MAX } from "./ingest";
 
 /** At ≈5 D1 rows per message this keeps imports inside the free plan's 100,000 writes a day. */
 export const HISTORY_PER_DAY = 15_000;
@@ -51,8 +53,7 @@ const keepFromOf = (retentionDays: number, now: Date) => (retentionDays > 0 ? Ma
  * The bot has stored everything since the group was first enabled, so history stops there.
  * Supergroups share one numbering, and INSERT OR IGNORE already skips messages the bot has.
  */
-/** Bot API ids of supergroups and channels are -10^12 - their channel id. */
-export const SUPERGROUP_MAX = -1_000_000_000_000;
+export { SUPERGROUP_MAX };
 
 export function liveFrom(chatId: number, firstEnabledIso: string): number {
   if (chatId <= SUPERGROUP_MAX) return Number.POSITIVE_INFINITY;
@@ -84,15 +85,17 @@ export function cleanMessages(raw: unknown, max = HISTORY_PAGE_MAX): HistoryMess
 }
 
 /** Enabled groups with their import progress, for the History screen. */
-export async function historyGroups(env: Env, db: D1Database, now = new Date()) {
+export async function historyGroups(env: Env, db: D1Database, now = new Date(), chats?: number[]) {
   const { results } = await db
     .prepare(
       "SELECT s.id, s.chat_id, s.title, s.retention_days, j.staged, j.imported, j.read_at, j.done_at, j.mcp_offset, " +
         "(SELECT COUNT(*) FROM passages p WHERE p.source_id=s.id AND p.removed_at IS NULL) AS stored, " +
         "(SELECT COALESCE(SUM(n),0) FROM history_pages h WHERE h.source_id=s.id AND h.body IS NOT NULL) AS pending, " +
         "(SELECT json_group_array(page) FROM history_pages h WHERE h.source_id=s.id) AS pages " +
-        "FROM sources s LEFT JOIN history_jobs j ON j.source_id=s.id WHERE s.enabled=1 ORDER BY s.enabled_at",
+        "FROM sources s LEFT JOIN history_jobs j ON j.source_id=s.id WHERE s.enabled=1 " +
+        "AND (?1 IS NULL OR s.chat_id IN (SELECT value FROM json_each(?1))) ORDER BY s.enabled_at",
     )
+    .bind(chats ? JSON.stringify(chats) : null)
     .all<{ chat_id: number; title: string | null; retention_days: number; staged: number | null; imported: number | null; read_at: string | null; done_at: string | null; mcp_offset: number | null; stored: number; pending: number; pages: string }>();
   const cap = perDay(env);
   const left = Math.max(0, cap - (await usedToday(db, today(now))));
@@ -242,9 +245,11 @@ async function finishHistory(app: App, now: Date): Promise<void> {
       app.db.prepare("DELETE FROM history_pages WHERE source_id=?").bind(r.source_id),
     ]);
     await audit(app.db, "history.import", String(r.owner_tg), r.source_id, { imported: r.imported });
-    const t = T(langOf(await memberByTg(app.db, r.owner_tg)));
+    // The owner gets the wow card: the import line, then what the community talks about (plan: journey 1).
+    const lang = langOf(await memberByTg(app.db, r.owner_tg));
+    const card = await wowCard(app.db, r.source_id, lang, T(lang).historyDone(escapeHtml(r.title ?? ""), r.imported));
     try {
-      await app.tg.sendMessage(r.owner_tg, t.historyDone(escapeHtml(r.title ?? ""), r.imported));
+      await app.tg.sendMessage(r.owner_tg, card.text, { buttons: card.buttons });
     } catch (e) {
       if (!(e instanceof DefiniteFailure)) throw e;
     }

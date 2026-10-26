@@ -30,9 +30,15 @@ export function lit(s) {
 
 const iso = (unix) => new Date(unix * 1000).toISOString().replace(/\.\d{3}Z$/, "Z");
 
+/** Supergroup and channel ids are at most -10^12; basic group ids number messages per account. */
+const SUPERGROUP_MAX = -1_000_000_000_000;
+
 /** Yields one SQL statement per line, in order. */
 export function* toSql(exp, chatId, now = new Date().toISOString().replace(/\.\d{3}Z$/, "Z")) {
   const src = `(SELECT id FROM sources WHERE chat_id=${Number(chatId)} AND enabled=1)`;
+  // Basic groups: the bot has stored everything since the group was first enabled, under its own ids.
+  // An export's copy of those messages would be stored a second time, so only older messages are kept.
+  const basic = Number(chatId) > SUPERGROUP_MAX;
   for (const m of exp.messages ?? []) {
     if (m.type !== "message") continue; // service messages carry no knowledge
     const text = plainText(m.text);
@@ -42,18 +48,21 @@ export function* toSql(exp, chatId, now = new Date().toISOString().replace(/\.\d
     const edit = m.edited_unixtime ? Number(m.edited_unixtime) : 0;
     const reply = m.reply_to_message_id ? Number(m.reply_to_message_id) : "NULL";
     const uid = typeof m.from_id === "string" && /^user\d+$/.test(m.from_id) ? Number(m.from_id.slice(4)) : null;
+    const live = basic
+      ? ` AND '${iso(unix)}' < (SELECT MIN(a.at) FROM audit a WHERE a.action='source.enable' AND a.subject=(SELECT id FROM sources WHERE chat_id=${Number(chatId)}))`
+      : "";
     if (uid) {
       yield `INSERT OR IGNORE INTO members(id, tg_id, created_at) SELECT lower(hex(randomblob(16))), ${uid}, '${now}' WHERE EXISTS ${src};`;
       yield `INSERT OR IGNORE INTO source_access(source_id, member_id, granted_at) SELECT ${src}, m.id, '${now}' FROM members m WHERE m.tg_id=${uid} AND m.collection_opt_out=0 AND EXISTS ${src};`;
       yield (
         `INSERT OR IGNORE INTO passages(source_id, msg_id, part, author_id, body, event_at, edit_version, reply_to) ` +
         `SELECT ${src}, ${id}, 0, m.id, ${lit(text)}, '${iso(unix)}', ${edit}, ${reply} FROM members m ` +
-        `WHERE m.tg_id=${uid} AND m.collection_opt_out=0 AND EXISTS ${src};`
+        `WHERE m.tg_id=${uid} AND m.collection_opt_out=0 AND EXISTS ${src}${live};`
       );
     } else {
       yield (
         `INSERT OR IGNORE INTO passages(source_id, msg_id, part, author_id, body, event_at, edit_version, reply_to) ` +
-        `SELECT ${src}, ${id}, 0, NULL, ${lit(text)}, '${iso(unix)}', ${edit}, ${reply} WHERE EXISTS ${src};`
+        `SELECT ${src}, ${id}, 0, NULL, ${lit(text)}, '${iso(unix)}', ${edit}, ${reply} WHERE EXISTS ${src}${live};`
       );
     }
   }

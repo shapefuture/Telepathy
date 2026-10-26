@@ -100,6 +100,22 @@ export interface Candidate {
 }
 
 /** Hard filters in SQL (consent, availability, skill, cap, no concurrent intro), then score. */
+/** Topics someone who shares a group with this member has offered to help with, most covered first. */
+export async function offeredSkills(db: D1Database, requesterId: string, limit = 8): Promise<string[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT s.code, COUNT(DISTINCT m.id) AS n
+       FROM skills s JOIN members m ON m.id = s.member_id
+       WHERE s.state = 'confirmed' AND m.discoverable = 1 AND m.available = 1 AND m.removed_at IS NULL AND m.collection_opt_out = 0 AND m.id != ?
+         AND EXISTS (SELECT 1 FROM source_access a JOIN source_access b ON a.source_id = b.source_id
+                     WHERE a.member_id = m.id AND b.member_id = ? AND a.revoked_at IS NULL AND b.revoked_at IS NULL)
+       GROUP BY s.code ORDER BY n DESC, s.code LIMIT ?`,
+    )
+    .bind(requesterId, requesterId, limit)
+    .all<{ code: string; n: number }>();
+  return results.map((r) => r.code).filter((c) => TAXONOMY.has(c));
+}
+
 export async function eligibleCandidates(
   db: D1Database,
   requesterId: string,

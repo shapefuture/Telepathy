@@ -56,6 +56,44 @@ describe("the living card", () => {
     expect(shown(calls, 1)).toContain("No one suitable has taken it yet");
   });
 
+  it("a question that names no topic: pick one from what the community offers, or learn how to change that", async () => {
+    const { app, calls } = testApp();
+    await enableGroup(app);
+    for (const tg of [1, 11]) await feed(app, groupMsg(tg, `hello from ${tg}`));
+    const sent = (text: string) => calls.filter((c) => c.method === "sendMessage" && c.params.chat_id === 1 && String(c.params.text).includes(text));
+
+    // Nobody has offered help yet: say so, and say how to change it.
+    await feed(app, dm(1, "something odd happened, who can look?"));
+    await feed(app, press(1, `t:${await threadOf(1)}:ask`));
+    expect(sent("Nobody in your community has offered").length).toBe(1);
+    expect(sent("couldn't match").length).toBe(0); // the old dead end is gone
+
+    // Someone offers accounting: the same question now gets a topic picker, and the pick asks them.
+    await env.DB.prepare("UPDATE members SET discoverable=1 WHERE tg_id=11").run();
+    await env.DB.prepare("INSERT INTO skills(member_id, code, state) VALUES (?, 'accounting', 'confirmed')").bind(await idOf(11)).run();
+    await feed(app, dm(1, "another odd thing, who can look?"));
+    const id = await threadOf(1);
+    await feed(app, press(1, `t:${id}:ask`));
+    const picker = sent("Who should I ask?").at(-1)!;
+    const choice = picker.params.reply_markup.inline_keyboard.flat().map((b: { callback_data: string }) => b.callback_data);
+    expect(choice).toEqual([`t:${id}:sk:accounting`]);
+    expect(choice[0].length).toBeLessThanOrEqual(64);
+    await feed(app, press(1, choice[0]));
+    expect(shown(calls, 1)).toContain("Asked 1 people");
+    expect(await q<{ skills_json: string }>("SELECT n.skills_json FROM needs n JOIN threads t ON t.need_id=n.id WHERE t.id=?", id)).toEqual({ skills_json: '["accounting"]' });
+    await feed(app, press(1, `t:${id}:sk:not_a_topic`)); // a forged topic changes nothing
+    expect((await q<{ n: number }>("SELECT COUNT(*) AS n FROM needs"))!.n).toBe(1);
+  });
+
+  it("'what can you do?' is about the bot: the guide, and no card", async () => {
+    const { app, calls } = await memoryWorld();
+    for (const text of ["Что ты умеешь", "что умеешь?", "кто ты", "help"]) await feed(app, dm(1, text));
+    expect((await q<{ n: number }>("SELECT COUNT(*) AS n FROM threads"))!.n).toBe(0);
+    expect(calls.filter((c) => c.method === "sendMessage" && c.params.chat_id === 1 && String(c.params.text).includes("How to use me")).length).toBe(4);
+    await feed(app, dm(1, "what can I bring to the meetup?")); // a real question still opens a card
+    expect((await q<{ n: number }>("SELECT COUNT(*) AS n FROM threads"))!.n).toBe(1);
+  });
+
   it("asks people, an expert accepts, the asker confirms, and the outcome and thanks close the loop", async () => {
     const { app, calls } = testApp();
     await enableGroup(app);

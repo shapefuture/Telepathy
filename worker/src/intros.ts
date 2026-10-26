@@ -43,6 +43,8 @@ export function next(status: Status, event: Event, actor: Actor): Status | null 
 }
 
 export class IntroError extends Error {} // user-facing, safe to show
+/** The text matched no skill: the caller can let the person pick the topic instead. */
+export class NoSkillError extends IntroError {}
 
 interface IntroRow {
   id: string;
@@ -69,11 +71,12 @@ export async function requestIntro(
   rawText: string,
   now = nowIso(),
   lang: Lang = "en",
+  pickedSkills?: string[],
 ): Promise<{ needId: string; introId: string | null; skills: string[]; keys: string[] }> {
   const text = rawText.split(/\s+/).join(" ").trim().slice(0, 500);
-  const skills = matchSkills(text);
+  const skills = pickedSkills?.length ? pickedSkills : matchSkills(text);
   if (!skills.length) {
-    throw new IntroError(T(lang).introNoSkill);
+    throw new NoSkillError(T(lang).introNoSkill);
   }
   const open = await db
     .prepare("SELECT COUNT(*) AS n FROM needs WHERE member_id=? AND created_at>=? AND status IN ('open','matching')")

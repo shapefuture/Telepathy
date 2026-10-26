@@ -7,6 +7,7 @@ import type { App } from "./bot";
 import { langOf, type Member } from "./acl";
 import { brief } from "./ai/beam";
 import { recordAnswer, vote } from "./feedback";
+import { bridgeFromThread, closeBridgeHelpful } from "./alliance";
 import { T, defaultLang, type Lang } from "./i18n";
 import { cancelNeed, IntroError, requestIntro } from "./intros";
 import { effectStatement } from "./outbox";
@@ -18,6 +19,8 @@ import { addMs, HOUR, newId, nowIso } from "./util";
 
 export interface Ask {
   memberId: string;
+  /** The club the question was asked in, when it was asked in a group (Мост uses it to pick a partner). */
+  sourceId?: string | null;
   /** The asker's private chat (their Telegram id): where the card lives. */
   tgId: number;
   question: string;
@@ -42,8 +45,8 @@ export async function openThread(app: App, ask: Ask, now = new Date()): Promise<
   const at = nowIso(now);
   const m = T(ask.lang);
   await db
-    .prepare("INSERT INTO threads(id, member_id, chat_id, question, state, rev, created_at, updated_at) VALUES (?,?,?,?, 'searching', 0, ?, ?)")
-    .bind(id, ask.memberId, ask.tgId, ask.question, at, at)
+    .prepare("INSERT INTO threads(id, member_id, chat_id, question, state, rev, source_id, created_at, updated_at) VALUES (?,?,?,?, 'searching', 0, ?, ?, ?)")
+    .bind(id, ask.memberId, ask.tgId, ask.question, ask.sourceId ?? null, at, at)
     .run();
   let placed: { message_id: number };
   try {
@@ -171,6 +174,26 @@ export async function threadAction(
       return [];
     }
     return askPeople(app, mem, t, now);
+  }
+  if (action === "bridge") {
+    // Explain first (plan: journey 6): only the request text crosses, nothing about the asker.
+    await app.tg.sendMessage(t.chat_id, m.bridgeConfirm, { buttons: [[btn(m.bBridgeGo, `t:${t.id}:bridgeok`)]] });
+    await toast("");
+    return [];
+  }
+  if (action === "bridgeok") {
+    if (t.bridge_id) {
+      await toast(m.notAvailable);
+      return [];
+    }
+    const bridged = await bridgeFromThread(db, mem, t.id, t.question, t.source_id ?? null, at);
+    if (!bridged.ok) {
+      await app.tg.sendMessage(t.chat_id, bridged.text ?? m.bridgeNone);
+      return [];
+    }
+    await paint(app, t.id);
+    await toast("");
+    return bridged.keys;
   }
   if (action === "cancel") {
     if (!t.need_id) return [];
@@ -339,4 +362,17 @@ export async function resend(app: App, threadId: string, memberId: string): Prom
   if (!r) return;
   const sent = await app.tg.sendMessage(r.chatId, r.text, { buttons: r.buttons });
   await app.db.prepare("UPDATE threads SET message_id=? WHERE id=?").bind(sent.message_id, threadId).run();
+}
+
+/** "Помогло" on a bridged request: the request closes, the helping club is credited, the card closes. */
+export async function bridgeHelpful(app: App, mem: Member, bridgeId: string, now = new Date()): Promise<{ ok: boolean; keys: string[] }> {
+  const at = nowIso(now);
+  const t = await app.db.prepare("SELECT id FROM threads WHERE bridge_id=? AND member_id=? AND outcome IS NULL").bind(bridgeId, mem.id).first<{ id: string }>();
+  const closed = await closeBridgeHelpful(app.db, mem, bridgeId, at);
+  if (!closed) return { ok: false, keys: [] };
+  if (t) {
+    await close(app.db, t.id, "solved", null, at);
+    await paint(app, t.id);
+  }
+  return { ok: true, keys: [] };
 }

@@ -42,6 +42,8 @@ export interface ThreadRow {
   followup_at: string | null;
   followup_sent_at: string | null;
   rev: number;
+  source_id?: string | null;
+  bridge_id?: string | null;
 }
 
 export interface Rendered {
@@ -135,8 +137,27 @@ export async function renderThread(db: D1Database, threadId: string, now = new D
     return card(lines.join("\n"), [[btn(m.bThatsIt, `t:${id}:ok`), btn(m.bAskPeople, `t:${id}:ask`)], [btn(m.bNotThat, `t:${id}:no`)]]);
   }
   if (t.state === "closed") return card(t.brief ?? m.threadStopped); // brief carries a note here, e.g. "no access"
+  if (t.bridge_id) {
+    // The request went to a partner club (Мост): the card follows that, with the same buttons as people.
+    const b = await db
+      .prepare("SELECT b.status, b.outcome, s.title AS to_title FROM bridges b JOIN sources s ON s.id = b.to_source_id WHERE b.id=?")
+      .bind(t.bridge_id)
+      .first<{ status: string; outcome: string | null; to_title: string | null }>();
+    const to = escapeHtml(b?.to_title ?? "");
+    if (b?.status === "open") return card(m.threadBridgeOpen(to), [[btn(m.bCancelAsk, `t:${id}:cancel`)]]);
+    if (b?.status === "helper_yes") return card(m.bridgeHelp(to), [[btn(m.bOpenContact, `bh:${t.bridge_id}:ask`)]]);
+    if (b?.status === "connected") return card(m.threadBridgeConnected(to), [[btn(m.bHelpfulBridge, `bh:${t.bridge_id}:helpful`)]]);
+    if (b?.status === "closed") return card(b.outcome === "helpful" ? m.threadBridgeClosed : m.threadBridgeEnded);
+    if (b?.status === "expired") return card(m.threadBridgeExpired(to), [[btn(m.bAskPeople, `t:${id}:ask`)]]);
+  }
   // asking / introduced
-  if (!t.need_id) return card(m.threadNothing, [[btn(m.bAskPeople, `t:${id}:ask`)]]);
+  if (!t.need_id) {
+    const clubs = await db
+      .prepare("SELECT 1 FROM alliances a WHERE a.status='active' AND (a.inviter_source_id IN (SELECT source_id FROM source_access WHERE member_id=? AND revoked_at IS NULL) OR a.partner_source_id IN (SELECT source_id FROM source_access WHERE member_id=? AND revoked_at IS NULL)) LIMIT 1")
+      .bind(t.member_id, t.member_id)
+      .first();
+    return card(m.threadNothing, [[btn(m.bAskPeople, `t:${id}:ask`)], ...(clubs ? [[btn(m.bBridge, `t:${id}:bridge`)]] : [])]);
+  }
   const need = await db.prepare("SELECT status FROM needs WHERE id=?").bind(t.need_id).first<{ status: string }>();
   const intro = await latestIntro(db, t.need_id);
   const asked = (await db.prepare("SELECT COUNT(*) AS n FROM intros WHERE need_id=?").bind(t.need_id).first<{ n: number }>())?.n ?? 0;
@@ -204,4 +225,22 @@ export async function syncNeed(db: D1Database, needId: string, now = nowIso()): 
 /** The people behind a helper's thank-you: how many people they've helped so far. */
 export async function helpedCount(db: D1Database, memberId: string): Promise<number> {
   return (await db.prepare("SELECT COUNT(*) AS n FROM intros WHERE candidate_id=? AND outcome='helpful'").bind(memberId).first<{ n: number }>())?.n ?? 0;
+}
+
+/** Queue a card edit for the thread following a bridge, after the bridge changed. */
+export async function bridgeCardKeys(db: D1Database, bridgeId: string, now = nowIso()): Promise<string[]> {
+  const t = await db
+    .prepare("SELECT id, chat_id, message_id, rev FROM threads WHERE bridge_id=? AND outcome IS NULL AND message_id IS NOT NULL")
+    .bind(bridgeId)
+    .first<{ id: string; chat_id: number; message_id: number; rev: number }>();
+  if (!t) return [];
+  const rev = t.rev + 1;
+  const key = `thread:${t.id}:${rev}`;
+  await db.batch([
+    db.prepare("UPDATE threads SET rev=?, updated_at=? WHERE id=?").bind(rev, now, t.id),
+    db
+      .prepare("INSERT OR IGNORE INTO effects(id, key, chat_id, payload, state, created_at, updated_at) VALUES (?,?,?,?, 'pending', ?, ?)")
+      .bind(crypto.randomUUID(), key, t.chat_id, JSON.stringify({ thread: t.id, edit: t.message_id }), now, now),
+  ]);
+  return [key];
 }

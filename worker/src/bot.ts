@@ -27,7 +27,9 @@ import type { Fetcher, InlineButton, Telegram } from "./telegram";
 import { DefiniteFailure } from "./telegram";
 import { forgetAdminCache, isChatAdminLive } from "./admins";
 import { askToConnect, botUsername, chatFromParam, connectGroup, sendGuide } from "./connect";
-import { answerPending, openThread, pilotText, resend, threadAction } from "./thread";
+import { answerPending, bridgeHelpful, openThread, pilotText, resend, threadAction } from "./thread";
+import { acceptInvite, alliancesOf, bridgeBoard, clubsOf, connectBridge, createInvite, deliverBridge, inviteCard, isLevel, LEVELS, levelWord, answerBridgeAsHelper, setAlliance, type Level } from "./alliance";
+import { bridgeCardKeys } from "./thread-card";
 import { pulseCard, shareToGroup } from "./pulse";
 import { helpedCount } from "./thread-card";
 import { SETTING_COLUMNS, settingsView, toggleSetting, type SettingColumn } from "./group-settings";
@@ -76,7 +78,7 @@ export interface Update {
 /** Kept for tests and docs: the English privacy notice. */
 export const PRIVACY_NOTICE = T("en").privacy;
 
-const PRIVATE_ONLY = new Set(["intro", "expert", "profile", "optin", "optout", "skills", "forget_me", "digest", "requests", "language", "catchup", "events", "pings", "app", "cancel", "desk", "offer", "partner", "fed", "ledger", "passport", "continuity", "destinations", "alert", "drill", "name", "pilot", "pulse"]);
+const PRIVATE_ONLY = new Set(["intro", "expert", "profile", "optin", "optout", "skills", "forget_me", "digest", "requests", "language", "catchup", "events", "pings", "app", "cancel", "desk", "offer", "partner", "fed", "ledger", "passport", "continuity", "destinations", "alert", "drill", "name", "pilot", "pulse", "union", "bridges"]);
 const GROUP_TYPES = new Set(["group", "supergroup"]);
 const btn = (text: string, data: string): InlineButton => ({ text, callback_data: data });
 const linkBtn = (text: string, href: string) => ({ text, url: href }) as unknown as InlineButton;
@@ -268,7 +270,7 @@ async function groupAsk(app: App, msg: TgMessage, question: string): Promise<str
     await reply(app, msg.chat.id, m.askUsage, undefined, msg.message_id);
     return [];
   }
-  const opened = await openThread(app, { memberId: asker.id, tgId: msg.from.id, question: f.query, readable: f.readable, filters: f.filters, lang });
+  const opened = await openThread(app, { memberId: asker.id, tgId: msg.from.id, question: f.query, readable: f.readable, filters: f.filters, lang, sourceId: source.id });
   if (opened) {
     const bot = await botUsername(app);
     const buttons = bot ? [[linkBtn(m.bOpenPrivately, `https://t.me/${bot}?start=q${opened.id}`)]] : undefined;
@@ -443,6 +445,15 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
   const pre = T(await langForUser(app, from));
   switch (cmd) {
     case "start": {
+      // An alliance invitation (Союз): the other club's owner sees what would cross, then accepts.
+      const invite = /^u([0-9a-f]{16})$/i.exec(args.trim());
+      if (invite) {
+        const who = (await memberByTg(app.db, from.id)) ?? (await ensureMember(app.db, from.id, undefined, from.language_code));
+        const view = await inviteCard(app.db, invite[1]!, langOf(who));
+        const mm = T(langOf(who));
+        await reply(app, chat, view ? view.text : mm.unionGone, view?.buttons.map((r) => r));
+        return [];
+      }
       // From a group's quiet reply ("open in private"): that request's card, again.
       const thread = /^q([0-9a-f]{32})$/i.exec(args.trim());
       if (thread) {
@@ -500,6 +511,23 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
   const lang = langOf(mem);
   const m = T(lang);
   if (cmd === "help") return cmdHelpNeed(app, chat, mem, args);
+  if (cmd === "union") {
+    const who = await memberByTg(app.db, from.id);
+    if (!who) return [];
+    const v = await unionView(app, who, lang);
+    await reply(app, chat, v.text, v.buttons);
+    return [];
+  }
+  if (cmd === "bridges") {
+    if (!isOwner(app, from.id)) return [];
+    const rows = await bridgeBoard(app.db, lang);
+    if (!rows.length) {
+      await reply(app, chat, pre.bridgesNone);
+      return [];
+    }
+    await reply(app, chat, [pre.bridgesTitle, ...rows.map((r) => r.line)].join("\n"), rows.filter((r) => r.open).map((r) => [btn(pre.bResend, `bq:${r.id}:send`), btn(pre.bCloseBridge, `bq:${r.id}:close`)]));
+    return [];
+  }
   if (cmd === "pulse") {
     if (!isOwner(app, from.id)) return [];
     const rows = (await app.db.prepare("SELECT id, title FROM sources WHERE enabled=1 AND enabled_by=? ORDER BY title").bind(mem.id).all<{ id: string; title: string | null }>()).results;
@@ -672,6 +700,23 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
   return [];
 }
 
+/** /union: this member's alliances, with the credit both ways, and the invitations they can send. */
+async function unionView(app: App, mem: Member, lang: Lang): Promise<{ text: string; buttons: InlineButton[][] }> {
+  const m = T(lang);
+  const rows = await alliancesOf(app.db, mem.id);
+  const lines = [m.unionTitle];
+  if (!rows.length) lines.push(m.unionNone);
+  const buttons: InlineButton[][] = [];
+  for (const r of rows) {
+    const status = r.status === "active" ? m.unionStatusActive : r.status === "paused" ? m.unionStatusPaused : m.unionStatusEnded;
+    lines.push(m.unionRow(escapeHtml(r.mine), escapeHtml(r.other), levelWord(m, r.level), status), m.unionCredit(r.helped, r.received));
+    if (r.status === "active") buttons.push([btn(m.bUnionPause, `ux:${r.id}:pause`), btn(m.bUnionEnd, `ux:${r.id}:end`)]);
+    if (r.status === "paused") buttons.push([btn(m.bUnionResume, `ux:${r.id}:resume`), btn(m.bUnionEnd, `ux:${r.id}:end`)]);
+  }
+  for (const c of await clubsOf(app.db, mem.id)) buttons.push([btn(m.bInviteFrom(c.title ?? ""), `uv:${c.id}`)]);
+  return { text: lines.join("\n"), buttons };
+}
+
 async function cmdSkills(app: App, chat: number, mem: Member, args: string, m: Messages): Promise<string[]> {
   const [verb = "", ...rest] = args.split(/\s+/);
   const what = rest.join(" ");
@@ -825,6 +870,97 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
       await app.tg.call("editMessageText", { chat_id: chat.id, message_id: cb.message.message_id, text: view.text, parse_mode: "HTML", reply_markup: { inline_keyboard: view.buttons } });
     }
     return [];
+  }
+  if (kind === "uv" || kind === "ui") {
+    // Invite: pick what crosses (uv), then make the invitation (ui). Only a club's own owner may.
+    const who = await memberByTg(app.db, cb.from.id);
+    const owned = who ? (await clubsOf(app.db, who.id)).some((c) => c.id === a) : false;
+    if (!who || !owned) {
+      await answerCb(pre.notAvailable);
+      return [];
+    }
+    await answerCb();
+    if (kind === "uv") {
+      const mm = T(langOf(who));
+      await app.tg.sendMessage(cb.from.id, mm.unionWhatCrosses, { buttons: LEVELS.map((l) => [btn(levelWord(mm, l), `ui:${a}:${l}`)]) });
+      return [];
+    }
+    const level = isLevel(b) ? b : ("requests" as Level);
+    const code = await createInvite(app.db, a, who.id, level, nowIso());
+    const bot = await botUsername(app);
+    const mm = T(langOf(who));
+    const link = bot ? `https://t.me/${bot}?start=u${code}` : null;
+    await app.tg.sendMessage(cb.from.id, link ? mm.unionInviteSent(link) : mm.unionInviteCode(code));
+    return [];
+  }
+  if (kind === "ac") {
+    // Accept (ac:<code>:<level>): the alliance runs at the smaller of the two levels.
+    const who = (await memberByTg(app.db, cb.from.id)) ?? (await ensureMember(app.db, cb.from.id, undefined, cb.from.language_code));
+    const r = await acceptInvite(app.db, a, who.id, isLevel(b) ? b : "requests", nowIso());
+    await answerCb(r.text ?? "", !r.ok);
+    if (r.ok && r.text) await app.tg.sendMessage(cb.from.id, r.text);
+    await clearButtons();
+    return r.keys;
+  }
+  if (kind === "ux") {
+    // Pause, resume or end an alliance (ux:<id>:pause|resume|end), by either side.
+    const who = await memberByTg(app.db, cb.from.id);
+    const act = b as "pause" | "resume" | "end";
+    if (!who || !["pause", "resume", "end"].includes(act)) {
+      await answerCb(pre.notAvailable);
+      return [];
+    }
+    const r = await setAlliance(app.db, who.id, a, act, nowIso());
+    await answerCb(r.ok ? pre.saved : pre.notAvailable);
+    return r.keys;
+  }
+  if (kind === "bh") {
+    // The bridge (Мост): a helper says yes or no; the asker connects; the asker says it helped.
+    const who = await memberByTg(app.db, cb.from.id);
+    if (!who) {
+      await answerCb(pre.notAvailable);
+      return [];
+    }
+    if (b === "yes") {
+      const r = await answerBridgeAsHelper(app.db, who, a, nowIso());
+      await answerCb(r.text, !r.ok);
+      await clearButtons();
+      return r.keys;
+    }
+    if (b === "no") {
+      await answerCb();
+      await clearButtons();
+      return [];
+    }
+    if (b === "ask") {
+      const r = await connectBridge(app.db, who, a, nowIso());
+      await answerCb(r.ok ? "" : r.text, !r.ok);
+      if (r.ok) await app.tg.sendMessage(cb.from.id, r.text);
+      await clearButtons();
+      return r.keys;
+    }
+    if (b === "helpful") {
+      const r = await bridgeHelpful(app, who, a, new Date());
+      await answerCb(r.ok ? pre.threadSolvedToast : pre.notAvailable);
+      return r.keys;
+    }
+    await answerCb();
+    return [];
+  }
+  if (kind === "bq") {
+    // Operator's bridge console: send the request to its club again, or close it.
+    if (!isOwner(app, cb.from.id)) {
+      await answerCb();
+      return [];
+    }
+    if (b === "send") {
+      const keys = await deliverBridge(app.db, a, nowIso());
+      await answerCb(keys.length ? pre.bridgeSent : pre.notAvailable);
+      return keys;
+    }
+    const closed = await app.db.prepare("UPDATE bridges SET status='closed', updated_at=? WHERE id=? AND status IN ('open','helper_yes')").bind(nowIso(), a).run();
+    await answerCb(closed.meta.changes ? pre.bridgeClosedByOperator : pre.notAvailable);
+    return closed.meta.changes ? await bridgeCardKeys(app.db, a, nowIso()) : [];
   }
   if (kind === "pu") {
     const mem2 = await memberByTg(app.db, cb.from.id);

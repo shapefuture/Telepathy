@@ -20,6 +20,7 @@ import { runEscrow } from "./hydra/escrow";
 import { deleteDue } from "./welcome";
 import { followupsDue } from "./thread";
 import { pulseStep } from "./pulse";
+import { expireBridges } from "./alliance";
 import { ingestHistory, remindHistory } from "./history";
 import { readViaMcp } from "./history-mcp";
 import { watchSeals } from "./hydra/fed";
@@ -162,6 +163,7 @@ export async function runCron(base: App, now = new Date()): Promise<Record<strin
   await step("welcome_cleanup", () => deleteDue(app, 5, now));
   await step("thread_followup", async () => (await followupsDue(app.db, nowIso(now))).length);
   await step("pulse", async () => (await pulseStep(app.db, now, timezone(app.env), digestHour(app.env))).length);
+  await step("bridges_expired", async () => (await expireBridges(app.db, nowIso(now))).length);
   await step("sent", () => dispatchPending(app.db, app.tg, Math.min(SEND_BUDGET, app.tg.calls + Math.max(0, app.budget!.left()))));
   // Cloudflare's docs disagree on the free-plan D1 cap (50 on the D1 page, 1000 for internal
   // services on the Workers page). Measure it, so a busy run is visible in the logs.

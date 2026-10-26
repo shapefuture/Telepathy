@@ -302,3 +302,19 @@ npm run db:migrate:remote && npm run deploy
 | in-process worker loop | cron trigger every minute |
 
 The Python implementation in `src/telepathy/` stays in the repo as the self-hosted alternative.
+
+## 13. Commands and cards in the product release
+
+Owners of a club (the person who connected the group):
+
+- `/settings` in the group: one card of toggles (answer repeated questions, ask people who know, welcome newcomers). Admins tap to change.
+- `/pulse`: last week's summary for each club. It also arrives each Monday at the digest hour, and "Share with the group" posts a line without private details.
+- `/union`: alliances with partner clubs, with credit both ways. Invite a club with the link it gives you.
+- `/ark`: the copy line, "Take everything" (the club's memory as one JSON file), and "Call everyone" once `/move https://new-address` is set.
+- `/knows`: what the bot keeps about you, with a button to remove each part.
+- `/name on` shows your first name on answer cards (off by default).
+
+Operator (the owner IDs in `OWNER_IDS`):
+
+- `/pilot`: requests, answers from memory, people asked, outcomes, and the median time to the first answer.
+- `/bridges`: requests sent to partner clubs, with "Send to the club again" and "Close".

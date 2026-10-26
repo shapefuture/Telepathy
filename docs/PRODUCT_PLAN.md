@@ -234,8 +234,8 @@ Warm, short, "ты". Features are named after what they do for people:
   button **"Подключить за 1 касание"**, which leads straight to adding the bot.
 - **Next:** a live demo of a thread: a card going through all the states on its own.
 - **Then:** «Пульс» as proof, then «Союз» clubs, then «Ковчег» as the guarantee.
-- **Fix the encoding:** the copied page text contains «Изменен��я правил», which reviewers also
-  noticed. It needs checking on the live site.
+- **Fix the encoding:** one heading in the copied landing text («Изменения правил») arrived
+  corrupted, which reviewers also noticed. The page lives in `telepathy-landing`, so it is fixed there.
 
 ## Build order (by priority)
 
@@ -281,3 +281,38 @@ replacing the chat, or a separate parent-chat product.
 - Every step across clubs is visible to the member and can be withdrawn.
 - An agent proposes and a person decides.
 - A newcomer is told in two lines what is stored and how to delete it.
+
+## Status: what is built
+
+The build order below is the plan. This section records what the repository does now, with the
+code that does it. Each build step is one commit on this branch, with its tests.
+
+| Step | Built | Where |
+|---|---|---|
+| 1. «Нить» and memory | The living card, answers with faces and months, «Спросить людей», three outcomes and 🙏, the quiet group rule, the settings card, the vocabulary, the wow card after an import with forgotten questions, `/pilot` | `worker/src/thread.ts`, `thread-card.ts`, `group-settings.ts`, `wow.ts` |
+| 2. Expert side and «Пульс» | Why-you on invites, «Не сейчас» without penalty and a pause after two in a row, quiet hours, thank-you words, the Monday summary with share, `/pulse` | `intros.ts`, `pulse.ts`, `thread.ts` |
+| 3. «Союз» and «Мост» | Invitations with the sharing level, pause/resume/end, bridged requests (text only), contacts on both yes, two-sided credit, operator `/bridges` | `alliance.ts` |
+| 4. Three-tab Mini App | Спросить, Нити (the bot's own cards, pressed through the same handler), «Созвездие», club chips, Telegram theme, motion | `app-page.ts`, `app.ts` |
+| 5. «Главное» and onboarding | The daily card with Done, the quiet day, newcomer questions and topics, a consent-based offer to ask | `glavnoe.ts`, `welcome.ts` |
+| 6. Gatherings | «Иду», «Не иду», who's going with reasons, the reminder, the mutual "keep in touch" | `gather.ts` |
+| 7. «Ковчег» | The status line from the daily copy, take everything, call everyone, «Что бот знает обо мне» | `ark.ts` |
+
+### Not built, and why
+
+- **Step 8, later when there is demand** (club subscriptions, MAX, personal agents over MCP and
+  `/a2a`): the plan defers it, so it is not started. Paid consultations already exist in the
+  capacity offers.
+- **«Пульс» as an image:** the Worker has no raster library. The Monday card is text, and the
+  Mini App draws the same numbers. Adding an image needs a rasteriser dependency, decided separately.
+- **The AI summary typing in live:** the summary appears with its card. Live typing is a motion
+  detail that is not built.
+- **Telegram's group repeat hint** (a single line and a link to the best answer for a repeated
+  question): the existing `/hints` covers it, still off by default.
+- **The landing page** lives in `telepathy-landing`, not in this repository, so it is not changed here.
+- **«Позвать всех»** sends Telegram messages only. There is no email path in this step.
+
+### Before this release reaches production
+
+Run `npm run db:migrate:remote`, which applies migrations 0016 to 0020. The new cron steps
+(`thread_followup`, `pulse`, `bridges_expired`, `gather_remind`, `gather_after`) need nothing else.
+Copies (the Ковчег line) appear once the existing escrow is configured.

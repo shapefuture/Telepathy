@@ -318,3 +318,21 @@ Operator (the owner IDs in `OWNER_IDS`):
 
 - `/pilot`: requests, answers from memory, people asked, outcomes, and the median time to the first answer.
 - `/bridges`: requests sent to partner clubs, with "Send to the club again" and "Close".
+
+## 14. The landing page
+
+The landing page is served by this same Worker, so it takes no extra Worker slot. It is a static
+asset: `worker/public/index.html` with its pictures in `worker/public/img/`, answered at `/`
+without running Worker code. Every other path (`/telegram`, `/app`, `/health`, …) still reaches
+the Worker, and `npm run deploy` (or the deploy workflow) publishes the page with it.
+
+The page is edited in the `telepathy-landing` repository (`public/telepathy-nexus.html`, which
+Vercel also serves). After changing it there, copy it here:
+
+```sh
+cp ../telepathy-landing/public/telepathy-nexus.html worker/public/index.html
+cp ../telepathy-landing/public/img/*.webp worker/public/img/
+```
+
+To put it on a domain of its own, add a custom domain to the Worker in the Cloudflare dashboard
+(Workers & Pages → telepathy → Settings → Domains & Routes).

@@ -32,7 +32,7 @@ describe("webhook endpoint", () => {
     await webhook({ update_id: 12, ...dm(5, "/ask where is the meetup venue?") }, undefined, t.fetcher);
     const last = shown(t.calls, 5); // the answer is the living card, edited in place
     expect(last).toContain("Hall B");
-    expect(last).toContain("t.me/c/1234/");
+    expect(last).toContain("t.me/c/1234567890/");
   });
 });
 

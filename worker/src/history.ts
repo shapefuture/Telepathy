@@ -14,6 +14,7 @@ import { DefiniteFailure, type InlineButton } from "./telegram";
 import { escapeHtml } from "./text";
 import { audit, DAY, localParts, nowIso } from "./util";
 import { wowCard } from "./wow";
+import { SUPERGROUP_MAX } from "./ingest";
 
 /** At ≈5 D1 rows per message this keeps imports inside the free plan's 100,000 writes a day. */
 export const HISTORY_PER_DAY = 15_000;
@@ -52,8 +53,7 @@ const keepFromOf = (retentionDays: number, now: Date) => (retentionDays > 0 ? Ma
  * The bot has stored everything since the group was first enabled, so history stops there.
  * Supergroups share one numbering, and INSERT OR IGNORE already skips messages the bot has.
  */
-/** Bot API ids of supergroups and channels are -10^12 - their channel id. */
-export const SUPERGROUP_MAX = -1_000_000_000_000;
+export { SUPERGROUP_MAX };
 
 export function liveFrom(chatId: number, firstEnabledIso: string): number {
   if (chatId <= SUPERGROUP_MAX) return Number.POSITIVE_INFINITY;

@@ -9,7 +9,7 @@ import { GROUP, enableGroup, testApp } from "./helpers";
 const EXPORT = {
   name: "G",
   type: "private_supergroup",
-  id: 1234,
+  id: 1234567890,
   messages: [
     { id: 1, type: "message", date_unixtime: "1767261600", from: "Alice", from_id: "user5", text: "Our accountant is Dana.\nShe's great" },
     { id: 2, type: "message", date_unixtime: "1767261700", from_id: "user6", text: ["see ", { type: "link", text: "https://example.org" }], reply_to_message_id: 1 },

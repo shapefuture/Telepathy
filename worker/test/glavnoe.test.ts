@@ -39,7 +39,7 @@ describe("«Главное»: the day's card", () => {
     const mine = groupMsg(1, "Where do we pay the membership fee?");
     await feed(app, mine);
     const msgId = (mine.message as { message_id: number }).message_id;
-    await feed(app, groupMsg(2, "Pay it at the front desk, cash or card", { reply_to_message: { message_id: msgId, chat: { id: -1001234, type: "supergroup" }, from: { id: 1, is_bot: false }, text: "Where do we pay" } }));
+    await feed(app, groupMsg(2, "Pay it at the front desk, cash or card", { reply_to_message: { message_id: msgId, chat: { id: -1001234567890, type: "supergroup" }, from: { id: 1, is_bot: false }, text: "Where do we pay" } }));
     const c = await card(1);
     expect(c!.text).toContain("Waiting for you");
     expect(c!.text).toContain("front desk");
@@ -71,7 +71,7 @@ describe("newcomer onboarding", () => {
   async function joinNina(app: ReturnType<typeof testApp>["app"]) {
     await feed(app, {
       chat_member: {
-        chat: { id: -1001234, type: "supergroup", title: "G" },
+        chat: { id: -1001234567890, type: "supergroup", title: "G" },
         from: { id: OWNER, is_bot: false },
         old_chat_member: { status: "left", user: { id: 9, is_bot: false, first_name: "Nina" } },
         new_chat_member: { status: "member", user: { id: 9, is_bot: false, first_name: "Nina" } },

@@ -110,7 +110,7 @@ describe("the living card", () => {
   it("in a group, the answer is the asker's card and the group sees one line", async () => {
     const { app, calls } = await memoryWorld();
     await feed(app, groupCmd(1, "/ask where is the venue?"));
-    const line = calls.filter((c) => c.method === "sendMessage" && c.params.chat_id === -1001234).at(-1)!;
+    const line = calls.filter((c) => c.method === "sendMessage" && c.params.chat_id === -1001234567890).at(-1)!;
     expect(line.params.text).toContain("sent them to you privately");
     expect(shown(calls, 1)).toContain("Hall B");
   });
@@ -124,7 +124,7 @@ describe("the living card", () => {
     };
     const app = makeApp(env, blocked);
     await feed(app, groupCmd(1, "/ask where is the venue?"));
-    expect(t.texts(-1001234).at(-1)).toContain("Hall B");
+    expect(t.texts(-1001234567890).at(-1)).toContain("Hall B");
   });
 
   it("/start q<id> shows the card again, privately, for its owner only", async () => {
@@ -156,9 +156,9 @@ describe("group settings card", () => {
     const { app, calls } = testApp();
     await enableGroup(app);
     await feed(app, groupCmd(OWNER, "/settings"));
-    expect(calls.filter((c) => c.method === "sendMessage" && c.params.chat_id === -1001234).at(-1)!.params.reply_markup.inline_keyboard).toHaveLength(3);
+    expect(calls.filter((c) => c.method === "sendMessage" && c.params.chat_id === -1001234567890).at(-1)!.params.reply_markup.inline_keyboard).toHaveLength(3);
     const tap = (user: number, data: string) => ({
-      callback_query: { id: String(Math.random()), from: { id: user, is_bot: false }, data, message: { message_id: 7, chat: { id: -1001234, type: "supergroup" } } },
+      callback_query: { id: String(Math.random()), from: { id: user, is_bot: false }, data, message: { message_id: 7, chat: { id: -1001234567890, type: "supergroup" } } },
     });
     await feed(app, tap(5, "st:hints:1")); // not an admin
     expect(calls.some((c) => c.method === "editMessageText")).toBe(false);

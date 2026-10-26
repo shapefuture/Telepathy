@@ -6,7 +6,7 @@ import { dispatchPending } from "../src/outbox";
 import type { Fetcher } from "../src/telegram";
 
 export const OWNER = 1000;
-export const GROUP = -1001234;
+export const GROUP = -1001234567890;
 
 export interface Call {
   method: string;

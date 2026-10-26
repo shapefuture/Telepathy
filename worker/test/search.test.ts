@@ -18,7 +18,7 @@ describe("hybrid fuzzy search", () => {
     const a = await answer(env.DB, await ctx(1), "who is the accountant for startups?");
     expect(a.status).toBe("answered");
     expect(a.quotes[0]!.text).toContain("Dana");
-    expect(a.quotes[0]!.url).toMatch(/^https:\/\/t\.me\/c\/1234\/\d+$/);
+    expect(a.quotes[0]!.url).toMatch(/^https:\/\/t\.me\/c\/1234567890\/\d+$/);
   });
 
   it("handles Russian inflection via prefix matching", async () => {

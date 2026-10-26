@@ -31,7 +31,7 @@ async function twoClubs() {
 /** OWNER invites club B's owner with what the link lets cross; B's owner accepts. */
 async function allied(level: "requests" | "experts" | "full" = "experts", accept: "requests" | "experts" | "full" = "experts") {
   const t = await twoClubs();
-  const clubA = (await q<{ id: string }>("SELECT id FROM sources WHERE chat_id=?", -1001234))!.id;
+  const clubA = (await q<{ id: string }>("SELECT id FROM sources WHERE chat_id=?", -1001234567890))!.id;
   await feed(t.app, press(OWNER, `uv:${clubA}`));
   await feed(t.app, press(OWNER, `ui:${clubA}:${level}`));
   const code = /start u([0-9a-f]{16})/.exec(String(sentTo(t.calls, OWNER).at(-1)!.params.text))![1]!;

@@ -9,7 +9,8 @@ import { brief } from "./ai/beam";
 import { recordAnswer, vote } from "./feedback";
 import { bridgeFromThread, closeBridgeHelpful } from "./alliance";
 import { T, defaultLang, type Lang } from "./i18n";
-import { cancelNeed, IntroError, requestIntro } from "./intros";
+import { cancelNeed, IntroError, NoSkillError, requestIntro } from "./intros";
+import { labelIn, offeredSkills, TAXONOMY } from "./experts";
 import { effectStatement } from "./outbox";
 import { answer, type AnswerStatus, type Quote, type SearchFilters } from "./search";
 import { applyCard, btn, helpedCount, outcomeButtons, OUTCOMES, renderThread, type Outcome, type ThreadRow, type ThreadState } from "./thread-card";
@@ -110,8 +111,12 @@ async function close(db: D1Database, threadId: string, outcome: Outcome, helperI
   return true;
 }
 
-/** "Спросить людей": the same consent-based introduction flow as /intro, started from the card. */
-async function askPeople(app: App, mem: Member, t: ThreadRow, now: Date): Promise<string[]> {
+/**
+ * "Спросить людей": the same consent-based introduction flow as /intro, started from the card.
+ * When the question names no known topic, the person picks one from the topics people in their
+ * groups have offered to help with (t:<id>:sk:<code>), instead of hitting a dead end.
+ */
+async function askPeople(app: App, mem: Member, t: ThreadRow, now: Date, picked?: string): Promise<string[]> {
   if (t.need_id) {
     await paint(app, t.id);
     return [];
@@ -119,7 +124,7 @@ async function askPeople(app: App, mem: Member, t: ThreadRow, now: Date): Promis
   const lang = langOf(mem);
   try {
     const at = nowIso(now);
-    const r = await requestIntro(app.db, mem.id, t.question, at, lang);
+    const r = await requestIntro(app.db, mem.id, t.question, at, lang, picked ? [picked] : undefined);
     await app.db
       .prepare("UPDATE threads SET need_id=?, state='asking', updated_at=?, rev=rev+1 WHERE id=?")
       .bind(r.needId, at, t.id)
@@ -128,6 +133,18 @@ async function askPeople(app: App, mem: Member, t: ThreadRow, now: Date): Promis
     await paint(app, t.id);
     return r.keys;
   } catch (e) {
+    if (e instanceof NoSkillError) {
+      const m = T(lang);
+      const codes = await offeredSkills(app.db, mem.id);
+      if (!codes.length) {
+        await app.tg.sendMessage(t.chat_id, m.askNoHelpers);
+        return [];
+      }
+      const rows: ReturnType<typeof btn>[][] = [];
+      for (let i = 0; i < codes.length; i += 2) rows.push(codes.slice(i, i + 2).map((c) => btn(labelIn(TAXONOMY.get(c)!, lang), `t:${t.id}:sk:${c}`)));
+      await app.tg.sendMessage(t.chat_id, m.askPickTopic, { buttons: rows });
+      return [];
+    }
     if (!(e instanceof IntroError)) throw e;
     await app.tg.sendMessage(t.chat_id, e.message);
     return [];
@@ -174,6 +191,15 @@ export async function threadAction(
       return [];
     }
     return askPeople(app, mem, t, now);
+  }
+  if (action === "sk") {
+    // A topic picked for "Спросить людей" when the question named none.
+    if (t.state === "closed" || t.outcome || !TAXONOMY.has(arg)) {
+      await toast(m.notAvailable);
+      return [];
+    }
+    await toast("");
+    return askPeople(app, mem, t, now, arg);
   }
   if (action === "bridge") {
     // Explain first (plan: journey 6): only the request text crosses, nothing about the asker.

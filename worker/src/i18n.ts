@@ -178,6 +178,8 @@ const EN = {
   introCreated: (labels: string) =>
     `Request created (<i>${labels}</i>). I've invited the best-matching available expert anonymously. You'll be asked to confirm before any contact is shared. Invitations expire after 72h; I'll try up to 3 experts.`,
   introNoMatch: (labels: string) => `No opted-in, available expert matches <i>${labels}</i> right now. Try again later or ask in the community.`,
+  askPickTopic: "Who should I ask? Pick the topic, and I'll find someone in your community who offered to help with it.",
+  askNoHelpers: "Nobody in your community has offered to help with a topic yet, so there's no one to ask for now. You can be the first: /skills. Or ask the community's team: /help <i>what you need</i>.",
   introNoSkill: "I couldn't match that to a skill. Try naming the area, e.g. <code>/intro accountant for a small startup</code>, or see /skills all.",
   introCap: (n: number, cap: number) => `You already have ${n} open requests this week (limit ${cap}). Cancel one with /requests or wait.`,
   introClosedNoMatch: "No available expert accepted your request this time, so it is closed. You can try again later or ask in the community.",
@@ -638,6 +640,8 @@ const RU: Messages = {
   introCreated: (labels: string) =>
     `Запрос создан (<i>${labels}</i>). Я анонимно пригласил самого подходящего эксперта. Перед обменом контактами вас попросят подтвердить. Приглашение действует 72 часа; я попробую до 3 экспертов.`,
   introNoMatch: (labels: string) => `Сейчас нет доступных экспертов по теме <i>${labels}</i>. Попробуйте позже или спросите в сообществе.`,
+  askPickTopic: "Кого спросить? Выберите тему, и я найду в сообществе того, кто вызвался в ней помогать.",
+  askNoHelpers: "Пока никто в сообществе не отметил, в чём готов помогать, так что спросить некого. Можно стать первым: /skills. Или написать команде сообщества: /help <i>что нужно</i>.",
   introNoSkill: "Не удалось сопоставить запрос с навыком. Назовите область, например <code>/intro бухгалтер для небольшого стартапа</code>, или посмотрите /skills all.",
   introCap: (n: number, cap: number) => `У вас уже ${n} открытых запроса на этой неделе (лимит ${cap}). Отмените один через /requests или подождите.`,
   introClosedNoMatch: "На этот раз ни один эксперт не принял запрос, поэтому он закрыт. Попробуйте позже или спросите в сообществе.",

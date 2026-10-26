@@ -169,6 +169,9 @@ export async function handleUpdate(app: App, u: Update): Promise<string[]> {
   return [];
 }
 
+/** Questions about the bot itself ("что ты умеешь", "кто ты", "help"): answered with the guide. */
+export const ABOUT_BOT = /^\s*(?:(?:а\s+)?(?:что|чё|че|чего)\s+(?:ты\s+)?(?:умеешь|можешь|делаешь)|кто\s+ты(?:\s+такой)?|ты\s+кто|(?:как\s+)?(?:тобой\s+)?пользоваться|помощь|помоги|инструкция|what\s+can\s+you\s+do|who\s+are\s+you|how\s+(?:do\s+i\s+)?use\s+(?:you|this)|help)\s*[?!.)]*\s*$/i;
+
 async function onMessage(app: App, msg: TgMessage, edited: boolean): Promise<string[]> {
   const command = edited ? null : parseCommand(msg, app.env.BOT_USERNAME);
   if (GROUP_TYPES.has(msg.chat.type)) {
@@ -215,7 +218,9 @@ async function onMessage(app: App, msg: TgMessage, edited: boolean): Promise<str
     if (!q || edited) return [];
     const asker = msg.from ? await memberByTg(app.db, msg.from.id) : null;
     const words = asker ? await answerPending(app, asker, q) : null; // the words for a 🙏 just pressed
-    return words ?? privateCommand(app, msg, "ask", q);
+    if (words) return words;
+    // "What can you do?" is about the bot, not a question for the community's memory.
+    return privateCommand(app, msg, ABOUT_BOT.test(q) ? "help" : "ask", ABOUT_BOT.test(q) ? "" : q);
   }
   return privateCommand(app, msg, command.cmd, command.args);
 }

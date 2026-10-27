@@ -3,7 +3,7 @@
 // the club talked about most. Nothing is invented: a quiet day says so, and a day with no activity
 // sends nothing. Lines marked done don't come back.
 
-import { parseEventDate, upcomingEvents } from "./features";
+import { eventUrl, parseEventDate, upcomingEvents } from "./features";
 import { citation } from "./ingest";
 import { T, type Lang } from "./i18n";
 import { escapeHtml, snippet } from "./text";
@@ -55,7 +55,7 @@ export async function sharedParts(db: D1Database, readable: Set<string>, start: 
   const week = now.getTime() + 7 * DAY;
   for (const e of await upcomingEvents(db, readable, now)) {
     if (Date.parse(e.starts_at) > week || out.meetings.length >= 3) continue;
-    const url = citation(e.chat_id, e.msg_id, e.username);
+    const url = eventUrl(e);
     const title = url ? `<a href="${escapeHtml(url)}">${escapeHtml(e.title)}</a>` : escapeHtml(e.title);
     out.meetings.push({ text: `${escapeHtml(fmt(e.starts_at, lang, tz))} — ${title}` });
   }

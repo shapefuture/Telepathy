@@ -6,10 +6,10 @@
 
 import { ensureMember, grantStatement, langOf, memberByTg, readable, revoke, VISIBILITIES, type Member, type Visibility } from "./acl";
 import { digestHour, ownerIds, timezone, type Env } from "./env";
-import { eligibleCandidates, label, labelIn, labelsFor, matchSkills, resolveSkill, TAXONOMY } from "./experts";
+import { eligibleCandidates, label, labelIn, labelsFor, matchSkills, resolveSkill, skillName, TAXONOMY } from "./experts";
 import { recordAnswer, vote } from "./feedback";
 import { build as buildDigest } from "./digest";
-import { answerSuggestion, detectEvent, markCanonical, toIcs, upcomingEvents } from "./features";
+import { answerSuggestion, detectEvent, eventUrl, markCanonical, toIcs, upcomingEvents } from "./features";
 import { maybeHint } from "./hints";
 import { defaultLang, langFromCode, T, type Lang, type Messages } from "./i18n";
 import { citation, docOffloadable, docSupported, EDGE_DOC_MAX_BYTES, enabledSource, ingestMessage, removeMessage, storeDocument, type TgMessage, type TgUser } from "./ingest";
@@ -408,7 +408,7 @@ function profileView(mem: Member, skills: { code: string; state: string }[], hel
   const lang = langOf(mem);
   const m = T(lang);
   const list =
-    skills.map((s) => `${TAXONOMY.get(s.code) ? labelIn(TAXONOMY.get(s.code)!, lang) : s.code}${s.state === "confirmed" ? "" : ` (${m.suggested})`}`).join(", ") ||
+    skills.map((s) => `${skillName(s.code, lang)}${s.state === "confirmed" ? "" : ` (${m.suggested})`}`).join(", ") ||
     m.noneYet;
   const yn = (v: number) => (v ? m.yes : m.no);
   const oo = (v: number) => (v ? m.on : m.off);
@@ -714,7 +714,7 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
       }
       const fmt = new Intl.DateTimeFormat(lang === "ru" ? "ru-RU" : "en-GB", { timeZone: timezone(app.env), dateStyle: "medium", timeStyle: "short" });
       const lines = evs.map((e) => {
-        const url = citation(e.chat_id, e.msg_id, e.username);
+        const url = eventUrl(e);
         return `• ${fmt.format(new Date(e.starts_at))} — ${url ? `<a href="${escapeHtml(url)}">${escapeHtml(e.title)}</a>` : escapeHtml(e.title)}`;
       });
       await reply(app, chat, `${m.eventsTitle}\n${lines.join("\n")}`);

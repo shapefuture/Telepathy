@@ -96,14 +96,25 @@ export async function pulseStep(db: D1Database, now: Date, tz: string, hour: num
   const since = nowIso(new Date(now.getTime() - 7 * DAY));
   const { results } = await db
     .prepare(
-      "SELECT s.id, s.title, m.tg_id, m.lang FROM sources s JOIN members m ON m.id = s.enabled_by WHERE s.enabled=1 AND m.removed_at IS NULL LIMIT 50",
+      // Groups already handled today are left out: the step runs every minute until midnight, and
+      // the week's numbers read every message of the week.
+      "SELECT s.id, s.title, m.tg_id, m.lang FROM sources s JOIN members m ON m.id = s.enabled_by WHERE s.enabled=1 AND m.removed_at IS NULL " +
+        "AND NOT EXISTS (SELECT 1 FROM effects e WHERE e.key = 'pulse:' || s.id || ':' || ?) LIMIT 50",
     )
+    .bind(day)
     .all<{ id: string; title: string | null; tg_id: number; lang: Lang | null }>();
   const keys: string[] = [];
   for (const s of results) {
     const key = `pulse:${s.id}:${day}`;
     const card = await pulseCard(db, s.id, s.title ?? "", since, s.lang ?? defaultLang());
-    if (!card.text) continue; // no messages all week: say nothing
+    if (!card.text) {
+      // No messages all week: say nothing, and remember that this group is done for today.
+      await db
+        .prepare("INSERT OR IGNORE INTO effects(id, key, chat_id, payload, state, created_at, updated_at) VALUES (?,?,?,'{}','skipped',?,?)")
+        .bind(crypto.randomUUID(), key, s.tg_id, nowIso(now), nowIso(now))
+        .run();
+      continue;
+    }
     const m = T(s.lang ?? defaultLang());
     const buttons: InlineButton[][] = card.quiet ? [] : [[{ text: m.bPulseShare, callback_data: `pu:${s.id}` }]];
     await effectStatement(db, key, s.tg_id, { text: card.text, buttons }).run();

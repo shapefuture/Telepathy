@@ -158,7 +158,7 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:200;o
 .bub.grey{background:var(--grey);color:#55504a;filter:grayscale(1)}
 .bub.grey s{text-decoration-thickness:2px}
 .b1{left:-6%;top:4%;rotate:-9deg}.b2{left:-8%;top:30%;rotate:5deg}.b3{left:-2%;top:56%;rotate:-4deg}
-.b4{background:var(--lime);right:-2%;top:2%;rotate:8deg}.b5{background:var(--pink);left:8%;bottom:6%;rotate:-6deg}.b6{background:var(--sky);color:#fff;left:30%;bottom:-6%;rotate:3deg}
+.b4{background:var(--lime);right:-2%;top:2%;rotate:8deg}.b5{background:var(--pink);left:-4%;bottom:22%;rotate:-6deg}.b6{background:var(--sky);color:var(--ink);right:-3%;top:34%;rotate:5deg}
 .hero-phone{position:absolute;right:-2%;bottom:-8%;z-index:2;transform:rotate(-4deg) scale(.8);transform-origin:100% 100%}
 .hero-phone .screen{height:500px}
 .typing{display:inline-flex;gap:4px;background:#fff;border-radius:16px;padding:11px 13px}
@@ -212,12 +212,15 @@ section{position:relative}
 .card:nth-child(1){--rot:-2deg;--pc:var(--pink2)}.card:nth-child(2){--rot:1.5deg;--pc:var(--lav)}.card:nth-child(3){--rot:-1deg;--pc:var(--sky2)}.card:nth-child(4){--rot:2deg;--pc:#F2FFC2}
 .card .stk{position:absolute;top:-16px;right:-10px;font:800 13px/1 var(--display);background:var(--pink);border:var(--line);border-radius:999px;padding:8px 11px;rotate:9deg;box-shadow:3px 3px 0 var(--ink);z-index:2}
 @media (max-width:980px){.pain{grid-template-columns:repeat(2,1fr)}}
-@media (max-width:560px){.pain{grid-template-columns:1fr;gap:30px;max-width:420px;margin:0 auto}}
+@media (max-width:560px){.pain{grid-template-columns:1fr;gap:22px;max-width:420px;margin:0 auto}
+  .card{display:grid;grid-template-columns:38% 1fr;gap:0 12px;align-items:center;padding:10px}
+  .card .pic{grid-row:span 2}.card h3{margin:2px 0 6px;font-size:18px;align-self:end}.card p{margin:0;font-size:14.5px;align-self:start}}
 
 /* chaos toy */
 .chaos-wrap{margin-top:56px;display:grid;grid-template-columns:auto 1fr;gap:28px;align-items:center}
 .chaos{position:relative;height:360px;border:var(--line);border-radius:26px;background:#fff;box-shadow:var(--shadow);overflow:hidden}
-.chaos .hint{position:absolute;inset:0;display:grid;place-items:center;text-align:center;font:700 28px/1.1 var(--hand);color:#9a92a8;padding:20px}
+.chaos .hint{position:absolute;left:0;right:0;top:34px;text-align:center;font:700 28px/1.1 var(--hand);color:#6b5fa0;padding:0 20px}
+.chaos .q.pre{background:var(--grey);color:#3a352f}
 .chaos .q{position:absolute;left:0;top:0;font:700 13px/1.15 var(--body);padding:8px 11px;border:2.5px solid var(--ink);border-radius:14px;background:#fff;white-space:nowrap;will-change:transform;box-shadow:2px 2px 0 var(--ink)}
 .chaos.sorted .q{transition:transform .9s var(--spring), background .4s;background:var(--lime)}
 .chaos .q b{display:none}
@@ -226,13 +229,13 @@ section{position:relative}
 .chaos.sorted .res{opacity:1;transform:none}
 .chaos-side h3{font-size:clamp(24px,3vw,34px);font-weight:900;max-width:12ch}
 .chaos-side p{margin:12px 0 20px;color:#3a352f;max-width:30ch}
-@media (max-width:760px){.chaos-wrap{grid-template-columns:1fr}.chaos{height:340px}}
+@media (max-width:760px){.chaos-wrap{grid-template-columns:1fr;gap:18px;margin-top:40px}.chaos{height:320px}}
 
 /* how */
 .how-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:start}
 .how-phone{position:sticky;top:96px;display:grid;place-items:center;padding:20px 0}
-.steps{display:flex;flex-direction:column;gap:18vh;padding:12vh 0 22vh}
-.step{position:relative;border:var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:22px 24px;background:var(--sc,#fff);opacity:.35;transform:scale(.95) rotate(var(--sr,0deg));transition:opacity .5s, transform .8s var(--spring)}
+.steps{display:flex;flex-direction:column;gap:14vh;padding:10vh 0 18vh}
+.step{position:relative;border:var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:22px 24px;background:var(--sc,#fff);opacity:.62;transform:scale(.97) rotate(var(--sr,0deg));transition:opacity .5s, transform .8s var(--spring)}
 .step.on{opacity:1;transform:scale(1) rotate(var(--sr,0deg))}
 .step:nth-child(1){--sc:var(--lav);--sr:-1.5deg}.step:nth-child(2){--sc:var(--sky2);--sr:1deg}.step:nth-child(3){--sc:#F2FFC2;--sr:-1deg}.step:nth-child(4){--sc:#FFE1C9;--sr:1.5deg}
 .step .n{display:inline-grid;place-items:center;width:52px;height:52px;border-radius:50%;background:var(--ink);color:var(--lime);font:900 20px/1 var(--display);margin-bottom:12px}
@@ -246,7 +249,7 @@ section{position:relative}
   .how-phone{top:62px;z-index:2;padding:6px 0 0}
   .how-phone .phone{transform:scale(.78);transform-origin:50% 0;margin-bottom:-118px}
   .how-phone .screen{height:470px}
-  .steps{gap:44vh;padding:6vh 0 30vh;position:relative;z-index:3}
+  .steps{gap:24vh;padding:4vh 0 20vh;position:relative;z-index:3}
   .how-note{position:static;display:block;margin-top:10px;text-align:left}
 }
 
@@ -256,7 +259,7 @@ section{position:relative}
 .bar{background:#fff;padding:14px 16px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #d6dee6}
 .bar .ava{width:38px;height:38px;border-radius:50%;background:var(--orange);display:grid;place-items:center;font:800 15px var(--display);color:#fff;border:2px solid var(--ink)}
 .bar b{display:block;font:700 15px/1.2 var(--body)}
-.bar small{color:#7d8792;font-size:12.5px}
+.bar small{color:#5d6670;font-size:12.5px}
 .chat{flex:1;padding:12px 12px 14px;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden}
 .it{display:grid;grid-template-rows:0fr;opacity:0;transform:translateY(16px) scale(.92);transform-origin:0 100%;transition:grid-template-rows .55s var(--spring-soft),opacity .25s,transform .7s var(--spring),margin .5s var(--spring-soft)}
 .it>div{overflow:hidden;min-height:0}
@@ -303,7 +306,7 @@ section{position:relative}
 .pcard h3{font-size:24px;margin-bottom:10px}
 .pcard p{color:#231f1b;font-size:16px}
 .pcard .chip{display:inline-block;margin-top:16px;font:700 13px/1 var(--body);padding:9px 12px;border-radius:999px;border:2px solid var(--ink);background:#fff;color:var(--ink)}
-.pcard:nth-child(1){--rot:-1.4deg;--pc:var(--lime)}.pcard:nth-child(2){--rot:1deg;--pc:var(--sky)}.pcard:nth-child(2) p,.pcard:nth-child(2) h3{color:#fff}.pcard:nth-child(3){--rot:-.6deg;--pc:var(--pink)}
+.pcard:nth-child(1){--rot:-1.4deg;--pc:var(--lime)}.pcard:nth-child(2){--rot:1deg;--pc:var(--sky)}.pcard:nth-child(3){--rot:-.6deg;--pc:var(--pink)}
 @media (max-width:900px){.people{grid-template-columns:1fr;max-width:520px;margin:0 auto}}
 
 /* compare (reference: "В чём разница?") */
@@ -382,11 +385,13 @@ section{position:relative}
 @media (max-width:860px){.status{grid-template-columns:1fr}}
 
 /* faq */
-.faq{max-width:880px}
+.tgbtn{display:block;margin-top:16px;padding:10px;border-radius:10px;background:rgba(20,18,16,.08);text-align:center;font:600 14px/1.2 var(--body);color:#2f2a25}
+.faq{display:grid;grid-template-columns:1fr 1fr;gap:0 18px;align-items:start}
+@media (max-width:860px){.faq{grid-template-columns:1fr}}
 .qa{border:var(--line);border-radius:20px;background:#fff;box-shadow:var(--shadow-sm);margin-bottom:16px;transition:background .3s, rotate .5s var(--spring)}
-.qa:nth-child(odd){rotate:-.4deg}.qa:nth-child(even){rotate:.5deg}
+
 .qa[open]{background:var(--paper2);rotate:0deg}
-.qa summary{list-style:none;cursor:pointer;padding:20px 22px;min-height:56px;font:800 clamp(16px,2vw,21px)/1.25 var(--display);display:flex;gap:16px;align-items:center;justify-content:space-between}
+.qa summary{list-style:none;cursor:pointer;padding:20px 22px;min-height:56px;font:700 clamp(16px,1.6vw,18.5px)/1.3 var(--body);display:flex;gap:16px;align-items:center;justify-content:space-between}
 .qa summary::-webkit-details-marker{display:none}
 .qa summary i{flex:none;width:34px;height:34px;border-radius:50%;border:2.5px solid var(--ink);display:grid;place-items:center;font-style:normal;font-size:20px;transition:transform .6s var(--spring),background .3s}
 .qa[open] summary i{transform:rotate(135deg);background:var(--lime)}
@@ -397,11 +402,11 @@ section{position:relative}
 
 /* final (reference: blue band) */
 .final{--bg:var(--sky);margin-top:40px}
-.final .wrap{display:grid;grid-template-columns:1fr auto;gap:30px;align-items:center}
+.final .wrap{display:grid;grid-template-columns:1fr;gap:30px;align-items:center}
 .final h2{font-size:clamp(36px,6.4vw,76px);color:var(--ink)}
 .final h2 .pop{display:inline-block;background:#fff;border:var(--line);border-radius:16px;padding:0 .16em .04em;box-shadow:6px 6px 0 var(--ink);rotate:-2deg;margin-top:.1em}
 .final .shout{font:700 clamp(34px,4.2vw,50px)/1 var(--hand);color:#fff;rotate:-4deg;display:inline-block;margin-bottom:22px;text-transform:uppercase;text-shadow:3px 3px 0 var(--ink)}
-.final p{font-size:19px;margin-top:16px;font-weight:600}
+.final p{font-size:19px;margin-top:26px;font-weight:600}
 .final img{width:min(330px,70vw);border:var(--line);border-radius:26px;box-shadow:var(--shadow)}
 @media (max-width:860px){.final .wrap{grid-template-columns:1fr}}
 footer{background:var(--ink);color:#bdb5a9;padding:34px 0 calc(34px + env(safe-area-inset-bottom));font-size:14px}
@@ -468,7 +473,7 @@ footer a{color:var(--lime);text-decoration:none}
 /* mascots: each one has a job */
 .mascot{position:absolute;pointer-events:none;z-index:2}
 .mascot svg{display:block;width:100%;overflow:visible}
-.mascot .lbl{position:absolute;white-space:nowrap;font:700 20px/1 var(--hand);color:var(--violet);rotate:-4deg}
+.mascot .lbl{position:absolute;white-space:nowrap;font:700 22px/1 var(--hand);color:#5b2fe0;rotate:-4deg}
 .snail{width:150px;right:4%;bottom:-6px;animation:crawl 26s linear infinite}
 @keyframes crawl{0%,100%{translate:0 0}50%{translate:-40vw 0}}
 .snail svg{animation:face 26s steps(1) infinite}
@@ -479,8 +484,9 @@ footer a{color:var(--lime);text-decoration:none}
 .bird{width:84px;right:-6px;top:-34px;animation:flap 1.4s ease-in-out infinite}
 @keyframes flap{0%,100%{translate:0 0}50%{translate:0 -8px}}
 .compare-quote{max-width:860px;font:800 clamp(20px,2.4vw,28px)/1.3 var(--display);letter-spacing:-.01em;margin:-18px 0 36px}
+.compare-quote.after-people{margin:48px 0 0}
 .compare-quote span{background:var(--lime);padding:0 .15em;border-radius:6px}
-@media (max-width:640px){.snail{width:110px}.frog{width:80px;top:-6px}.frog .lbl{display:none}}
+@media (max-width:640px){.snail .lbl{display:none}.snail{width:110px}.frog{width:80px;top:-6px}.frog .lbl{display:none}}
 
 /* offscreen sections rest: their endless animations pause until they come back into view */
 .off,.off *,.off *::before,.off *::after{animation-play-state:paused!important}
@@ -488,7 +494,7 @@ footer a{color:var(--lime);text-decoration:none}
   .snail,.snail svg,.bird{animation:none!important}
   .wd>span{transform:none!important}
   *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
-  .rv,.hero h1 .w,.it,.report li{opacity:1!important;transform:none!important}
+  .rv,.hero h1 .w,.it,.report li,.step{opacity:1!important;transform:none!important}
   .u-orange path{stroke-dashoffset:0!important}.hl::before{transform:rotate(-1.5deg)!important}
   .boil{filter:none}
 }
@@ -501,8 +507,6 @@ footer a{color:var(--lime);text-decoration:none}
   <defs>
     <filter id="boil" x="-20%" y="-20%" width="140%" height="140%"><feTurbulence id="boilT" type="fractalNoise" baseFrequency=".035" numOctaves="2" seed="1"/><feDisplacementMap in="SourceGraphic" scale="3.2"/></filter>
   </defs>
-  <symbol id="spark" viewBox="0 0 24 24"><path d="M12 0c1 7 5 11 12 12-7 1-11 5-12 12-1-7-5-11-12-12 7-1 11-5 12-12z"/></symbol>
-  <symbol id="zap" viewBox="0 0 30 48"><path d="M18 1 2 27h11l-4 20 19-28H16z" fill="#D7FF3B" stroke="#141210" stroke-width="3" stroke-linejoin="round"/></symbol>
 </svg>
 
 <header class="nav" id="nav">
@@ -518,7 +522,7 @@ footer a{color:var(--lime);text-decoration:none}
       <span>Миндальная<br>связь</span>
     </a>
     <nav class="links" aria-label="Разделы">
-      <a href="#how">Как работает</a><a href="#people">Люди</a><a href="#ark">Гарантия</a><a href="#pilot">Пилот</a>
+      <a href="#how">Как работает</a><a href="#people">Люди</a><a href="#pilot">Пилот</a><a href="#ark">Гарантия</a>
     </nav>
     <a class="btn sm mag nudge" href="https://t.me/telepathy_ai_bot?startgroup=landing" target="_blank" rel="noopener">Добавить в чат <span class="arr">→</span></a>
   </div>
@@ -527,8 +531,6 @@ footer a{color:var(--lime);text-decoration:none}
 <main id="top">
 <!-- ============ HERO ============ -->
 <section class="hero">
-  <svg class="star boil" style="--s:30px;left:2%;top:4%;--c:#7C4DFF"><use href="#spark"/></svg>
-  <svg class="bolt boil hero-bolt" viewBox="0 0 30 48"><use href="#zap"/></svg>
   <div class="wrap">
     <div>
       <span class="tag rv"><i></i>Бот для сообществ в Telegram</span>
@@ -536,7 +538,7 @@ footer a{color:var(--lime);text-decoration:none}
       <p class="lede rv" style="--d:.5s">Миндальная связь превращает переписку сообщества в помощника для каждого участника. Он находит ответ в истории, зовёт того, кто разбирается, и ведёт вопрос, пока задача не решена.</p>
       <ul class="wins rv" style="--d:.58s"><li>🔎 ответ из истории за секунды</li><li>🙋 знаток сообщества в одно касание</li><li>✅ вопрос доходит до «решено»</li></ul>
       <div class="cta rv" style="--d:.65s">
-        <a class="btn mag" href="https://t.me/telepathy_ai_bot?startgroup=landing" target="_blank" rel="noopener">Добавить в свой чат <span class="arr">→</span></a>
+        <a class="btn mag" href="https://t.me/telepathy_ai_bot?startgroup=landing" target="_blank" rel="noopener">Добавить в чат <span class="arr">→</span></a>
         <a class="btn ghost mag" href="#how">Как это работает</a>
       </div>
       <div class="proof rv" style="--d:.8s"><div class="faces" aria-hidden="true"><span style="background:var(--pink)">А</span><span style="background:var(--lime)">М</span><span style="background:var(--sky)">О</span><span style="background:var(--orange)">🐈</span></div><span>Закрытая бета. Подключаем первые сообщества, от книжных клубов до кружков основателей.</span></div>
@@ -547,8 +549,8 @@ footer a{color:var(--lime);text-decoration:none}
         <div class="screen">
           <div class="bar"><div class="ava">П</div><div><b>Книжный клуб «Полка»</b><small>214 участников</small></div></div>
           <div class="chat">
-            <div class="it" data-from="0"><div><div class="msg"><span class="who" style="color:#d9486c">Аня</span>кто за пиццу в четверг? 🍕</div></div></div>
-            <div class="it" data-from="1"><div><div class="msg"><span class="who" style="color:#2f8f5b">Дима</span>я!! и ананас не трогайте</div></div></div>
+            <div class="it" data-from="0"><div><div class="msg"><span class="who" style="color:#b8325a">Аня</span>кто за пиццу в четверг? 🍕</div></div></div>
+            <div class="it" data-from="1"><div><div class="msg"><span class="who" style="color:#23794a">Дима</span>я!! и ананас не трогайте</div></div></div>
             <div class="it" data-from="2"><div><div class="msg"><span class="who" style="color:#7C4DFF">Лена</span>А где запись прошлой встречи? Никак не найду 🥲</div></div></div>
             <div class="it" data-from="3" data-to="4"><div><div class="typing"><i></i><i></i><i></i></div></div></div>
             <div class="it" data-from="4"><div>
@@ -570,8 +572,6 @@ footer a{color:var(--lime);text-decoration:none}
       <div class="bub b4 float" style="--t:5.6s;--dl:-1s">нашёл в истории ✦</div>
       <div class="bub b5 float" style="--t:6.2s;--dl:-2.6s">Марк писал<br>это в марте</div>
       <div class="bub b6 float" style="--t:5.9s;--dl:-4s">спасибо!! 🙏</div>
-      <svg class="star boil" style="--s:40px;right:2%;top:-4%;--c:#FF7EC8;--t:4.2s"><use href="#spark"/></svg>
-      <svg class="star boil" style="--s:22px;left:4%;bottom:12%;--dl:-1.6s"><use href="#spark"/></svg>
     </div>
   </div>
 </section>
@@ -586,7 +586,6 @@ footer a{color:var(--lime);text-decoration:none}
 
 <!-- ============ PAIN ============ -->
 <section class="sec wavy pain-band">
-  <svg class="bolt boil" style="right:4%;top:40px;--s:40px;--dl:-1s" viewBox="0 0 30 48"><use href="#zap"/></svg>
   <div class="wrap">
     <div class="head"><div class="kick rv">знакомо?<svg viewBox="0 0 46 22"><path d="M2 12c10-8 18 8 28 0 5-4 9-4 14 0"/></svg></div><h2 class="rv">Узнаёте хотя бы одну ситуацию?</h2></div>
     <div class="pain">
@@ -601,7 +600,7 @@ footer a{color:var(--lime);text-decoration:none}
         <p>Так выглядит чат в обычный вторник. Потом за дело берётся бот.</p>
         <button class="btn lime mag" id="chaosBtn" type="button"><span>Устроить хаос</span> <span class="arr">🌪</span></button>
       </div>
-      <div class="chaos sc" id="chaos" aria-live="polite"><div class="hint">здесь пока тихо.<br>подозрительно тихо</div><div class="res" id="chaosRes"></div></div>
+      <div class="chaos sc" id="chaos" aria-live="polite"><div class="hint">обычный вторник.<br>нажмите кнопку</div><div class="q pre" style="transform:translate(14px,252px) rotate(-6deg)">где ссылка на запись?</div><div class="q pre" style="transform:translate(232px,266px) rotate(12deg)">ап</div><div class="q pre" style="transform:translate(150px,214px) rotate(4deg)">кто знает юриста?</div><div class="q pre" style="transform:translate(14px,176px) rotate(-4deg)">поищите выше</div><div class="q pre" style="transform:translate(170px,150px) rotate(-9deg)">кто-нибудь?..</div><div class="res" id="chaosRes"></div></div>
     </div>
   </div>
 </section>
@@ -609,14 +608,14 @@ footer a{color:var(--lime);text-decoration:none}
 <!-- ============ HOW ============ -->
 <section class="sec" id="how">
   <div class="wrap">
-    <div class="head"><div class="kick rv">как работает<svg viewBox="0 0 46 22"><path d="M2 12c10-8 18 8 28 0 5-4 9-4 14 0"/></svg></div><h2 class="rv">Один вопрос.<br>Одна живая карточка.</h2><p class="rv">На каждый вопрос бот присылает одну карточку и обновляет её, пока человек не получит ответ.</p><span class="note how-note">меньше стресса,<br>больше заботы о людях ♡</span></div>
+    <div class="head"><div class="kick rv">как работает<svg viewBox="0 0 46 22"><path d="M2 12c10-8 18 8 28 0 5-4 9-4 14 0"/></svg></div><h2 class="rv">Один вопрос.<br>Одна живая карточка.</h2><p class="rv">На каждый вопрос бот присылает одну карточку и обновляет её, пока человек не получит ответ.</p></div>
     <div class="how-grid">
       <div class="how-phone">
         <div class="phone" id="howPhone" data-step="0">
           <div class="screen">
             <div class="bar"><div class="ava" style="background:var(--violet)">К</div><div><b>Клуб основателей</b><small>88 участников</small></div></div>
             <div class="chat">
-              <div class="it on" data-from="0"><div><div class="msg"><span class="who" style="color:#2f8f5b">Саша</span>Кто может глянуть договор аренды? Нужен юрист 🙏</div></div></div>
+              <div class="it on" data-from="0"><div><div class="msg"><span class="who" style="color:#23794a">Саша</span>Кто может глянуть договор аренды? Нужен юрист 🙏</div></div></div>
               <div class="it" data-from="1"><div>
                 <div class="nit">
                   <div class="hd">🧵 Нить <em data-em>ищу</em></div>
@@ -647,7 +646,7 @@ footer a{color:var(--lime);text-decoration:none}
       <div class="kick rv">первая минута<svg viewBox="0 0 46 22"><path d="M2 12c10-8 18 8 28 0 5-4 9-4 14 0"/></svg></div>
       <h2 class="rv">Сначала бот покажет, что вы пропустили</h2>
       <p class="rv" style="font-size:19px;margin-top:18px;max-width:40ch;color:#3a352f">После подключения бот прочитает историю чата и соберёт вопросы, которые так и остались без ответа. Администратор увидит их первым и решит, что с ними делать.</p>
-      <div class="cta rv"><a class="btn lime mag" href="https://t.me/telepathy_ai_bot?startgroup=landing" target="_blank" rel="noopener">Проверить свой чат <span class="arr">→</span></a></div>
+      <div class="cta rv"><a class="btn mag" href="https://t.me/telepathy_ai_bot?startgroup=landing" target="_blank" rel="noopener">Проверить свой чат <span class="arr">→</span></a></div>
     </div>
     <div class="report sc tilt" id="report" style="--rot:-2deg">
       <span class="tape" aria-hidden="true"></span><span class="example">пример</span>
@@ -658,50 +657,58 @@ footer a{color:var(--lime);text-decoration:none}
         <li>Где презентация с прошлой лекции?<small>Тимур · в мае</small></li>
         <li>Кто едет на книжную ярмарку, давайте вместе?<small>Ира · в апреле</small></li>
       </ul>
-      <span class="btn sm" style="pointer-events:none">Разобрать вместе →</span>
+      <span class="tgbtn" aria-hidden="true">Разобрать вместе</span>
     </div>
   </div>
 </section>
 
 <!-- ============ PEOPLE ============ -->
 <section class="sec" id="people" style="padding-top:0">
-  <svg class="star boil" style="--s:36px;left:3%;top:10px;--c:#3BA4FF"><use href="#spark"/></svg>
   <div class="wrap">
     <div class="head"><div class="kick rv">люди<svg viewBox="0 0 46 22"><path d="M2 12c10-8 18 8 28 0 5-4 9-4 14 0"/></svg></div><h2 class="rv">Когда память молчит, помогают свои</h2></div>
     <div class="people">
       <article class="pcard sc tilt"><div class="pic"><img decoding="async" src="img/art-helper.webp" alt="Ноутбук с ножками даёт пять" loading="lazy" width="720" height="720"></div><div class="body"><h3>Знатоки сообщества</h3><p>Участники сами отмечают, в чём разбираются. Бот зовёт их точечно, учитывает тихие часы, а после двух отказов подряд сам предложит передохнуть.</p><span class="chip">«Не сейчас» без обид</span></div></article>
       <article class="pcard sc tilt" style="--d:.1s"><div class="pic"><img decoding="async" src="img/nexus-lounge.webp" alt="Администратор спокойно работает в кресле, рядом кот и маленький робот" loading="lazy" width="900" height="603"></div><div class="body"><h3>Администраторы видят первыми</h3><p>Если на вопрос никто не ответил, он попадает в Пульт администраторов этого сообщества. Познакомить человека с нужным знатоком можно в одно касание.</p><span class="chip">Пульт сообщества</span></div></article>
-      <article class="pcard sc tilt" style="--d:.2s;overflow:visible"><div class="mascot bird" aria-hidden="true"><svg class="boil" viewBox="0 0 84 70"><path d="M10 40q10-26 40-22 16 2 24 14-10-2-16 4 6 10-6 18-26 10-42-14z" fill="#FFF8EC" stroke="#141210" stroke-width="3"/><path d="M34 30q8-22 26-20-6 14-20 22" fill="#3BA4FF" stroke="#141210" stroke-width="3" stroke-linejoin="round"/><circle cx="62" cy="30" r="2.8"/><path d="M73 32l9-2-8 6" fill="#FF8A3D" stroke="#141210" stroke-width="2.5" stroke-linejoin="round"/><rect x="28" y="46" width="22" height="15" rx="2" fill="#D7FF3B" stroke="#141210" stroke-width="2.5"/><path d="M28 47l11 8 11-8" fill="none" stroke="#141210" stroke-width="2"/></svg></div><div class="pic" style="border-radius:19px 19px 0 0"><img decoding="async" src="img/art-people.webp" alt="Люди обнимают большое сердце" loading="lazy" width="720" height="720"></div><div class="body"><h3>Союз сообществ</h3><p>Подружите своё сообщество с соседним. Если у вас нет нужного специалиста, к ним уйдёт только текст вопроса, без имени. Контакты откроются, когда согласятся обе стороны.</p><span class="chip">Помощь ходит, люди остаются дома</span></div></article>
+      <article class="pcard sc tilt" style="--d:.2s;overflow:visible"><div class="pic" style="border-radius:19px 19px 0 0"><img decoding="async" src="img/art-people.webp" alt="Люди обнимают большое сердце" loading="lazy" width="720" height="720"></div><div class="body"><h3>Союз сообществ</h3><p>Подружите своё сообщество с соседним. Если у вас нет нужного специалиста, к ним уйдёт только текст вопроса, без имени. Контакты откроются, когда согласятся обе стороны.</p><span class="chip">Помощь ходит, люди остаются дома</span></div></article>
     </div>
+    <p class="compare-quote after-people rv">CRM помнит записи. Чат помнит шум. Миндальная связь помнит, <span>кто что знает</span> и куда идёт вопрос.</p>
   </div>
 </section>
 
-<!-- ============ COMPARE ============ -->
-<section class="sec" style="padding-top:0">
-  <div class="wrap">
-    <div class="head"><div class="kick rv">а теперь честно<svg viewBox="0 0 46 22"><path d="M2 12c10-8 18 8 28 0 5-4 9-4 14 0"/></svg></div><h2 class="rv">В чём разница?</h2></div>
-    <p class="compare-quote rv">CRM помнит записи. Чат помнит шум. Миндальная связь помнит, <span>кто что знает</span> и куда идёт вопрос.</p>
-    <div class="cmp">
-      <div class="side old sc tilt" style="--rot:-1deg"><h3>💬 Обычный чат</h3><ul><li>Вопрос тонет за пять минут</li><li>Ответ помнит только тот, кто ответил</li><li>Организатор отвечает за всех</li><li>Закроют чат, и пропадёт всё</li><li>Вместо ответа голосовое на семь минут</li></ul><img decoding="async" src="img/art-lost.webp" alt="" loading="lazy" width="720" height="720"></div>
-      <div class="side new sc tilt" style="--rot:1deg"><span class="hand">ваше сообщество.<br>ваши правила.</span><h3>🌰 Миндальная связь</h3><ul><li>Ответ находится в истории за секунды</li><li>Память сообщества доступна каждому</li><li>Помогают те, кто разбирается</li><li>Всё можно забрать одним файлом</li></ul><img decoding="async" src="img/art-freedom.webp" alt="Кот в очках с флагом" loading="lazy" width="720" height="720"></div>
+<!-- ============ PILOT ============ -->
+<section class="sec" id="pilot">
+  <div class="wrap pilot-wrap">
+    <div class="pass sc tilt" id="ticket">
+      <div class="pass-main">
+        <div class="pass-top"><span class="tag" style="background:#fff"><i></i>Пилот · первые 30 сообществ</span></div>
+        <div class="seal" role="img" aria-label="Месяц бесплатно"><svg viewBox="0 0 104 104" aria-hidden="true"><defs><path id="ring" d="M52 52m-37 0a37 37 0 1 1 74 0a37 37 0 1 1-74 0"/></defs><circle cx="52" cy="52" r="50" fill="#FF7EC8" stroke="#141210" stroke-width="3"/><circle cx="52" cy="52" r="26" fill="#141210"/><text font-family="Unbounded,sans-serif" font-weight="900" font-size="10.5" fill="#141210" letter-spacing="1"><textPath href="#ring" textLength="228" lengthAdjust="spacing">МЕСЯЦ БЕСПЛАТНО ✦ 30 ДНЕЙ ✦</textPath></text><text x="52" y="58" text-anchor="middle" font-family="Unbounded,sans-serif" font-weight="900" font-size="17" fill="#D7FF3B">0 ₽</text></svg></div>
+        <h2>Месяц <em>на&nbsp;пробу</em></h2>
+        <p class="sub">Подключите бота и посмотрите, сколько вопросов в сообществе закроется само. Он щёлкает их как орешки: профессиональная деформация.</p>
+        <ul>
+          <li>Подключение одним касанием, без настроек</li>
+          <li>История чата загружается в пару касаний</li>
+          <li>Каждый понедельник «Пульс»: сколько вопросов закрыто и кому сказать спасибо</li>
+          <li>Карта не нужна. Через месяц один вопрос: продолжаем?</li>
+          <li>Не понравилось? Заберёте всё и уйдёте</li>
+          <li>Вы решаете, что бот делает в группе</li>
+        </ul>
+        <a class="btn mag" href="https://t.me/telepathy_ai_bot?startgroup=pilot" target="_blank" rel="noopener">Забрать пилот <span class="arr">→</span></a>
+        <p class="fine">Добавить бота может администратор группы. Остальным он покажет кнопку «Подключить» для админа.</p>
+      </div>
+      <div class="pass-stub" role="group" aria-label="Корешок билета: 0 рублей за 30 дней">
+        <span class="stub-k">вход для одного сообщества</span>
+        <div class="price"><b>0&nbsp;₽</b><span>за 30 дней</span></div>
+        <span class="stub-joke">дешевле, чем пицца в&nbsp;четверг</span>
+        <div class="barcode" aria-hidden="true"></div>
+        <span class="stub-k">обмену на орехи не подлежит</span>
+      </div>
     </div>
-  </div>
-</section>
 
-<!-- ============ PARADOX ============ -->
-<section class="paradox" aria-label="Платформы меняются. Связь остаётся.">
-  <div class="wrap">
-    <p><span class="shaky" data-t="Платформы меняются.">Платформы меняются.</span></p>
-    <p><span class="steady">Связь остаётся.</span></p>
-    <small class="rv">а помощь ходит между сообществами, пока участники остаются дома ♡</small>
   </div>
 </section>
 
 <!-- ============ ARK ============ -->
 <section class="sec ark" id="ark">
-  <div class="mascot snail" aria-hidden="true"><span class="lbl">улитка-архивариус: медленно, зато ничего не теряет</span><svg class="boil" viewBox="0 0 150 90"><path d="M8 82h104q20 0 24-14l-6-2q-6 8-20 8H24z" fill="#FFC9A3" stroke="#FFF8EC" stroke-width="3"/><path d="M120 66q2-18 8-30M128 64q8-14 18-22" stroke="#FFF8EC" stroke-width="3" stroke-linecap="round" fill="none"/><circle cx="128" cy="34" r="4" fill="#FFF8EC"/><circle cx="147" cy="40" r="4" fill="#FFF8EC"/><circle cx="62" cy="46" r="34" fill="#7C4DFF" stroke="#FFF8EC" stroke-width="3"/><path d="M62 46m-6 0a6 6 0 1 1 12 0a12 12 0 1 1-24 0a18 18 0 1 1 36 0a24 24 0 1 1-48 0" fill="none" stroke="#D7FF3B" stroke-width="3" stroke-linecap="round"/><rect x="44" y="2" width="30" height="20" rx="3" fill="#D7FF3B" stroke="#FFF8EC" stroke-width="2.5"/><path d="M44 9h30" stroke="#141210" stroke-width="2"/></svg></div>
-  <svg class="star boil" style="--s:46px;right:8%;top:10%;--c:#D7FF3B"><use href="#spark"/></svg>
-  <svg class="star boil" style="--s:24px;left:5%;bottom:12%;--c:#FF7EC8;--dl:-1s"><use href="#spark"/></svg>
   <div class="wrap ark-grid">
     <div class="ark-art rv" style="--rot:-3deg"><img decoding="async" src="img/art-freedom.webp" alt="Кот в очках с флагом стоит на горе старых телефонов" loading="lazy" width="720" height="720"></div>
     <div>
@@ -714,39 +721,6 @@ footer a{color:var(--lime);text-decoration:none}
         <div class="sc"><span class="ic">🔍</span><span><b>Каждый видит, что о нём известно</b><p>Одна кнопка показывает всё, что бот хранит о человеке. Вторая это удаляет.</p></span></div>
       </div>
     </div>
-  </div>
-</section>
-
-<!-- ============ PILOT ============ -->
-<section class="sec" id="pilot">
-  <svg class="bolt boil" style="left:6%;top:90px;--s:44px" viewBox="0 0 30 48"><use href="#zap"/></svg>
-  <div class="wrap pilot-wrap">
-    <div class="pass sc tilt" id="ticket">
-      <div class="pass-main">
-        <div class="pass-top"><span class="tag" style="background:#fff"><i></i>Пилот · первые 30 сообществ</span><span class="pass-no">№ 0001</span></div>
-        <div class="seal" aria-label="Месяц бесплатно"><svg viewBox="0 0 104 104" aria-hidden="true"><defs><path id="ring" d="M52 52m-37 0a37 37 0 1 1 74 0a37 37 0 1 1-74 0"/></defs><circle cx="52" cy="52" r="50" fill="#FF7EC8" stroke="#141210" stroke-width="3"/><circle cx="52" cy="52" r="26" fill="#141210"/><text font-family="Unbounded,sans-serif" font-weight="900" font-size="10.5" fill="#141210" letter-spacing="1"><textPath href="#ring" textLength="228" lengthAdjust="spacing">МЕСЯЦ БЕСПЛАТНО ✦ 30 ДНЕЙ ✦</textPath></text><text x="52" y="58" text-anchor="middle" font-family="Unbounded,sans-serif" font-weight="900" font-size="17" fill="#D7FF3B">0 ₽</text></svg></div>
-        <h2>Месяц <em>на&nbsp;пробу</em></h2>
-        <p class="sub">Подключите бота и посмотрите, сколько вопросов в сообществе закроется само. Он щёлкает их как орешки: профессиональная деформация.</p>
-        <ul>
-          <li>Подключение одним касанием, без настроек</li>
-          <li>История чата загружается в пару касаний</li>
-          <li>Каждый понедельник «Пульс»: сколько вопросов закрыто и кому сказать спасибо</li>
-          <li>Через месяц один вопрос: продолжаем?</li>
-          <li>Не понравилось? Заберёте всё и уйдёте</li>
-          <li>Вы решаете, что бот делает в группе</li>
-        </ul>
-        <a class="btn mag" href="https://t.me/telepathy_ai_bot?startgroup=pilot" target="_blank" rel="noopener">Забрать пилот <span class="arr">→</span></a>
-        <p class="fine">Добавить бота может администратор группы. Остальным он покажет кнопку «Подключить» для админа.</p>
-      </div>
-      <div class="pass-stub" aria-label="Корешок билета: 0 рублей за 30 дней">
-        <span class="stub-k">вход для одного сообщества</span>
-        <div class="price"><b>0&nbsp;₽</b><span>за 30 дней</span></div>
-        <span class="stub-joke">дешевле, чем пицца в&nbsp;четверг</span>
-        <div class="barcode" aria-hidden="true"></div>
-        <span class="stub-k">обмену на орехи не подлежит</span>
-      </div>
-    </div>
-
   </div>
 </section>
 
@@ -767,7 +741,7 @@ footer a{color:var(--lime);text-decoration:none}
 <!-- ============ FAQ ============ -->
 <section class="sec" style="padding-top:0">
   <div class="wrap">
-    <div class="head"><div class="mascot frog" aria-hidden="true"><span class="lbl">лягушка согласия говорит только «да» или «нет»</span><svg class="boil" viewBox="0 0 110 90"><ellipse cx="55" cy="60" rx="46" ry="28" fill="#5BE3B0" stroke="#141210" stroke-width="3.5"/><circle cx="33" cy="30" r="15" fill="#5BE3B0" stroke="#141210" stroke-width="3.5"/><circle cx="77" cy="30" r="15" fill="#5BE3B0" stroke="#141210" stroke-width="3.5"/><circle cx="33" cy="30" r="8" fill="#fff" stroke="#141210" stroke-width="2"/><circle cx="77" cy="30" r="8" fill="#fff" stroke="#141210" stroke-width="2"/><circle cx="35" cy="31" r="3.5"/><circle cx="79" cy="31" r="3.5"/><path d="M28 62q27 18 54 0" fill="none" stroke="#141210" stroke-width="3" stroke-linecap="round"/><circle cx="24" cy="54" r="5" fill="#FF7EC8" opacity=".6"/><circle cx="86" cy="54" r="5" fill="#FF7EC8" opacity=".6"/></svg></div><div class="kick rv">вопросы<svg viewBox="0 0 46 22"><path d="M2 12c10-8 18 8 28 0 5-4 9-4 14 0"/></svg></div><h2 class="rv">Что обычно спрашивают <span class="hand" style="color:var(--violet);font-size:.72em;display:inline-block;rotate:-4deg">(да, мы их тоже собрали)</span></h2></div>
+    <div class="head"><div class="kick rv">вопросы<svg viewBox="0 0 46 22"><path d="M2 12c10-8 18 8 28 0 5-4 9-4 14 0"/></svg></div><h2 class="rv">Что обычно спрашивают</h2></div>
     <div class="faq">
       <details class="qa sc"><summary>Бот будет писать в группу без спроса?<i>+</i></summary><div class="a"><div><p>В группе бот молчит, пока его не спросят. Если хотите, он будет подсказывать, что на вопрос уже отвечали: это включается одной командой.</p></div></div></details>
       <details class="qa sc"><summary>Что бот видит и что хранит?<i>+</i></summary><div class="a"><div><p>Только группы, куда его добавили. Каждый участник может посмотреть, что о нём хранится, и удалить это командой /forget_me. Новичкам бот в двух строках объясняет, что хранится и как это стереть.</p></div></div></details>
@@ -787,16 +761,13 @@ footer a{color:var(--lime);text-decoration:none}
 
 <!-- ============ FINAL ============ -->
 <section class="sec final wavy">
-  <svg class="star boil" style="--s:40px;left:4%;top:16%;--c:#fff"><use href="#spark"/></svg>
-  <svg class="star boil" style="--s:28px;right:36%;bottom:14%;--c:#D7FF3B;--dl:-1.2s"><use href="#spark"/></svg>
   <div class="wrap">
     <div>
       <span class="shout rv">Люди важнее платформ.</span>
       <h2 class="rv">Пусть ваш чат <span class="pop">помогает каждому</span></h2>
       <p class="rv">Одно касание, и следующий вопрос в чате получит ответ. Вжух.</p>
-      <div class="cta rv"><a class="btn lime mag" href="https://t.me/telepathy_ai_bot?startgroup=landing" target="_blank" rel="noopener">Добавить в свой чат <span class="arr">→</span></a><a class="btn ghost mag" href="https://t.me/telepathy_ai_bot" target="_blank" rel="noopener">Написать боту</a></div>
+      <div class="cta rv"><a class="btn lime mag" href="https://t.me/telepathy_ai_bot?startgroup=landing" target="_blank" rel="noopener">Добавить в чат <span class="arr">→</span></a><a class="btn ghost mag" href="https://t.me/telepathy_ai_bot" target="_blank" rel="noopener">Написать боту</a></div>
     </div>
-    <img decoding="async" class="sc float tilt" style="--rot:4deg;--t:7s" src="img/art-people.webp" alt="" loading="lazy" width="720" height="720">
   </div>
 </section>
 </main>
@@ -1039,7 +1010,7 @@ footer a{color:var(--lime);text-decoration:none}
   // ---- the cat: peeks out when you stop scrolling, talks when touched, throws cats if you insist ----
   var cat=$("#cat"), say=$("#catSay"), idle, talkT, pets=0, petT;
   var LINES=["мяу. ответ в закрепе","я прочитал весь чат. дважды","ап","кто-нибудь?..","я тут модератор","мур. добавь бота в чат","вопросы без ответа? я считал","не трогай ананас","вжух, и ответ нашёлся","я сделяль","ждун тоже ждёт ответа","press F за потерянные ссылки","год назад, Карл!","это фиаско, братан. шучу, всё нашлось"];
-  function peek(){ cat.classList.add("peek"); }
+  function peek(){ if(innerWidth<760&&scrollY<innerHeight*.8) return; cat.classList.add("peek"); }
   addEventListener("scroll",function(){ cat.classList.remove("peek","talk"); clearTimeout(idle); idle=setTimeout(peek,1800); },{passive:true});
   setTimeout(peek,3500);
   cat.addEventListener("click",function(){

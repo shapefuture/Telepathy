@@ -10,6 +10,11 @@ on:
     branches: [main]
     paths: ["worker/**"]
   workflow_dispatch:
+    inputs:
+      migrations:
+        description: "Apply D1 migrations first (each check reads the database; skip when none are new)"
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -31,6 +36,8 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # to see whether this push touched worker/migrations
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -41,7 +48,27 @@ jobs:
       - run: npm test
       - name: Point wrangler.jsonc at the real D1 database
         run: sed -i "s/00000000-0000-0000-0000-000000000000/${{ vars.D1_DATABASE_ID }}/" wrangler.jsonc
+      # Applying migrations queries the database, which counts against D1's daily read
+      # limit. A push runs them only when it adds or changes a migration; a manual run
+      # runs them unless "migrations" is unticked.
+      - name: Decide whether migrations are needed
+        id: mig
+        env:
+          EVENT: ${{ github.event_name }}
+          WANT: ${{ inputs.migrations }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            echo "run=$WANT" >> "$GITHUB_OUTPUT"
+          elif [ -z "$BEFORE" ] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          elif git diff --quiet "$BEFORE" "$GITHUB_SHA" -- migrations; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Apply D1 migrations (forward-only)
+        if: steps.mig.outputs.run == 'true'
         run: npx wrangler d1 migrations apply telepathy --remote
       - name: Deploy
         run: npx wrangler deploy

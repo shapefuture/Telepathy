@@ -39,7 +39,8 @@ export async function routeUnanswered(db: D1Database, now = new Date()): Promise
         "WHERE p.part = 0 AND p.removed_at IS NULL AND p.intent = 'help_request' AND p.intent_conf >= 0.7 " +
         "AND p.event_at <= ? AND p.event_at >= ? " +
         "AND NOT EXISTS (SELECT 1 FROM passages r WHERE r.source_id = p.source_id AND r.reply_to = p.msg_id AND r.removed_at IS NULL) " +
-        "AND NOT EXISTS (SELECT 1 FROM effects e WHERE e.key LIKE 'route:' || p.source_id || ':' || p.msg_id || ':%') " +
+        // A key range (not LIKE) so the lookup uses the key index.
+        "AND NOT EXISTS (SELECT 1 FROM effects e WHERE e.key >= 'route:' || p.source_id || ':' || p.msg_id || ':' AND e.key < 'route:' || p.source_id || ':' || p.msg_id || ';') " +
         "ORDER BY p.event_at LIMIT 10",
     )
     .bind(nowIso(new Date(now.getTime() - ROUTE_AFTER)), nowIso(new Date(now.getTime() - ROUTE_MAX_AGE)))

@@ -16,11 +16,25 @@ export interface Skill {
 export const TAXONOMY: Map<string, Skill> = new Map(
   (skillsData as { skills: Skill[] }).skills.map((s) => [s.code, s]),
 );
+/** A skill a person typed in themselves: stored as "my:<text>", shown as the text. */
+export const CUSTOM_PREFIX = "my:";
+export const CUSTOM_MAX = 20;
+/** Clean what was typed into a custom skill code, or null if it is unusable (2 to 40 characters). */
+export function customCode(text: string): string | null {
+  const t = text.replace(/[\u0000-\u001f\u007f<>&"]/g, " ").replace(/\s+/g, " ").trim().slice(0, 40).trim();
+  return t.length >= 2 ? CUSTOM_PREFIX + t : null;
+}
+/** The name of any skill code: taxonomy label, custom text, or the code itself. */
+export const skillName = (code: string, lang: Lang): string => {
+  const s = TAXONOMY.get(code);
+  return s ? labelIn(s, lang) : code.startsWith(CUSTOM_PREFIX) ? code.slice(CUSTOM_PREFIX.length) : code;
+};
+
 /** Full bilingual label (used in /skills all). */
 export const label = (s: Skill): string => (s.en === s.ru ? s.en : `${s.en} / ${s.ru}`);
 /** Label in one language. */
 export const labelIn = (s: Skill, lang: Lang): string => (lang === "ru" ? s.ru : s.en);
-export const labelsFor = (codes: string[], lang: Lang): string => codes.map((c) => (TAXONOMY.get(c) ? labelIn(TAXONOMY.get(c)!, lang) : c)).join(", ");
+export const labelsFor = (codes: string[], lang: Lang): string => codes.map((c) => skillName(c, lang)).join(", ");
 
 export const WEIGHTS = { domain: 0.4, helpfulness: 0.25, evidence: 0.15, context: 0.1, fairness: 0.1 } as const;
 const EVIDENCE: Record<string, number> = {

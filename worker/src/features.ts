@@ -218,16 +218,21 @@ export interface EventRow {
   starts_at: string;
   chat_id: number;
   username: string | null;
+  /** The member who added it by hand in the Mini App; null for events found in a chat message. */
+  created_by: string | null;
 }
+
+/** Link to the message that announced the event; events added by hand have none. */
+export const eventUrl = (e: EventRow): string | null => (e.created_by ? null : citation(e.chat_id, e.msg_id, e.username));
 
 export async function upcomingEvents(db: D1Database, readable: Set<string>, now = new Date()): Promise<EventRow[]> {
   if (!readable.size) return [];
   return (
     await db
       .prepare(
-        "SELECT e.source_id, e.msg_id, e.title, e.starts_at, s.chat_id, s.username FROM events e JOIN sources s ON s.id = e.source_id AND s.enabled = 1 " +
-          "JOIN passages p ON p.source_id = e.source_id AND p.msg_id = e.msg_id AND p.part = 0 AND p.removed_at IS NULL " +
-          "WHERE e.hidden = 0 AND e.starts_at >= ? AND e.source_id IN (SELECT value FROM json_each(?)) ORDER BY e.starts_at LIMIT 15",
+        "SELECT e.source_id, e.msg_id, e.title, e.starts_at, e.created_by, s.chat_id, s.username FROM events e JOIN sources s ON s.id = e.source_id AND s.enabled = 1 " +
+          "LEFT JOIN passages p ON p.source_id = e.source_id AND p.msg_id = e.msg_id AND p.part = 0 AND p.removed_at IS NULL " +
+          "WHERE (e.created_by IS NOT NULL OR p.id IS NOT NULL) AND e.hidden = 0 AND e.starts_at >= ? AND e.source_id IN (SELECT value FROM json_each(?)) ORDER BY e.starts_at LIMIT 15",
       )
       .bind(nowIso(now), JSON.stringify([...readable]))
       .all<EventRow>()
@@ -240,7 +245,7 @@ const icsDate = (iso: string) => iso.replace(/[-:]/g, "").replace(/\.\d{3}/, "")
 export function toIcs(events: EventRow[]): string {
   const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Telepathy//events//EN"];
   for (const e of events) {
-    const url = citation(e.chat_id, e.msg_id, e.username);
+    const url = eventUrl(e);
     lines.push(
       "BEGIN:VEVENT",
       `UID:${e.source_id}-${e.msg_id}@telepathy`,

@@ -15,8 +15,9 @@ import { createDraft, getMission, isTerminal, MissionError, report, type Mission
 import { rateOk, status, type App } from "./bot";
 import { build as buildDigest } from "./digest";
 import { ownerIds, timezone, type Env } from "./env";
-import { label, labelIn, resolveSkill, TAXONOMY } from "./experts";
-import { upcomingEvents, toIcs } from "./features";
+import { CUSTOM_MAX, CUSTOM_PREFIX, customCode, label, labelIn, resolveSkill, TAXONOMY } from "./experts";
+import { eventUrl, upcomingEvents, toIcs } from "./features";
+import { eventByShort, fullKey, rsvp, shortKey } from "./gather";
 import { eligiblePartners, fedEnabled, partnerList } from "./federation/gateway";
 import { recordAnswer, vote } from "./feedback";
 import { T, type Lang } from "./i18n";
@@ -29,6 +30,7 @@ import { mcpOn, startAuto } from "./history-mcp";
 import { isChatAdmin, managedChats } from "./admins";
 import { answer, parseFilters } from "./search";
 import { createTelegram, type Fetcher, type Telegram } from "./telegram";
+import { applyBio } from "./bio";
 import { audit, DAY, HOUR, localParts, nowIso, safeEqual } from "./util";
 import { PAGE } from "./app-page";
 import { handleUpdate, type Update } from "./bot";
@@ -185,11 +187,24 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
     return out({ ok: true });
   }
   if (key === "GET skills") return out([...TAXONOMY.values()].map((s) => ({ code: s.code, label: labelIn(s, lang), full: label(s) })));
+  // A link to a site or pasted bio text: add the skills found, keep nothing else.
+  if (key === "POST skills" && p[1] === "bio") {
+    if (!rateOk(user.id, 5)) return out({ ok: false, status: "busy" }, undefined, 429);
+    const r = await applyBio(app, m, typeof body.text === "string" ? body.text.slice(0, 8000) : "", "app");
+    return out(r.status === "ok" ? { ok: true, added: r.added, known: r.known } : { ok: false, status: r.status });
+  }
   if (key === "POST skills") {
-    const code = typeof body.code === "string" ? (TAXONOMY.has(body.code) ? body.code : resolveSkill(body.code)) : null;
+    const raw = typeof body.code === "string" ? body.code : "";
+    // A skill from the list, a phrase the bot recognises, or the person's own words ("my:<text>").
+    const code = raw.startsWith(CUSTOM_PREFIX) ? customCode(raw.slice(CUSTOM_PREFIX.length)) : TAXONOMY.has(raw) ? raw : resolveSkill(raw) ?? customCode(raw);
     if (!code) return out({ ok: false }, undefined, 400);
-    if (body.on) await db.prepare("INSERT INTO skills(member_id, code, state, kind) VALUES (?,?,'confirmed','self_claim') ON CONFLICT(member_id, code) DO UPDATE SET state='confirmed'").bind(m.id, code).run();
-    else await db.prepare("DELETE FROM skills WHERE member_id=? AND code=?").bind(m.id, code).run();
+    if (body.on) {
+      if (code.startsWith(CUSTOM_PREFIX)) {
+        const have = await db.prepare("SELECT COUNT(*) AS n FROM skills WHERE member_id=? AND code LIKE 'my:%' AND code<>?").bind(m.id, code).first<{ n: number }>();
+        if ((have?.n ?? 0) >= CUSTOM_MAX) return out({ ok: false, error: "too many" }, undefined, 400);
+      }
+      await db.prepare("INSERT INTO skills(member_id, code, state, kind) VALUES (?,?,'confirmed','self_claim') ON CONFLICT(member_id, code) DO UPDATE SET state='confirmed'").bind(m.id, code).run();
+    } else await db.prepare("DELETE FROM skills WHERE member_id=? AND code=?").bind(m.id, code).run();
     return out({ ok: true, code });
   }
   if (key === "GET privacy") return out({ html: T(lang).privacy });
@@ -376,12 +391,64 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
   // ---- events ------------------------------------------------------------------------------
   if (key === "GET events") {
     const evs = await upcomingEvents(db, await readable(db, m));
-    return out(evs.map((e) => ({ title: e.title, starts_at: e.starts_at, url: citation(e.chat_id, e.msg_id, e.username) })));
+    const going = new Map(
+      evs.length
+        ? (await db.prepare("SELECT event_key, status FROM rsvps WHERE member_id=? AND event_key IN (SELECT value FROM json_each(?))").bind(m.id, JSON.stringify(evs.map((e) => fullKey(e.source_id, e.msg_id)))).all<{ event_key: string; status: string }>()).results.map((r) => [r.event_key, r.status] as const)
+        : [],
+    );
+    const titles = new Map((await groupsOf(db, m)).map((g) => [g.id, g.title ?? "group"]));
+    return out(
+      evs.map((e) => ({
+        key: shortKey(e.source_id, e.msg_id),
+        title: e.title,
+        starts_at: e.starts_at,
+        url: eventUrl(e),
+        group: titles.get(e.source_id) ?? null,
+        mine: e.created_by === m.id,
+        going: going.get(fullKey(e.source_id, e.msg_id)) === "going",
+      })),
+    );
   }
   if (key === "POST events" && p[1] === "ics") {
     const evs = await upcomingEvents(db, await readable(db, m));
     if (!evs.length) return out({ ok: false });
     await app.tg.sendFile(m.tg_id, "telepathy-events.ics", toIcs(evs), "text/calendar", T(lang).eventsIcs);
+    return out({ ok: true });
+  }
+  // Add an event by hand: in a group the person reads, a few at a time, with a real date in the future.
+  if (key === "POST events" && p[1] === "add") {
+    const title = typeof body.title === "string" ? body.title.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 120) : "";
+    const at = typeof body.starts_at === "string" ? Date.parse(body.starts_at) : NaN;
+    const readableIds = await readable(db, m);
+    const source = typeof body.group === "string" ? body.group : "";
+    const now = Date.now();
+    if (title.length < 3 || !Number.isFinite(at) || at < now - HOUR || at > now + 366 * DAY || !readableIds.has(source)) return out({ ok: false, error: "invalid" }, undefined, 400);
+    const open = await db.prepare("SELECT COUNT(*) AS n FROM events WHERE created_by=? AND hidden=0 AND starts_at>=?").bind(m.id, nowIso(new Date(now))).first<{ n: number }>();
+    if ((open?.n ?? 0) >= 5) return out({ ok: false, error: "limit" }, undefined, 429);
+    // No chat message stands behind it, so it gets a message id above any Telegram has handed out.
+    for (let i = 0; i < 4; i++) {
+      const msgId = 3_000_000_000 + Math.floor(Math.random() * 900_000_000);
+      const r = await db.prepare("INSERT OR IGNORE INTO events(source_id, msg_id, title, starts_at, created_by, created_at) VALUES (?,?,?,?,?,?)").bind(source, msgId, title, nowIso(new Date(at)), m.id, nowIso()).run();
+      if (r.meta.changes) {
+        await rsvp(db, m.id, fullKey(source, msgId), "going");
+        await audit(db, "event.create", m.id, fullKey(source, msgId), { via: "app" });
+        return out({ ok: true, key: shortKey(source, msgId) });
+      }
+    }
+    return out({ ok: false }, undefined, 500);
+  }
+  if (key === "POST events" && p[1] === "rsvp") {
+    const ev = await eventByShort(db, typeof body.key === "string" ? body.key : "", await readable(db, m));
+    if (!ev) return notFound();
+    await rsvp(db, m.id, fullKey(ev.source_id, ev.msg_id), body.going === false ? "not" : "going");
+    return out({ ok: true });
+  }
+  if (key === "POST events" && p[1] === "remove") {
+    const ev = await eventByShort(db, typeof body.key === "string" ? body.key : "", await readable(db, m));
+    if (!ev) return notFound();
+    const r = await db.prepare("UPDATE events SET hidden=1 WHERE source_id=? AND msg_id=? AND (created_by=? OR ?=1)").bind(ev.source_id, ev.msg_id, m.id, owner ? 1 : 0).run();
+    if (!r.meta.changes) return out({ ok: false }, undefined, 403);
+    await audit(db, "event.remove", m.id, fullKey(ev.source_id, ev.msg_id), { via: "app" });
     return out({ ok: true });
   }
 

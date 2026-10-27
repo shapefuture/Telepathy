@@ -6,10 +6,11 @@
 
 import { ensureMember, grantStatement, langOf, memberByTg, readable, revoke, VISIBILITIES, type Member, type Visibility } from "./acl";
 import { digestHour, ownerIds, timezone, type Env } from "./env";
-import { eligibleCandidates, label, labelIn, labelsFor, matchSkills, resolveSkill, TAXONOMY } from "./experts";
+import { applyBio, lonelyUrl } from "./bio";
+import { eligibleCandidates, label, labelIn, labelsFor, matchSkills, resolveSkill, skillName, TAXONOMY } from "./experts";
 import { recordAnswer, vote } from "./feedback";
 import { build as buildDigest } from "./digest";
-import { answerSuggestion, detectEvent, markCanonical, toIcs, upcomingEvents } from "./features";
+import { answerSuggestion, detectEvent, eventUrl, markCanonical, toIcs, upcomingEvents } from "./features";
 import { maybeHint } from "./hints";
 import { defaultLang, langFromCode, T, type Lang, type Messages } from "./i18n";
 import { citation, docOffloadable, docSupported, EDGE_DOC_MAX_BYTES, enabledSource, ingestMessage, removeMessage, storeDocument, type TgMessage, type TgUser } from "./ingest";
@@ -80,7 +81,7 @@ export interface Update {
 /** Kept for tests and docs: the English privacy notice. */
 export const PRIVACY_NOTICE = T("en").privacy;
 
-const PRIVATE_ONLY = new Set(["intro", "expert", "profile", "optin", "optout", "skills", "forget_me", "digest", "requests", "language", "catchup", "events", "pings", "app", "cancel", "desk", "offer", "partner", "fed", "ledger", "passport", "continuity", "destinations", "alert", "drill", "name", "pilot", "pulse", "union", "bridges", "ark", "move", "knows"]);
+const PRIVATE_ONLY = new Set(["bio", "intro", "expert", "profile", "optin", "optout", "skills", "forget_me", "digest", "requests", "language", "catchup", "events", "pings", "app", "cancel", "desk", "offer", "partner", "fed", "ledger", "passport", "continuity", "destinations", "alert", "drill", "name", "pilot", "pulse", "union", "bridges", "ark", "move", "knows"]);
 const GROUP_TYPES = new Set(["group", "supergroup"]);
 const btn = (text: string, data: string): InlineButton => ({ text, callback_data: data });
 const linkBtn = (text: string, href: string) => ({ text, url: href }) as unknown as InlineButton;
@@ -220,6 +221,8 @@ async function onMessage(app: App, msg: TgMessage, edited: boolean): Promise<str
     const words = asker ? await answerPending(app, asker, q) : null; // the words for a 🙏 just pressed
     if (words) return words;
     // "What can you do?" is about the bot, not a question for the community's memory.
+    // A message that is only a link is a profile to read, not a question.
+    if (lonelyUrl(q)) return privateCommand(app, msg, "bio", q);
     return privateCommand(app, msg, ABOUT_BOT.test(q) ? "help" : "ask", ABOUT_BOT.test(q) ? "" : q);
   }
   return privateCommand(app, msg, command.cmd, command.args);
@@ -408,7 +411,7 @@ function profileView(mem: Member, skills: { code: string; state: string }[], hel
   const lang = langOf(mem);
   const m = T(lang);
   const list =
-    skills.map((s) => `${TAXONOMY.get(s.code) ? labelIn(TAXONOMY.get(s.code)!, lang) : s.code}${s.state === "confirmed" ? "" : ` (${m.suggested})`}`).join(", ") ||
+    skills.map((s) => `${skillName(s.code, lang)}${s.state === "confirmed" ? "" : ` (${m.suggested})`}`).join(", ") ||
     m.noneYet;
   const yn = (v: number) => (v ? m.yes : m.no);
   const oo = (v: number) => (v ? m.on : m.off);
@@ -638,6 +641,20 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
     }
     case "skills":
       return cmdSkills(app, chat, mem, args, m);
+    case "bio": {
+      if (!args) {
+        await reply(app, chat, m.bioUsage);
+        return [];
+      }
+      if (!rateOk(from.id, 5)) {
+        await reply(app, chat, m.bioBusy);
+        return [];
+      }
+      const r = await applyBio(app, mem, args, "bot");
+      const say: Record<string, string> = { none: m.bioNone, empty: m.bioNone, short: m.bioShort, blocked: m.bioBlocked, bad_url: m.bioBadUrl, failed: m.bioFailed };
+      await reply(app, chat, r.status === "ok" ? (r.added.length ? m.bioAdded(r.added.map(escapeHtml).join(", "), r.known) : m.bioKnown) : say[r.status]!);
+      return [];
+    }
     case "expert": {
       if (!rateOk(from.id, rateLimit(app))) {
         await reply(app, chat, m.tooMany);
@@ -714,7 +731,7 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
       }
       const fmt = new Intl.DateTimeFormat(lang === "ru" ? "ru-RU" : "en-GB", { timeZone: timezone(app.env), dateStyle: "medium", timeStyle: "short" });
       const lines = evs.map((e) => {
-        const url = citation(e.chat_id, e.msg_id, e.username);
+        const url = eventUrl(e);
         return `• ${fmt.format(new Date(e.starts_at))} — ${url ? `<a href="${escapeHtml(url)}">${escapeHtml(e.title)}</a>` : escapeHtml(e.title)}`;
       });
       await reply(app, chat, `${m.eventsTitle}\n${lines.join("\n")}`);
@@ -795,7 +812,7 @@ async function cmdSkills(app: App, chat: number, mem: Member, args: string, m: M
   const listed =
     (await mySkills(app, mem.id))
       .filter((s) => s.state === "confirmed")
-      .map((s) => `• ${escapeHtml(labelIn(TAXONOMY.get(s.code)!, langOf(mem)))}`)
+      .map((s) => `• ${escapeHtml(skillName(s.code, langOf(mem)))}`)
       .join("\n") || m.noneYet;
   await reply(app, chat, m.yourSkills(listed));
   return [];

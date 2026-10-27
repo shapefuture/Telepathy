@@ -4,7 +4,7 @@
 import { langOf, readable, type Member } from "../acl";
 import type { App } from "../bot";
 import { ENVELOPE_FIELDS, findIdentifiers } from "../domain/consent";
-import { TAXONOMY, labelIn } from "../experts";
+import { skillName } from "../experts";
 import { recordAnswer } from "../feedback";
 import type { Lang } from "../i18n";
 import { IntroError, requestIntro } from "../intros";
@@ -35,7 +35,7 @@ import { chatAdminIds } from "../admins";
 import { ownerIds } from "../env";
 
 export const short = (id: string) => id.slice(0, 6);
-export const jobLabel = (code: string, lang: Lang) => (TAXONOMY.get(code) ? labelIn(TAXONOMY.get(code)!, lang) : code);
+export const jobLabel = (code: string, lang: Lang) => skillName(code, lang);
 
 export interface Outcome {
   ok: boolean;

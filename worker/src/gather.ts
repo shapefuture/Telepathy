@@ -6,7 +6,7 @@
 import { langOf, type Member } from "./acl";
 import { T, defaultLang, type Lang } from "./i18n";
 import { effectStatement } from "./outbox";
-import { labelIn, TAXONOMY } from "./experts";
+import { skillName } from "./experts";
 import { faceOf, namesFor } from "./thread-card";
 import type { InlineButton } from "./telegram";
 import { escapeHtml } from "./text";
@@ -65,7 +65,7 @@ export async function whoGoes(db: D1Database, eventKey: string, me: Member, lang
   const lines = [m.gatherWhoHead(going.length)];
   for (const s of scored) {
     const who = `${faceOf(s.id)} ${escapeHtml(names.get(s.id) ?? m.memberAnon)}`;
-    const why = s.shared.length ? m.gatherSharedSkill(escapeHtml(labelIn(TAXONOMY.get(s.shared[0]!)!, lang))) : m.gatherAlsoGoing;
+    const why = s.shared.length ? m.gatherSharedSkill(escapeHtml(skillName(s.shared[0]!, lang))) : m.gatherAlsoGoing;
     lines.push(m.gatherWhoLine(who, why));
   }
   return lines.join("\n");

@@ -43,7 +43,7 @@ async function viaWorkersAi(app: App, model: string, messages: Msg[]): Promise<s
 }
 
 /** Tries each configured model in order; a cached result for the same input is reused. */
-async function generate(app: App, messages: Msg[], user: string, lang: Lang): Promise<string | null> {
+export async function generate(app: App, messages: Msg[], user: string, lang: Lang): Promise<string | null> {
   const tries: [string, () => Promise<string | null>][] = [];
   if (beamEnabled(app)) tries.push([`beam:${app.env.BEAM_MODEL || "beam"}`, () => viaBeam(app, messages)]);
   const wm = workersModel(app);

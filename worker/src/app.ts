@@ -30,6 +30,7 @@ import { mcpOn, startAuto } from "./history-mcp";
 import { isChatAdmin, managedChats } from "./admins";
 import { answer, parseFilters } from "./search";
 import { createTelegram, type Fetcher, type Telegram } from "./telegram";
+import { applyBio } from "./bio";
 import { audit, DAY, HOUR, localParts, nowIso, safeEqual } from "./util";
 import { PAGE } from "./app-page";
 import { handleUpdate, type Update } from "./bot";
@@ -186,6 +187,12 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
     return out({ ok: true });
   }
   if (key === "GET skills") return out([...TAXONOMY.values()].map((s) => ({ code: s.code, label: labelIn(s, lang), full: label(s) })));
+  // A link to a site or pasted bio text: add the skills found, keep nothing else.
+  if (key === "POST skills" && p[1] === "bio") {
+    if (!rateOk(user.id, 5)) return out({ ok: false, status: "busy" }, undefined, 429);
+    const r = await applyBio(app, m, typeof body.text === "string" ? body.text.slice(0, 8000) : "", "app");
+    return out(r.status === "ok" ? { ok: true, added: r.added, known: r.known } : { ok: false, status: r.status });
+  }
   if (key === "POST skills") {
     const raw = typeof body.code === "string" ? body.code : "";
     // A skill from the list, a phrase the bot recognises, or the person's own words ("my:<text>").

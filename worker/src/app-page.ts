@@ -227,7 +227,7 @@ function askView(){var q=h("input",{placeholder:t("askPh"),value:S.prefill||"",e
  function run(){var v=q.value.trim();if(!v)return;haptic("tap");box.replaceChildren(skel());
   busy(null,post("thread",{q:v,group:S.group||null})).then(function(r){if(!r.ok){box.replaceChildren(h("p",{cls:"muted",text:t("nothingHere")}));return}S.focus=r.id;haptic("success");go("threads")}).catch(function(){box.replaceChildren()})}
  q.addEventListener("keydown",function(e){if(e.key==="Enter")run()});
- get("events").then(function(evs){if(!evs||!evs.length)return;box.replaceChildren(h("h2",{text:t("next")}),evs.slice(0,3).map(function(e){return card(h("b",{text:e.title}),h("div",{cls:"muted",text:new Date(e.starts_at).toLocaleString(S.lang==="ru"?"ru-RU":"en-GB",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}))}))}).catch(function(){});
+ get("events").then(function(evs){if(!evs||!evs.length)return;box.replaceChildren(h("h2",{text:t("next")}),...evs.slice(0,3).map(function(e){return card(h("b",{text:e.title}),h("div",{cls:"muted",text:new Date(e.starts_at).toLocaleString(S.lang==="ru"?"ru-RU":"en-GB",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}))}))}).catch(function(){});
  setMain([h("h1",null,h("span",{cls:"under"},t("ask"))),h("div",{cls:"search"},q,h("button",{"aria-label":t("search"),onclick:run},"→")),row,hints,h("p",{cls:"muted",text:t("constelHint")}),h("div",{cls:"btns"},h("button",{cls:"sec",onclick:function(){go("constel")}},t("constel"))),box]);
  q.focus()}
 
@@ -250,7 +250,7 @@ function constelView(){var box=h("div",null,skel());setMain([h("h1",null,h("span
   if(!stars||!stars.length)box.append(empty());
   box.append(h("div",{id:"detail"}))}).catch(function(){box.replaceChildren(h("p",{cls:"muted",text:t("err")}))})}
 function starView(s){var d=document.getElementById("detail");if(!d)return;d.replaceChildren(skel());
- get("constellation/"+s.code).then(function(x){d.replaceChildren(h("h2",{text:x.label}),(x.quotes||[]).length?x.quotes.map(function(q){return card(h("div",{cls:"q",text:q.text}),h("div",{cls:"muted",text:(q.who?q.who.face+" "+(q.who.name||t("memberAnon")):"")+" · "+(q.when||"").slice(0,7)+(q.label?" · "+q.label:"")}))}):empty(),(x.people||[]).length?h("div",{cls:"chips"},x.people.map(function(p){return h("span",{cls:"chip on"},p.face+" "+(p.name||t("member")))})):null)}).catch(function(){d.replaceChildren(h("p",{cls:"muted",text:t("err")}))})}
+ get("constellation/"+s.code).then(function(x){d.replaceChildren(h("h2",{text:x.label}),...((x.quotes||[]).length?x.quotes.map(function(q){return card(h("div",{cls:"q",text:q.text}),h("div",{cls:"muted",text:(q.who?q.who.face+" "+(q.who.name||t("memberAnon")):"")+" · "+(q.when||"").slice(0,7)+(q.label?" · "+q.label:"")}))}):[empty()]),(x.people||[]).length?h("div",{cls:"chips"},x.people.map(function(p){return h("span",{cls:"chip on"},p.face+" "+(p.name||t("member")))})):h("span"))}).catch(function(){d.replaceChildren(h("p",{cls:"muted",text:t("err")}))})}
 
 // A thank-you falls as a few almonds (plan: the motion system)
 function almonds(){for(var i=0;i<14;i++){var d=h("span",{cls:"almond",text:"🌰"});d.style.left=(8+Math.random()*84)+"%";d.style.animationDelay=(Math.random()*0.3)+"s";document.body.append(d);setTimeout(function(x){return function(){x.remove()}}(d),1900)}}

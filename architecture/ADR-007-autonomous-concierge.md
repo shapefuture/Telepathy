@@ -115,5 +115,4 @@ resources, and how the concierge is priced. Each needs its own evidence from ste
   a confirmed deal closes the request as solved, and the card names it.
 - **Newcomers without contact** are a board item, not a message: one press runs this week's round or
   sends the onboarding card, once a week per group. Nobody who didn't opt in is reached by a round.
-- **Known gaps:** partner and investor requests are counted but have no path of their own yet; the census
-  reads at most 4,000 requests and 20,000 replies; newcomers are members new to the bot, not to the group.
+- **Known gaps:** partner and investor requests share the introduction path and the existing bridge button, not a path of their own; the census reads at most 4,000 requests and 20,000 replies; newcomers are members new to the bot, not to the group. Introductions on request have no supply until people add their line, from the profile or with `/introduce`.

@@ -116,6 +116,15 @@ const EN = {
     `Someone in your club asks to be introduced to the right person: «${text}». Can you open that door? They won't see your name until you both agree.`,
   pulseClosed: (answered: string, connected: number, agreed: number) => `Closed this week: answered ${answered} · introductions connected ${connected} · work agreed ${agreed}`,
   wowJobs: (line: string) => `Asked most here (last six months): ${line} · /jobs`,
+  pDoors: "Can introduce people to",
+  bDoorsOn: "🚪 I can introduce people",
+  bDoorsEdit: "🚪 Change who I can introduce",
+  bDoorsOff: "Stop introducing people",
+  doorsAsk:
+    "Write one line: who or where you can open doors to, for example “directors at banks” or “investors in fintech”. Nobody sees this line; it is only used to match requests. An introduction happens only when you both agree.",
+  doorsNeedOptIn: "First /optin, so people can find you. Then tap the button again.",
+  boardClosed: (week: string, answered: string, connected: number, agreed: number) =>
+    `Week of ${week}: answered ${answered} · introductions connected ${connected} · work agreed ${agreed}`,
 };
 type Texts = typeof EN;
 const RU: Texts = {
@@ -230,6 +239,15 @@ const RU: Texts = {
     `В клубе просят познакомить с нужным человеком: «${text}». Можете открыть эту дверь? Имя просящего вы не увидите, пока оба не согласитесь.`,
   pulseClosed: (answered: string, connected: number, agreed: number) => `Закрыто за неделю: ответили ${answered} · знакомств состоялось ${connected} · договорились о работе ${agreed}`,
   wowJobs: (line: string) => `Чаще всего спрашивают (полгода): ${line} · /jobs`,
+  pDoors: "Могу познакомить с",
+  bDoorsOn: "🚪 Могу познакомить с людьми",
+  bDoorsEdit: "🚪 Изменить, с кем могу познакомить",
+  bDoorsOff: "Больше не знакомлю",
+  doorsAsk:
+    "Напишите одной строкой, с кем или куда вы можете познакомить: например, «директора в банках» или «инвесторы из fintech». Эту строку никто не увидит: она нужна только для поиска. Знакомство идёт, только когда вы оба согласны.",
+  doorsNeedOptIn: "Сначала /optin, чтобы вас можно было найти. Потом нажмите кнопку ещё раз.",
+  boardClosed: (week: string, answered: string, connected: number, agreed: number) =>
+    `Неделя с ${week}: ответили ${answered} · знакомств состоялось ${connected} · договорились о работе ${agreed}`,
 };
 
 export const T2 = (lang: Lang): Texts => (lang === "ru" ? RU : EN);

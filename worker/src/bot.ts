@@ -27,6 +27,7 @@ import { startScreen, screenAnswer } from "./concierge/join";
 import { spamCheck } from "./concierge/spam";
 import { roundsCommand } from "./concierge/rounds";
 import { introduceCommand, openCommand } from "./concierge/people";
+import { T2 } from "./concierge/texts";
 import { assistCallback, clubDeskCommand, cmdHelpNeed, forgetMissions, listMissions, ownerAssistCommand, OWNER_COMMANDS } from "./assist/bot";
 import { brief } from "./ai/beam";
 import { answer, parseFilters, renderAnswer } from "./search";
@@ -45,7 +46,7 @@ import { eventByShort, fullKey, rsvp, shortKey, wantToSee, whoGoes } from "./gat
 import { arkLine, callEveryone, exportFor, forgetPart, knowsCard } from "./ark";
 import { welcomeJoinRequest, welcomeJoiner } from "./welcome";
 import { escapeHtml } from "./text";
-import { audit, DAY, HOUR, localParts, nowIso, tzOffsetMinutes } from "./util";
+import { addMs, audit, DAY, HOUR, localParts, nowIso, tzOffsetMinutes } from "./util";
 
 export interface App {
   env: Env;
@@ -421,6 +422,7 @@ function quietLocal(mem: Member, tz: string): string | null {
 function profileView(mem: Member, skills: { code: string; state: string }[], helped = 0, tz = "UTC"): { text: string; buttons: InlineButton[][] } {
   const lang = langOf(mem);
   const m = T(lang);
+  const t2 = T2(lang);
   const list =
     skills.map((s) => `${skillName(s.code, lang)}${s.state === "confirmed" ? "" : ` (${m.suggested})`}`).join(", ") ||
     m.noneYet;
@@ -436,6 +438,7 @@ function profileView(mem: Member, skills: { code: string; state: string }[], hel
       `${m.pCollection}: <b>${mem.collection_opt_out ? m.pStopped : m.on}</b>\n` +
       `${m.pLanguage}: <b>${lang === "ru" ? "русский" : "English"}</b>\n` +
       `${m.pSkills}: ${escapeHtml(list)}\n` +
+      `${t2.pDoors}: <b>${escapeHtml(mem.doors ?? m.off)}</b>\n` +
       `${m.pHelped(helped)}\n` +
       `${m.pQuiet}: <b>${escapeHtml(quietLocal(mem, tz) ?? m.off)}</b>\n\n${m.addSkillHint}`,
     buttons: [
@@ -447,6 +450,8 @@ function profileView(mem: Member, skills: { code: string; state: string }[], hel
       ],
       [btn(mem.display_name ? m.bNameOff : m.bNameOn, `p:name:${mem.display_name ? 0 : 1}`)],
       [btn(mem.quiet_from !== null && mem.quiet_from !== undefined ? m.bQuietOff : m.bQuietOn, `p:quiet:${mem.quiet_from !== null && mem.quiet_from !== undefined ? 0 : 1}`)],
+      [btn(mem.doors ? t2.bDoorsEdit : t2.bDoorsOn, "dr:ask")],
+      ...(mem.doors ? [[btn(t2.bDoorsOff, "dr:off")]] : []),
       [btn(lang === "ru" ? "English" : "Русский", `p:lang:${lang === "ru" ? "en" : "ru"}`)],
     ],
   };
@@ -936,6 +941,36 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
     return [];
   }
   if (kind === "bd") return boardCallback(app, cb, data);
+  if (kind === "dr") {
+    // Profile: "I can introduce people" (plan: introductions on request). Asking takes the next line as the doors line.
+    const mem = await memberByTg(app.db, cb.from.id);
+    if (!mem) {
+      await answerCb(pre.notAvailable);
+      return [];
+    }
+    const tt = T2(langOf(mem));
+    if (a === "off") {
+      await introduceCommand(app, mem, "off");
+      await answerCb(tt.introduceOff);
+    } else if (!mem.discoverable) {
+      await answerCb(tt.doorsNeedOptIn, true);
+      return [];
+    } else {
+      await app.db
+        .prepare("INSERT INTO pending_inputs(member_id, kind, ref, expires_at) VALUES (?, 'doors', '', ?) ON CONFLICT(member_id) DO UPDATE SET kind='doors', ref='', expires_at=excluded.expires_at")
+        .bind(mem.id, addMs(nowIso(), HOUR))
+        .run();
+      await answerCb();
+      await app.tg.sendMessage(cb.from.id, tt.doorsAsk);
+      return [];
+    }
+    const fresh = (await memberByTg(app.db, cb.from.id))!;
+    const v = profileView(fresh, await mySkills(app, fresh.id), await helpedCount(app.db, fresh.id), timezone(app.env));
+    if (cb.message) {
+      await app.tg.call("editMessageText", { chat_id: cb.message.chat.id, message_id: cb.message.message_id, text: v.text, parse_mode: "HTML", reply_markup: { inline_keyboard: v.buttons } }).catch(() => undefined);
+    }
+    return [];
+  }
   if (kind === "dl") {
     // "We agreed on the work" (plan: deals): the person introduced confirms it, or says not yet.
     const mem = await memberByTg(app.db, cb.from.id);

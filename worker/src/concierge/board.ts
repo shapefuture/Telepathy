@@ -17,7 +17,7 @@ import { setVerdict } from "./gate";
 import { decideJoin } from "./join";
 import { executeLive } from "./live";
 import { dismissSpam, executeModerate } from "./spam";
-import { census, censusView, CENSUS_DAYS, NEWCOMER_MIN, newcomersOf } from "./jobs";
+import { census, censusView, CENSUS_DAYS, closedSummary, NEWCOMER_MIN, newcomersOf } from "./jobs";
 import { isoWeek, launchRounds } from "./rounds";
 import { onboardingCard } from "../welcome";
 import { btn, T2 } from "./texts";
@@ -196,7 +196,10 @@ export async function boardView(app: App, scope: Scope, lang: "en" | "ru", sec: 
   const c = await countsOf(app.db, scope);
   const total = c.j + c.p + c.l + c.b + c.n + c.g;
   if (!sec) {
-    if (!total) return { text: t.boardQuiet, buttons: [] };
+    // Last week's closed numbers from the Monday pulse: shown on the card and on /board, even on a quiet day.
+    const closed = await closedSummary(app.db, scope.ids, lang);
+    const note = closed ? `\n\n${closed}` : "";
+    if (!total) return { text: t.boardQuiet + note, buttons: [] };
     const rows: [string, number, string][] = [
       ["j", c.j, t.secJoin(c.j)],
       ["p", c.p, t.secSpam(c.p)],
@@ -206,7 +209,7 @@ export async function boardView(app: App, scope: Scope, lang: "en" | "ru", sec: 
       ["g", c.g, t.secGaps(c.g)],
     ];
     return {
-      text: t.boardHead(total),
+      text: t.boardHead(total) + note,
       buttons: rows.filter(([, n]) => n > 0).map(([k, , label]) => [btn(label, `bd:v:${k}:0`)]),
     };
   }

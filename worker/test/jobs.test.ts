@@ -8,7 +8,7 @@ import { boardDaily } from "../src/concierge/board";
 import { census, kindOf, newcomersOf, recommendationsFor } from "../src/concierge/jobs";
 import { makeApp } from "../src/index";
 import { forgetMember } from "../src/rights";
-import { pulseCard } from "../src/pulse";
+import { pulseCard, pulseStep } from "../src/pulse";
 import { wowCard } from "../src/wow";
 import { nowIso } from "../src/util";
 import { dm, enableGroup, feed, fakeTelegram, GROUP, nextMsg, OWNER, press, shown, shownButtons } from "./helpers";
@@ -324,5 +324,53 @@ describe("forgetting", () => {
     await expertOf(81, { open: true, doors: "Знаю директоров" });
     await forgetMember(env.DB, await idOf(81), 81);
     expect(await q("SELECT open_work, doors FROM members WHERE tg_id=81")).toEqual({ open_work: 0, doors: null });
+  });
+});
+
+describe("partners and investors", () => {
+  it("a request for a partner or an investor reaches people who named their doors, like an introduction", async () => {
+    const { app } = world();
+    await enableGroup(app);
+    for (const tg of [91, 92]) await post(app, tg, `hello from ${tg}`, now() - DAY);
+    await q("UPDATE sources SET doors=1");
+    await expertOf(92, { doors: "Знаю инвесторов из fintech" });
+    await feed(app, dm(91, "Ищу инвестора в fintech"));
+    await feed(app, press(91, `t:${await threadOf(91)}:ask`));
+    const invited = await env.DB.prepare("SELECT candidate_id FROM intros").all<{ candidate_id: string }>();
+    expect(invited.results.map((r) => r.candidate_id)).toEqual([await idOf(92)]);
+  });
+});
+
+describe("the profile's introduction switch", () => {
+  it("asks for the doors line, saves it, and stop clears it; without /optin it refuses", async () => {
+    const { app, calls } = world();
+    await enableGroup(app);
+    await post(app, 93, "hello", now() - DAY);
+    await feed(app, dm(93, "/profile"));
+    expect(shownButtons(calls, 93).flat().map((b) => b.callback_data)).toContain("dr:ask");
+    await feed(app, press(93, "dr:ask"));
+    expect(calls.some((c) => c.method === "answerCallbackQuery" && String(c.params.text).includes("First /optin"))).toBe(true);
+    await feed(app, dm(93, "/optin"));
+    await feed(app, press(93, "dr:ask"));
+    expect(shown(calls, 93)).toContain("Write one line");
+    await feed(app, dm(93, "Знаю директоров в банках"));
+    expect(await q("SELECT doors FROM members WHERE tg_id=93")).toEqual({ doors: "Знаю директоров в банках" });
+    await feed(app, dm(93, "/profile"));
+    expect(shownButtons(calls, 93).flat().map((b) => b.callback_data)).toContain("dr:off");
+    await feed(app, press(93, "dr:off"));
+    expect(await q("SELECT doors FROM members WHERE tg_id=93")).toEqual({ doors: null });
+  });
+});
+
+describe("the board's line of what closed", () => {
+  it("the board shows last week's closed numbers, stored by the Monday pulse", async () => {
+    const { app, calls } = world();
+    await enableGroup(app);
+    const base = Date.parse("2026-10-20T09:00:00Z") / 1000; // a Tuesday in the week before the Monday below
+    const ask = await post(app, 21, "Посоветуйте бухгалтера?", base);
+    await post(app, 22, "Советую бухгалтера Анну, обращайтесь", base + 1800, ask);
+    expect(await pulseStep(env.DB, new Date("2026-10-26T10:00:00Z"), "UTC", 9)).toHaveLength(1);
+    await feed(app, dm(OWNER, "/board"));
+    expect(shown(calls, OWNER)).toContain("Week of 2026-10-26: answered Recommendations 1");
   });
 });

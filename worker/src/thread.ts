@@ -9,6 +9,7 @@ import { brief } from "./ai/beam";
 import { recordAnswer, vote } from "./feedback";
 import { bridgeFromThread, closeBridgeHelpful } from "./alliance";
 import { kindOf } from "./concierge/jobs";
+import { introduceCommand } from "./concierge/people";
 import { T2 } from "./concierge/texts";
 import { T, defaultLang, type Lang } from "./i18n";
 import { cancelNeed, IntroError, NoSkillError, requestIntro, type Want } from "./intros";
@@ -125,9 +126,9 @@ async function askPeople(app: App, mem: Member, t: ThreadRow, now: Date, picked?
   }
   const lang = langOf(mem);
   // Hiring asks for people open to projects, and the answers to the clarifying question go with it.
-  // A request for an introduction is matched on the doors people have named (plan: «Нужен выход на…»).
+  // An introduction, or a partner or investor, is matched on the doors people have named (plan: «Нужен выход на…»).
   const kind = kindOf(t.question);
-  const want: Want | undefined = kind === "hiring" ? "hire" : kind === "introduction" ? "door" : undefined;
+  const want: Want | undefined = kind === "hiring" ? "hire" : kind === "introduction" || kind === "partner" ? "door" : undefined;
   const text = want === "hire" && t.clarify ? `${t.question}\n${t.clarify}` : t.question;
   try {
     const at = nowIso(now);
@@ -354,6 +355,15 @@ async function sendThanks(app: App, mem: Member, t: ThreadRow, words: string | n
   return [key];
 }
 
+/** The line someone writes after "I can introduce people" on their profile (plan: introductions on request). */
+async function doorsAnswer(app: App, mem: Member, text: string): Promise<string[] | null> {
+  const words = text.trim();
+  if (!words) return null;
+  await app.db.prepare("DELETE FROM pending_inputs WHERE member_id=? AND kind='doors'").bind(mem.id).run();
+  await app.tg.sendMessage(mem.tg_id, await introduceCommand(app, mem, words));
+  return [];
+}
+
 /** The clarifying question for a hiring request: one message, and the asker's next private text answers it. */
 async function askClarify(app: App, mem: Member, t: ThreadRow, now: Date): Promise<string[]> {
   const tt = T2(langOf(mem));
@@ -448,11 +458,12 @@ export async function answerPending(app: App, mem: Member, text: string, now = n
   const at = nowIso(now);
   const pending = await app.db.prepare("SELECT kind, ref, expires_at FROM pending_inputs WHERE member_id=?").bind(mem.id).first<{ kind: string; ref: string; expires_at: string }>();
   if (!pending) return null;
-  if (pending.kind !== "thanks" && pending.kind !== "clarify") return null; // e.g. a join screening: answered by that flow
+  if (!["thanks", "clarify", "doors"].includes(pending.kind)) return null; // e.g. a join screening: answered by that flow
   if (pending.expires_at <= at) {
     await app.db.prepare("DELETE FROM pending_inputs WHERE member_id=?").bind(mem.id).run();
     return null;
   }
+  if (pending.kind === "doors") return doorsAnswer(app, mem, text);
   const t = await ownThread(app.db, pending.ref, mem.id);
   if (pending.kind === "clarify") return clarifyAnswer(app, mem, t, text, now);
   if (!t || !t.helper_id || t.thanked_at) {

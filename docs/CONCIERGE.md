@@ -49,11 +49,12 @@ label it, and nothing is sent to a model.
 | Who recommends it | The asker, from groups they can read | Under a request about a topic, up to three replies that point at a person or a service, quoted word for word, with the date and a link. Never ranked by a model, and never from a group the asker isn't in. |
 | Hiring | The asker; people who said `/open on` | «Ищу исполнителя» asks one question first (budget, deadline, format, or skip). Then the usual introduction, offered only to people open to projects, who need `/optin` first. |
 | Looking for work | The person looking | A switch on their card, the same as `/open on` / `/open off`. |
-| Introductions on request | The asker; people who said `/introduce <line>` | «Нужен выход на…» is matched against the lines people wrote about the doors they can open, in groups whose owner turned it on (`Introductions on request` on the settings card). The line is never shown to anyone. |
+| Introductions on request | The asker; people who said `/introduce <line>`, or tapped «I can introduce people» on their profile | «Нужен выход на…» is matched against the lines people wrote about the doors they can open, in groups whose owner turned it on (`Introductions on request` on the settings card). The line is never shown to anyone. |
+| Partners and investors | The asker; people who named their doors | Routed like introductions on request: the same doors line, in the same groups. Where an alliance exists, the bridge button still offers the partner clubs. |
 | Deals | The asker and the person introduced | «Договорились о работе» closes the request as solved only when the person introduced confirms it too. Until then it's a proposal. |
 | Newcomers without contact | The owner (board) | Once a day, a group with at least three people new to the bot who posted in the last 30 days and got no reply and no introduction gets a board item. «Запустить раунд» runs this week's introduction round for the opted-in people there. «Познакомить» sends each newcomer the onboarding card (what they can help with), once per group. The item is hidden for the rest of the week after one press. |
 
-Every introduction still goes through the two-step consent, and contacts open only when both agree.
+Every introduction still goes through the two-step consent, and contacts open only when both agree. The board's home shows last week's closed numbers from the Monday pulse, also on a quiet day when you open `/board`.
 Introduction rounds, hiring, introductions on request and deals never message anyone who didn't opt in.
 
 

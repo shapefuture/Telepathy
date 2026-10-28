@@ -8,7 +8,7 @@ import { T, defaultLang, type Lang } from "./i18n";
 import { escapeHtml } from "./text";
 import { DAY, nowIso } from "./util";
 import { dueDay } from "./digest";
-import { closedOf, JOB_KINDS, type JobKind } from "./concierge/jobs";
+import { answeredText, closedOf, storeClosed, type Closed } from "./concierge/jobs";
 import { T2 } from "./concierge/texts";
 import type { App } from "./bot";
 import type { InlineButton } from "./telegram";
@@ -75,30 +75,28 @@ const hoursText = (h: number | null, lang: Lang) => {
 };
 
 /** What closed this week, by kind of request, and the introductions and deals both sides confirmed. */
-function closedLine(c: { answered: Record<JobKind, number>; connected: number; agreed: number }, lang: Lang): string {
-  const t = T2(lang);
-  const byKind = JOB_KINDS.filter((k) => c.answered[k] > 0)
-    .map((k) => `${t.jobKind[k]} ${c.answered[k]}`)
-    .join(" · ");
-  return t.pulseClosed(byKind || "0", c.connected, c.agreed);
+function closedLine(c: Closed, lang: Lang): string {
+  return T2(lang).pulseClosed(answeredText(c.answered, lang), c.connected, c.agreed);
 }
 
 /** The card the owner gets, and the celebratory line the group may get (no private details). */
-export async function pulseCard(db: D1Database, sourceId: string, title: string, since: string, lang: Lang): Promise<{ text: string; quiet: boolean; shareText: string }> {
+export async function pulseCard(db: D1Database, sourceId: string, title: string, since: string, lang: Lang): Promise<{ text: string; quiet: boolean; shareText: string; closed?: Closed }> {
   const m = T(lang);
   const p = await pulseOf(db, sourceId, since);
   const names = p.top ? await namesFor(db, [p.top.id]) : new Map<string, string | null>();
   const helper = p.top ? personLabel(p.top.id, names.get(p.top.id), m) : m.memberAnon;
   const lines = [m.pulseTitle(escapeHtml(title))];
+  let closed: Closed | undefined;
   if (!p.messages) return { text: "", quiet: true, shareText: "" };
   if (!p.questions) lines.push(m.pulseQuiet);
   else {
     lines.push(m.pulseQuestions(p.questions), m.pulseAnswered(p.answered), m.pulseWaiting(p.waiting), m.pulseSpeed(hoursText(p.medianHours, lang)));
     lines.push(p.top ? m.pulseTop(helper, p.top.n) : m.pulseNoHelp);
-    lines.push(closedLine(await closedOf(db, sourceId, since), lang));
+    closed = await closedOf(db, sourceId, since);
+    lines.push(closedLine(closed, lang));
   }
   const shareText = p.questions ? m.pulseShare(escapeHtml(title), p.questions, p.answered, p.top ? helper : m.memberAnon) : "";
-  return { text: lines.join("\n"), quiet: !p.questions, shareText };
+  return { text: lines.join("\n"), quiet: !p.questions, shareText, closed };
 }
 
 /** Monday, at the club's digest hour: one summary per group that had any activity that week. */
@@ -119,6 +117,7 @@ export async function pulseStep(db: D1Database, now: Date, tz: string, hour: num
   for (const s of results) {
     const key = `pulse:${s.id}:${day}`;
     const card = await pulseCard(db, s.id, s.title ?? "", since, s.lang ?? defaultLang());
+    if (card.closed) await storeClosed(db, s.id, day, card.closed); // the board shows this week's numbers
     if (!card.text) {
       // No messages all week: say nothing, and remember that this group is done for today.
       await db

@@ -27,6 +27,8 @@ export interface Member {
   catchup_at: string | null;
   /** Opt-in first name for answer cards; null unless the member switched it on. */
   display_name?: string | null;
+  /** The doors line for introductions on request (concierge/people.ts). Null unless the member wrote one. */
+  doors?: string | null;
   /** Quiet hours in UTC (0-23); null when off. Experts in them are not asked. */
   quiet_from?: number | null;
   quiet_to?: number | null;

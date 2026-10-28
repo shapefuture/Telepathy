@@ -258,3 +258,46 @@ export function censusView(c: Census, lang: Lang, doorsOn: boolean): string {
   if (!doorsOn && intro >= 5) lines.push(t.jobsIntroHint(intro));
   return lines.join("\n");
 }
+
+/** The answered requests as one line: "Recommendations 3 · Questions 1", or "0". */
+export function answeredText(answered: Record<JobKind, number>, lang: Lang): string {
+  const t = T2(lang);
+  return JOB_KINDS.filter((k) => answered[k] > 0).map((k) => `${t.jobKind[k]} ${answered[k]}`).join(" · ") || "0";
+}
+
+/** One group's closed numbers for a week, as the Monday pulse counted them. */
+export interface Closed {
+  answered: Record<JobKind, number>;
+  connected: number;
+  agreed: number;
+}
+
+/** Kept in settings, so the daily board can show the week without counting again. */
+export async function storeClosed(db: D1Database, sourceId: string, week: string, c: Closed): Promise<void> {
+  await db
+    .prepare("INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+    .bind(`closed.${sourceId}`, JSON.stringify({ week, ...c }))
+    .run();
+}
+
+/**
+ * The board's line: the closed numbers of the latest week any of these groups has, summed over them.
+ * Null when nothing closed that week, or nothing has been stored yet.
+ */
+export async function closedSummary(db: D1Database, sourceIds: string[], lang: Lang): Promise<string | null> {
+  if (!sourceIds.length) return null;
+  const { results } = await db
+    .prepare("SELECT value FROM settings WHERE key IN (SELECT 'closed.' || value FROM json_each(?))")
+    .bind(JSON.stringify(sourceIds))
+    .all<{ value: string }>();
+  const rows = results.map((r) => JSON.parse(r.value) as Closed & { week: string });
+  if (!rows.length) return null;
+  const weeks = rows.map((r) => r.week).sort();
+  const week = weeks[weeks.length - 1]!;
+  const latest = rows.filter((r) => r.week === week);
+  const answered = Object.fromEntries(JOB_KINDS.map((k) => [k, latest.reduce((a, r) => a + (r.answered[k] ?? 0), 0)])) as Record<JobKind, number>;
+  const connected = latest.reduce((a, r) => a + r.connected, 0);
+  const agreed = latest.reduce((a, r) => a + r.agreed, 0);
+  if (!JOB_KINDS.some((k) => answered[k] > 0) && !connected && !agreed) return null;
+  return T2(lang).boardClosed(week, answeredText(answered, lang), connected, agreed);
+}

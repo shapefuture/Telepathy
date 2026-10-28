@@ -92,7 +92,7 @@ answers, calling you for help, language). `/digest` reads the same setting as th
 
 The menu is five things: ask, what's new (catch-up and events), my requests, profile, how to use me. The
 operator's `/admin/setup` also sets the bot's description and short description (both languages) and its
-Russian name «Миндальная связь». The profile picture cannot be set from the API: it is set in BotFather.
+Russian name «Миндальная Связь». The profile picture cannot be set from the API: it is set in BotFather.
 
 ## Autonomy
 

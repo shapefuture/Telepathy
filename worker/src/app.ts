@@ -181,7 +181,7 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
       skillLabels: skills.map((c) => ({ code: c, label: jobLabel(c, lang) })),
       counts: { requests: n(req!), offers: n(offers!), invites: n(invites!) },
       startParam: user.startParam ?? null,
-      brand: app.env.BRAND_NAME || "Миндальная связь",
+      brand: app.env.BRAND_NAME || "Миндальная Связь",
       // The clubs this person can read: the tabs' club chips (plan: several clubs, one header each).
       groups: (await groupsOf(db, m)).map((g) => ({ id: g.id, title: g.title ?? "group" })),
     });

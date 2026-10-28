@@ -45,7 +45,7 @@ export const DESCRIPTION_RU = "Ответы из памяти клуба и лю
 export const DESCRIPTION_EN = "Answers from the club's memory, and the people who can help. Ask a question: I find what was already discussed and ask those ready to help. Contacts open only when you both agree.";
 export const SHORT_DESCRIPTION_RU = "Ответы из памяти клуба и помощь людей";
 export const SHORT_DESCRIPTION_EN = "Answers from the club's memory and people who can help";
-export const BOT_NAME_RU = "Миндальная связь";
+export const BOT_NAME_RU = "Миндальная Связь";
 /** In groups, only what works there. */
 export const GROUP_COMMANDS_RU = [{ command: "ask", description: "Спросить: отвечу из этой группы" }];
 export const GROUP_COMMANDS = [{ command: "ask", description: "Ask: I answer from this group" }];

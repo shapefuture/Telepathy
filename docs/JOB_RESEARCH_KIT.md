@@ -2,6 +2,13 @@
 
 The code can't pass gates G1–G3; people can. This kit is the shortest path.
 
+## 0. Read the census first (minutes)
+
+In a group the bot already reads, run `/jobs` in private. It counts six months of requests by kind:
+recommendations, hiring, introductions, partners, questions. The share about people, and how many of
+each went unanswered, is the evidence for or against the people-side jobs (see the stop rule in
+`docs/CONCIERGE.md`). Use the counts to choose which cases to ask about in the interviews.
+
 ## 1. Collect real cases (1–2 weeks)
 
 - Turn the desk on for members: announce `/help <what you need>` in your groups.

@@ -21,6 +21,13 @@ import { forgetPerson, personForMember } from "./continuity/people";
 import { cmdPassport, CONTINUITY_OWNER, ownerContinuity } from "./continuity/bot";
 import { hydraStatus } from "./hydra/bot";
 import { touchOwners } from "./hydra/notices";
+import { conciergeCallback, conciergeCommand } from "./concierge/bot";
+import { boardCallback, boardCommand, jobsCommand } from "./concierge/board";
+import { startScreen, screenAnswer } from "./concierge/join";
+import { spamCheck } from "./concierge/spam";
+import { roundsCommand } from "./concierge/rounds";
+import { introduceCommand, openCommand } from "./concierge/people";
+import { T2 } from "./concierge/texts";
 import { assistCallback, clubDeskCommand, cmdHelpNeed, forgetMissions, listMissions, ownerAssistCommand, OWNER_COMMANDS } from "./assist/bot";
 import { brief } from "./ai/beam";
 import { answer, parseFilters, renderAnswer } from "./search";
@@ -28,7 +35,7 @@ import type { Fetcher, InlineButton, Telegram } from "./telegram";
 import { DefiniteFailure } from "./telegram";
 import { forgetAdminCache, isChatAdminLive } from "./admins";
 import { askToConnect, botUsername, chatFromParam, connectGroup, sendGuide } from "./connect";
-import { answerPending, bridgeHelpful, openThread, pilotText, resend, threadAction } from "./thread";
+import { answerPending, bridgeHelpful, dealAnswer, openThread, pilotText, resend, threadAction } from "./thread";
 import { acceptInvite, alliancesOf, bridgeBoard, clubsOf, connectBridge, createInvite, deliverBridge, inviteCard, isLevel, LEVELS, levelWord, answerBridgeAsHelper, setAlliance, type Level } from "./alliance";
 import { bridgeCardKeys } from "./thread-card";
 import { pulseCard, shareToGroup } from "./pulse";
@@ -39,7 +46,7 @@ import { eventByShort, fullKey, rsvp, shortKey, wantToSee, whoGoes } from "./gat
 import { arkLine, callEveryone, exportFor, forgetPart, knowsCard } from "./ark";
 import { welcomeJoinRequest, welcomeJoiner } from "./welcome";
 import { escapeHtml } from "./text";
-import { audit, DAY, HOUR, localParts, nowIso, tzOffsetMinutes } from "./util";
+import { addMs, audit, DAY, HOUR, localParts, nowIso, tzOffsetMinutes } from "./util";
 
 export interface App {
   env: Env;
@@ -81,7 +88,7 @@ export interface Update {
 /** Kept for tests and docs: the English privacy notice. */
 export const PRIVACY_NOTICE = T("en").privacy;
 
-const PRIVATE_ONLY = new Set(["bio", "intro", "expert", "profile", "optin", "optout", "skills", "forget_me", "digest", "requests", "language", "catchup", "events", "pings", "app", "cancel", "desk", "offer", "partner", "fed", "ledger", "passport", "continuity", "destinations", "alert", "drill", "name", "pilot", "pulse", "union", "bridges", "ark", "move", "knows"]);
+const PRIVATE_ONLY = new Set(["bio", "intro", "expert", "profile", "optin", "optout", "skills", "forget_me", "digest", "requests", "language", "catchup", "events", "pings", "app", "cancel", "desk", "offer", "partner", "fed", "ledger", "passport", "continuity", "destinations", "alert", "drill", "name", "pilot", "pulse", "union", "bridges", "ark", "move", "knows", "open", "introduce", "jobs"]);
 const GROUP_TYPES = new Set(["group", "supergroup"]);
 const btn = (text: string, data: string): InlineButton => ({ text, callback_data: data });
 const linkBtn = (text: string, href: string) => ({ text, url: href }) as unknown as InlineButton;
@@ -164,7 +171,9 @@ export async function handleUpdate(app: App, u: Update): Promise<string[]> {
   if (u.my_chat_member) return onBotMembership(app, u.my_chat_member);
   if (u.chat_member) return onChatMember(app, u.chat_member);
   if (u.chat_join_request) {
-    await welcomeJoinRequest(app, u.chat_join_request.chat.id, u.chat_join_request.from, u.chat_join_request.user_chat_id);
+    const jr = u.chat_join_request;
+    // A group that screens applicants asks them three questions first; otherwise it welcomes them as before.
+    if (!(await startScreen(app, jr.chat.id, jr.from, jr.user_chat_id))) await welcomeJoinRequest(app, jr.chat.id, jr.from, jr.user_chat_id);
     return [];
   }
   return [];
@@ -218,6 +227,8 @@ async function onMessage(app: App, msg: TgMessage, edited: boolean): Promise<str
     const q = (msg.text ?? "").trim();
     if (!q || edited) return [];
     const asker = msg.from ? await memberByTg(app.db, msg.from.id) : null;
+    const screened = asker ? await screenAnswer(app, asker, q) : null; // a join screening's answer
+    if (screened) return screened;
     const words = asker ? await answerPending(app, asker, q) : null; // the words for a 🙏 just pressed
     if (words) return words;
     // "What can you do?" is about the bot, not a question for the community's memory.
@@ -233,6 +244,7 @@ async function ingest(app: App, msg: TgMessage, edited: boolean): Promise<string
   if (outcome !== "stored" || !source || edited || msg.edit_date) return [];
   const keys: string[] = [];
   const text = msg.text ?? msg.caption ?? "";
+  keys.push(...(await spamCheck(app, msg, source.id)));
   if (text) await detectEvent(app.db, source.id, msg.message_id, text, new Date(), tzOffsetMinutes(new Date(), timezone(app.env)));
   if (!msg.document) {
     const hint = await maybeHint(app.db, source, msg, await langForUser(app, msg.from));
@@ -410,6 +422,7 @@ function quietLocal(mem: Member, tz: string): string | null {
 function profileView(mem: Member, skills: { code: string; state: string }[], helped = 0, tz = "UTC"): { text: string; buttons: InlineButton[][] } {
   const lang = langOf(mem);
   const m = T(lang);
+  const t2 = T2(lang);
   const list =
     skills.map((s) => `${skillName(s.code, lang)}${s.state === "confirmed" ? "" : ` (${m.suggested})`}`).join(", ") ||
     m.noneYet;
@@ -425,6 +438,7 @@ function profileView(mem: Member, skills: { code: string; state: string }[], hel
       `${m.pCollection}: <b>${mem.collection_opt_out ? m.pStopped : m.on}</b>\n` +
       `${m.pLanguage}: <b>${lang === "ru" ? "русский" : "English"}</b>\n` +
       `${m.pSkills}: ${escapeHtml(list)}\n` +
+      `${t2.pDoors}: <b>${escapeHtml(mem.doors ?? m.off)}</b>\n` +
       `${m.pHelped(helped)}\n` +
       `${m.pQuiet}: <b>${escapeHtml(quietLocal(mem, tz) ?? m.off)}</b>\n\n${m.addSkillHint}`,
     buttons: [
@@ -436,6 +450,8 @@ function profileView(mem: Member, skills: { code: string; state: string }[], hel
       ],
       [btn(mem.display_name ? m.bNameOff : m.bNameOn, `p:name:${mem.display_name ? 0 : 1}`)],
       [btn(mem.quiet_from !== null && mem.quiet_from !== undefined ? m.bQuietOff : m.bQuietOn, `p:quiet:${mem.quiet_from !== null && mem.quiet_from !== undefined ? 0 : 1}`)],
+      [btn(mem.doors ? t2.bDoorsEdit : t2.bDoorsOn, "dr:ask")],
+      ...(mem.doors ? [[btn(t2.bDoorsOff, "dr:off")]] : []),
       [btn(lang === "ru" ? "English" : "Русский", `p:lang:${lang === "ru" ? "en" : "ru"}`)],
     ],
   };
@@ -454,6 +470,10 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
   const from = msg.from!;
   const pre = T(await langForUser(app, from));
   switch (cmd) {
+    case "board":
+      return boardCommand(app, chat, from.id, from.language_code);
+    case "jobs":
+      return rateOk(from.id, 5) ? jobsCommand(app, chat, from.id, from.language_code) : [];
     case "start": {
       // An alliance invitation (Союз): the other club's owner sees what would cross, then accepts.
       const invite = /^u([0-9a-f]{16})$/i.exec(args.trim());
@@ -505,6 +525,10 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
     const asker = await knownMember(app, msg);
     return asker ? clubDeskCommand(app, chat, from.id, langOf(asker)) : [];
   }
+  if (cmd === "concierge") {
+    if (!isOwner(app, from.id)) return [];
+    return conciergeCommand(app, chat, from.id, args, from.language_code);
+  }
   if (OWNER_COMMANDS.has(cmd)) {
     if (!isOwner(app, from.id)) return [];
     const owner = await ensureMember(app.db, from.id, "owner", from.language_code);
@@ -513,6 +537,18 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
   }
   const mem = await knownMember(app, msg);
   if (!mem) return [];
+  if (cmd === "rounds") {
+    await reply(app, chat, await roundsCommand(app, mem, args));
+    return [];
+  }
+  if (cmd === "open") {
+    await reply(app, chat, await openCommand(app, mem, args));
+    return [];
+  }
+  if (cmd === "introduce") {
+    await reply(app, chat, await introduceCommand(app, mem, args));
+    return [];
+  }
   if (cmd === "language") {
     const want = args.trim().toLowerCase();
     if (want !== "en" && want !== "ru") {
@@ -903,6 +939,57 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
     // The message carries the group's title: no need to ask Telegram for it again.
     if (!(await enabledSource(app.db, chat.id))) await connectGroup(app, { id: chat.id, title: chat.title, username: chat.username }, cb.from);
     return [];
+  }
+  if (kind === "bd") return boardCallback(app, cb, data);
+  if (kind === "dr") {
+    // Profile: "I can introduce people" (plan: introductions on request). Asking takes the next line as the doors line.
+    const mem = await memberByTg(app.db, cb.from.id);
+    if (!mem) {
+      await answerCb(pre.notAvailable);
+      return [];
+    }
+    const tt = T2(langOf(mem));
+    if (a === "off") {
+      await introduceCommand(app, mem, "off");
+      await answerCb(tt.introduceOff);
+    } else if (!mem.discoverable) {
+      await answerCb(tt.doorsNeedOptIn, true);
+      return [];
+    } else {
+      await app.db
+        .prepare("INSERT INTO pending_inputs(member_id, kind, ref, expires_at) VALUES (?, 'doors', '', ?) ON CONFLICT(member_id) DO UPDATE SET kind='doors', ref='', expires_at=excluded.expires_at")
+        .bind(mem.id, addMs(nowIso(), HOUR))
+        .run();
+      await answerCb();
+      await app.tg.sendMessage(cb.from.id, tt.doorsAsk);
+      return [];
+    }
+    const fresh = (await memberByTg(app.db, cb.from.id))!;
+    const v = profileView(fresh, await mySkills(app, fresh.id), await helpedCount(app.db, fresh.id), timezone(app.env));
+    if (cb.message) {
+      await app.tg.call("editMessageText", { chat_id: cb.message.chat.id, message_id: cb.message.message_id, text: v.text, parse_mode: "HTML", reply_markup: { inline_keyboard: v.buttons } }).catch(() => undefined);
+    }
+    return [];
+  }
+  if (kind === "dl") {
+    // "We agreed on the work" (plan: deals): the person introduced confirms it, or says not yet.
+    const mem = await memberByTg(app.db, cb.from.id);
+    if (!mem) {
+      await answerCb(pre.notAvailable);
+      return [];
+    }
+    const r = await dealAnswer(app, mem, a, b === "y");
+    await answerCb(r.text);
+    await clearButtons();
+    return r.keys;
+  }
+  if (kind === "cg") {
+    // Concierge replay report and review (operators only).
+    if (!isOwner(app, cb.from.id)) {
+      await answerCb();
+      return [];
+    }
+    return conciergeCallback(app, cb, data);
   }
   if (kind === "hy") {
     // Hydra status button on incident notices (owners only).

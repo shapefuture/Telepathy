@@ -19,6 +19,9 @@ export default defineConfig(async () => {
             ADMIN_TOKEN: "test-admin-token",
             OWNER_IDS: "1000",
             DEFAULT_LANG: "en", // tests assert English text; production default is "ru"
+            // The concierge model runs only remotely (Workers AI), so the cron stays out of it here.
+            // test/concierge.test.ts switches it on for its own app.
+            CONCIERGE_MODEL: "off",
           },
         },
       }),

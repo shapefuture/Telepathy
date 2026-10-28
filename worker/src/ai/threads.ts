@@ -20,12 +20,16 @@ interface Row extends Turn {
 const COLS = "id, msg_id, body, event_at, source_id, reply_to";
 const LIVE = "removed_at IS NULL AND body IS NOT NULL";
 
-/** Only reads within `readable`, so a conversation never pulls in hidden messages. */
-export async function conversation(db: D1Database, readable: Set<string>, passageId: number): Promise<Turn[]> {
+/**
+ * Only reads within `readable`, so a conversation never pulls in hidden messages. `before` keeps
+ * every turn strictly earlier than that time (history replay must not see the real answer).
+ */
+export async function conversation(db: D1Database, readable: Set<string>, passageId: number, before?: string): Promise<Turn[]> {
   const seed = await db.prepare(`SELECT ${COLS} FROM passages WHERE id = ? AND ${LIVE}`).bind(passageId).first<Row>();
-  if (!seed || !readable.has(seed.source_id)) return [];
+  if (!seed || !readable.has(seed.source_id) || (before && seed.event_at >= before)) return [];
   const from = new Date(Date.parse(seed.event_at) - NEAR_MS).toISOString();
-  const to = new Date(Date.parse(seed.event_at) + NEAR_MS).toISOString();
+  const end = new Date(Date.parse(seed.event_at) + NEAR_MS).toISOString();
+  const to = before && before < end ? before : end;
   const [parent, replies, near] = await db.batch([
     db.prepare(`SELECT ${COLS} FROM passages WHERE source_id = ? AND msg_id = ? AND ${LIVE} LIMIT 1`).bind(seed.source_id, seed.reply_to ?? -1),
     db.prepare(`SELECT ${COLS} FROM passages WHERE source_id = ? AND reply_to = ? AND ${LIVE} ORDER BY event_at LIMIT 3`).bind(seed.source_id, seed.msg_id),
@@ -36,6 +40,7 @@ export async function conversation(db: D1Database, readable: Set<string>, passag
   const picked = new Map<number, Row>([[seed.id, seed]]);
   for (const r of [...(parent!.results as Row[]), ...(replies!.results as Row[]), ...(near!.results as Row[])]) {
     if (picked.size >= MAX_MESSAGES) break;
+    if (before && r.event_at >= before) continue;
     picked.set(r.id, r);
   }
   const turns = [...picked.values()].sort((a, b) => a.event_at.localeCompare(b.event_at) || a.msg_id - b.msg_id);

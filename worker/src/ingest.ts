@@ -1,6 +1,7 @@
 // Telegram ingestion (P03). One idempotent upsert per message:
 // UNIQUE(source_id, msg_id, part) dedupes replays; edits apply only if newer (P03-03).
 
+import { scrubStatement } from "./concierge/replay";
 import { ensureMember, grantStatement, type Visibility } from "./acl";
 import { classify } from "./classify";
 import { nowIso } from "./util";
@@ -33,6 +34,8 @@ export interface TgMessage {
   document?: TgDocument;
   entities?: { type: string; offset: number; length: number }[];
   migrate_to_chat_id?: number;
+  /** Set for a message forwarded from a channel or group (spam guard). */
+  forward_from_chat?: { id: number };
 }
 
 export interface Source {
@@ -52,19 +55,8 @@ export async function enabledSource(db: D1Database, chatId: number): Promise<Sou
   return db.prepare("SELECT * FROM sources WHERE chat_id=? AND enabled=1").bind(chatId).first<Source>();
 }
 
-/**
- * Bot API ids of supergroups and channels are -100 followed by their channel id, so they are at most
- * -10^12. A basic group's id is smaller in magnitude, even when it happens to start with "-100".
- */
-export const SUPERGROUP_MAX = -1_000_000_000_000;
-export const isSupergroupId = (chatId: number): boolean => chatId <= SUPERGROUP_MAX;
-
-export function citation(chatId: number, msgId: number, username: string | null, topicId?: number | null): string | null {
-  if (username) return `https://t.me/${username}/${msgId}`;
-  if (!isSupergroupId(chatId)) return null; // basic groups have no message links
-  const s = String(chatId).slice(4); // without the -100 prefix
-  return topicId ? `https://t.me/c/${s}/${topicId}/${msgId}` : `https://t.me/c/${s}/${msgId}`;
-}
+export { citation, isSupergroupId, SUPERGROUP_MAX } from "./links";
+import { isSupergroupId } from "./links";
 
 const iso = (unix: number): string => nowIso(new Date(unix * 1000));
 
@@ -117,7 +109,7 @@ export async function removeMessage(db: D1Database, sourceId: string, msgId: num
     .prepare("UPDATE passages SET body=NULL, removed_at=? WHERE source_id=? AND msg_id=? AND removed_at IS NULL")
     .bind(nowIso(), sourceId, msgId)
     .run();
-  if (r.meta.changes > 0) await db.prepare("DELETE FROM ai_cache").run(); // summaries may quote it
+  if (r.meta.changes > 0) await db.batch([db.prepare("DELETE FROM ai_cache"), scrubStatement(db)]); // summaries and concierge cases may quote it
   return r.meta.changes > 0;
 }
 

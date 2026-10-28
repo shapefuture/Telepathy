@@ -1,5 +1,7 @@
 # AI summaries (Beam, with Workers AI as backup)
 
+The concierge (`docs/CONCIERGE.md`) is separate: it uses Workers AI only, never Beam.
+
 When it's on, `/ask` answers (in private, in groups and in the Mini App) start with a 1–3 sentence
 summary marked «Кратко от ИИ — сверься с источниками ниже». The found messages are still listed
 underneath, as before.

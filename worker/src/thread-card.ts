@@ -3,6 +3,9 @@
 // A card is always rendered from the database when it is sent, so an edit queued earlier can't
 // overwrite a newer state with stale text. This module imports nothing that imports it back.
 
+import { readable, memberById } from "./acl";
+import { kindOf, recommendationsFor } from "./concierge/jobs";
+import { T2 } from "./concierge/texts";
 import { defaultLang, T, type Lang, type Messages } from "./i18n";
 import type { Quote } from "./search";
 import type { InlineButton, Telegram } from "./telegram";
@@ -34,6 +37,8 @@ export interface ThreadRow {
   state: ThreadState;
   quotes_json: string | null;
   brief: string | null;
+  /** The asker's answer to the clarifying question: null = not asked yet, '' = skipped. */
+  clarify: string | null;
   answer_id: string | null;
   need_id: string | null;
   outcome: Outcome | null;
@@ -111,12 +116,15 @@ export async function renderThread(db: D1Database, threadId: string, now = new D
     .bind(threadId)
     .first<ThreadRow & { lang: Lang | null }>();
   if (!t || t.message_id === null) return null;
-  const m = T(t.lang ?? defaultLang());
+  const lang = t.lang ?? defaultLang();
+  const m = T(lang);
   const card = (text: string, buttons: InlineButton[][] = []): Rendered => ({ chatId: t.chat_id, messageId: t.message_id!, text, buttons });
   const id = t.id;
 
   if (t.outcome) {
-    const lines = [m.threadClosed(OUTCOME_LABEL(m, t.outcome))];
+    // A deal closes as solved; its proof is the confirmed deal (deals.ts), which is what the card names.
+    const deal = await dealAgreed(db, id);
+    const lines = [m.threadClosed(deal ? T2(lang).outcomeDealLabel : OUTCOME_LABEL(m, t.outcome))];
     const buttons = t.helper_id && !t.thanked_at ? [[btn(m.bThanks, `t:${id}:thx`)]] : [];
     if (t.thanked_at) lines.push(m.threadThanked);
     return card(lines.join("\n"), buttons);
@@ -133,8 +141,9 @@ export async function renderThread(db: D1Database, threadId: string, now = new D
       const doc = q.label ? ` · ${escapeHtml(q.label)}` : ""; // document passages carry their file and time
       lines.push(`\n<blockquote>${escapeHtml(q.text)}</blockquote>${who} · ${monthLabel(q.event_at, t.lang ?? defaultLang())}${doc}${source}`);
     }
-    lines.push(`\n${m.threadMemoryAsk}`);
-    return card(lines.join("\n"), [[btn(m.bThatsIt, `t:${id}:ok`), btn(m.bAskPeople, `t:${id}:ask`)], [btn(m.bNotThat, `t:${id}:no`)]]);
+    const extra = await extrasFor(db, t, lang);
+    lines.push(...extra.lines, `\n${m.threadMemoryAsk}`);
+    return card(lines.join("\n"), [[btn(m.bThatsIt, `t:${id}:ok`), btn(m.bAskPeople, `t:${id}:ask`)], [btn(m.bNotThat, `t:${id}:no`)], ...extra.buttons]);
   }
   if (t.state === "closed") return card(t.brief ?? m.threadStopped); // brief carries a note here, e.g. "no access"
   if (t.bridge_id) {
@@ -156,7 +165,8 @@ export async function renderThread(db: D1Database, threadId: string, now = new D
       .prepare("SELECT 1 FROM alliances a WHERE a.status='active' AND (a.inviter_source_id IN (SELECT source_id FROM source_access WHERE member_id=? AND revoked_at IS NULL) OR a.partner_source_id IN (SELECT source_id FROM source_access WHERE member_id=? AND revoked_at IS NULL)) LIMIT 1")
       .bind(t.member_id, t.member_id)
       .first();
-    return card(m.threadNothing, [[btn(m.bAskPeople, `t:${id}:ask`)], ...(clubs ? [[btn(m.bBridge, `t:${id}:bridge`)]] : [])]);
+    const extra = await extrasFor(db, t, lang);
+    return card([m.threadNothing, ...extra.lines].join("\n"), [[btn(m.bAskPeople, `t:${id}:ask`)], ...(clubs ? [[btn(m.bBridge, `t:${id}:bridge`)]] : []), ...extra.buttons]);
   }
   const need = await db.prepare("SELECT status FROM needs WHERE id=?").bind(t.need_id).first<{ status: string }>();
   const intro = await latestIntro(db, t.need_id);
@@ -167,14 +177,65 @@ export async function renderThread(db: D1Database, threadId: string, now = new D
     return card(m.threadCandidate(personLabel(intro.candidate_id, names.get(intro.candidate_id), m)), [[btn(m.bConfirm, `i:${intro.id}:confirm`)], [btn(m.bCancel, `i:${intro.id}:cancel`)]]);
   }
   if (intro && CONNECTED.has(intro.status)) {
-    if (t.followup_at && t.followup_at <= nowIso(now)) return card(m.threadFollowup, outcomeButtons(m, id));
-    return card(m.threadConnected);
+    const due = !!t.followup_at && t.followup_at <= nowIso(now);
+    const lines = [due ? m.threadFollowup : m.threadConnected];
+    const buttons: InlineButton[][] = due ? outcomeButtons(m, id) : [];
+    if (kindOf(t.question) === "hiring") {
+      // "We agreed on the work" counts only once the helper confirms it too (deals.ts).
+      const deal = await dealStatus(db, intro.id);
+      if (deal === "proposed") lines.push(T2(lang).dealWaiting);
+      else {
+        if (deal === "declined") lines.push(T2(lang).dealDeclined);
+        buttons.push([btn(T2(lang).bDeal, `t:${id}:deal`)]);
+      }
+    }
+    return card(lines.join("\n"), buttons);
   }
   // Nobody is on the hook right now: the search is over, or it is about to ask the next person.
   if (need?.status === "cancelled") return card(m.threadCancelled);
   if (need?.status === "expired") return card(m.threadExpired, [[btn(m.bAskPeople, `t:${id}:ask`)]]);
   if (need?.status === "no_match") return card(m.threadNoMatch);
   return card(m.threadAsking(asked), [[btn(m.bCancelAsk, `t:${id}:cancel`)]]);
+}
+
+/**
+ * What a request's kind adds to its card: who here recommends the topic (quotes with their links,
+ * from groups the asker can read), and, for someone looking for work, the open-to-projects switch.
+ */
+async function extrasFor(db: D1Database, t: ThreadRow, lang: Lang): Promise<{ lines: string[]; buttons: InlineButton[][] }> {
+  const tt = T2(lang);
+  const m = T(lang);
+  const out: { lines: string[]; buttons: InlineButton[][] } = { lines: [], buttons: [] };
+  if (kindOf(t.question) === "looking_for_work") {
+    const me = await db.prepare("SELECT open_work FROM members WHERE id=?").bind(t.member_id).first<{ open_work: number }>();
+    out.buttons.push([btn(me?.open_work ? tt.bOpenOff : tt.bOpenOn, `t:${t.id}:${me?.open_work ? "openoff" : "open"}`)]);
+  }
+  const asker = await memberById(db, t.member_id);
+  if (asker) {
+    const recs = await recommendationsFor(db, await readable(db, asker), asker.id, t.question);
+    if (recs.length) {
+      const names = await namesFor(db, recs.map((r) => r.author_id));
+      out.lines.push("", `<b>${tt.recHead}</b>`);
+      for (const r of recs) {
+        const source = r.url ? ` · <a href="${escapeHtml(r.url)}">${m.source}</a>` : "";
+        out.lines.push(`<blockquote>${escapeHtml(r.text)}</blockquote>${personLabel(r.author_id, names.get(r.author_id), m)} · ${monthLabel(r.event_at, lang)}${source}`);
+      }
+    }
+  }
+  return out;
+}
+
+/** The status of a proposed deal for an introduction, or null when nobody has proposed one. */
+export async function dealStatus(db: D1Database, introId: string): Promise<string | null> {
+  return (await db.prepare("SELECT status FROM deals WHERE intro_id=?").bind(introId).first<{ status: string }>())?.status ?? null;
+}
+
+/** Whether a thread's introduction ended in a deal that both sides confirmed. */
+async function dealAgreed(db: D1Database, threadId: string): Promise<boolean> {
+  return !!(await db
+    .prepare("SELECT 1 FROM deals d JOIN intros i ON i.id = d.intro_id JOIN threads t ON t.need_id = i.need_id WHERE t.id = ? AND d.status = 'agreed' LIMIT 1")
+    .bind(threadId)
+    .first());
 }
 
 /** Apply a rendered card. "Not modified" just means the card already shows this. */

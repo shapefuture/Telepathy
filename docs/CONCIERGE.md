@@ -38,6 +38,25 @@ group toggles. Everything else is on by default and only ever proposes until ear
 | Live suggestions | on when the model is on | Proposes a step for requests unanswered for four hours. |
 | Introduction rounds | off per member | Members opt in with `/rounds on` (they need `/optin` first). Once a week, Mondays UTC, one introduction on a topic they asked about, to someone who opted in too. Then the normal two-step consent. |
 
+## Jobs people bring (census, hiring, introductions, deals)
+
+What members ask for, and what happens to it. All of it is deterministic: the request's own words
+label it, and nothing is sent to a model.
+
+| Piece | Who sees it | What it does |
+|---|---|---|
+| Census (`/jobs`, and one line on the import card) | The operator, and admins of their groups | Counts requests by kind over six months: answered, how soon, thanked, bumped («ап») and asked again. Shows the share that is about people. Reads at most 4,000 requests and 20,000 replies, once per command. |
+| Who recommends it | The asker, from groups they can read | Under a request about a topic, up to three replies that point at a person or a service, quoted word for word, with the date and a link. Never ranked by a model, and never from a group the asker isn't in. |
+| Hiring | The asker; people who said `/open on` | «Ищу исполнителя» asks one question first (budget, deadline, format, or skip). Then the usual introduction, offered only to people open to projects, who need `/optin` first. |
+| Looking for work | The person looking | A switch on their card, the same as `/open on` / `/open off`. |
+| Introductions on request | The asker; people who said `/introduce <line>` | «Нужен выход на…» is matched against the lines people wrote about the doors they can open, in groups whose owner turned it on (`Introductions on request` on the settings card). The line is never shown to anyone. |
+| Deals | The asker and the person introduced | «Договорились о работе» closes the request as solved only when the person introduced confirms it too. Until then it's a proposal. |
+| Newcomers without contact | The owner (board) | Once a day, a group with at least three people new to the bot who posted in the last 30 days and got no reply and no introduction gets a board item. «Запустить раунд» runs this week's introduction round for the opted-in people there. «Познакомить» sends each newcomer the onboarding card (what they can help with), once per group. The item is hidden for the rest of the week after one press. |
+
+Every introduction still goes through the two-step consent, and contacts open only when both agree.
+Introduction rounds, hiring, introductions on request and deals never message anyone who didn't opt in.
+
+
 ## Autonomy
 
 `CONCIERGE_AUTONOMY` sets what may run without a person, per action. Each action has a ceiling in
@@ -76,6 +95,10 @@ earned it behaves as `suggest`, whatever the setting says.
 - **Spam flags** keep the reasons and the message's link, not its text.
 - **Rules that are not AI** (screening, spam, best answers) are reviewed the same way, so their
   autonomy is earned the same way.
+- **Jobs:** `/introduce` keeps the line about the doors someone can open (and `/introduce off` clears it);
+  `/open` keeps the open-to-projects switch. Both are cleared by `/forget_me`. A hiring or introduction
+  request keeps the answer to its clarifying question on its card, erased on `/forget_me`.
+- **Deals** keep only the two timestamps and the status (proposed, agreed, declined).
 
 Tell members in your group rules that requests are read to route them, and that a screening asks
 three questions.
@@ -86,7 +109,9 @@ three questions.
 |---|---|
 | `CONCIERGE_MODEL` | Workers AI model. Empty = the summaries' default. `off` disables the AI actions (replay, live suggestions). |
 | `CONCIERGE_AUTONOMY` | Per-action levels, as above. |
-| Group settings card | `Screen join requests`, `Catch spam` (on each group). |
+| Group settings card | `Screen join requests`, `Catch spam`, `Introductions on request` (on each group). |
+| Census window | Fixed in code: 180 days for `/jobs`, 30 days for newcomers, 14 days for bumps, 48 hours for thanks. |
+| Census window | Fixed in code: 180 days for `/jobs`, 30 days for newcomers, 14 days for bumps, 48 hours for thanks. |
 
 Telegram rights the bot needs: approve and decline join requests (for screening), delete messages and
 restrict members (for the spam guard). Without them the board says "Didn't go through".

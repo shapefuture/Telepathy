@@ -22,10 +22,11 @@ import { cmdPassport, CONTINUITY_OWNER, ownerContinuity } from "./continuity/bot
 import { hydraStatus } from "./hydra/bot";
 import { touchOwners } from "./hydra/notices";
 import { conciergeCallback, conciergeCommand } from "./concierge/bot";
-import { boardCallback, boardCommand } from "./concierge/board";
+import { boardCallback, boardCommand, jobsCommand } from "./concierge/board";
 import { startScreen, screenAnswer } from "./concierge/join";
 import { spamCheck } from "./concierge/spam";
 import { roundsCommand } from "./concierge/rounds";
+import { introduceCommand, openCommand } from "./concierge/people";
 import { assistCallback, clubDeskCommand, cmdHelpNeed, forgetMissions, listMissions, ownerAssistCommand, OWNER_COMMANDS } from "./assist/bot";
 import { brief } from "./ai/beam";
 import { answer, parseFilters, renderAnswer } from "./search";
@@ -33,7 +34,7 @@ import type { Fetcher, InlineButton, Telegram } from "./telegram";
 import { DefiniteFailure } from "./telegram";
 import { forgetAdminCache, isChatAdminLive } from "./admins";
 import { askToConnect, botUsername, chatFromParam, connectGroup, sendGuide } from "./connect";
-import { answerPending, bridgeHelpful, openThread, pilotText, resend, threadAction } from "./thread";
+import { answerPending, bridgeHelpful, dealAnswer, openThread, pilotText, resend, threadAction } from "./thread";
 import { acceptInvite, alliancesOf, bridgeBoard, clubsOf, connectBridge, createInvite, deliverBridge, inviteCard, isLevel, LEVELS, levelWord, answerBridgeAsHelper, setAlliance, type Level } from "./alliance";
 import { bridgeCardKeys } from "./thread-card";
 import { pulseCard, shareToGroup } from "./pulse";
@@ -86,7 +87,7 @@ export interface Update {
 /** Kept for tests and docs: the English privacy notice. */
 export const PRIVACY_NOTICE = T("en").privacy;
 
-const PRIVATE_ONLY = new Set(["bio", "intro", "expert", "profile", "optin", "optout", "skills", "forget_me", "digest", "requests", "language", "catchup", "events", "pings", "app", "cancel", "desk", "offer", "partner", "fed", "ledger", "passport", "continuity", "destinations", "alert", "drill", "name", "pilot", "pulse", "union", "bridges", "ark", "move", "knows"]);
+const PRIVATE_ONLY = new Set(["bio", "intro", "expert", "profile", "optin", "optout", "skills", "forget_me", "digest", "requests", "language", "catchup", "events", "pings", "app", "cancel", "desk", "offer", "partner", "fed", "ledger", "passport", "continuity", "destinations", "alert", "drill", "name", "pilot", "pulse", "union", "bridges", "ark", "move", "knows", "open", "introduce", "jobs"]);
 const GROUP_TYPES = new Set(["group", "supergroup"]);
 const btn = (text: string, data: string): InlineButton => ({ text, callback_data: data });
 const linkBtn = (text: string, href: string) => ({ text, url: href }) as unknown as InlineButton;
@@ -466,6 +467,8 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
   switch (cmd) {
     case "board":
       return boardCommand(app, chat, from.id, from.language_code);
+    case "jobs":
+      return rateOk(from.id, 5) ? jobsCommand(app, chat, from.id, from.language_code) : [];
     case "start": {
       // An alliance invitation (Союз): the other club's owner sees what would cross, then accepts.
       const invite = /^u([0-9a-f]{16})$/i.exec(args.trim());
@@ -531,6 +534,14 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
   if (!mem) return [];
   if (cmd === "rounds") {
     await reply(app, chat, await roundsCommand(app, mem, args));
+    return [];
+  }
+  if (cmd === "open") {
+    await reply(app, chat, await openCommand(app, mem, args));
+    return [];
+  }
+  if (cmd === "introduce") {
+    await reply(app, chat, await introduceCommand(app, mem, args));
     return [];
   }
   if (cmd === "language") {
@@ -925,6 +936,18 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
     return [];
   }
   if (kind === "bd") return boardCallback(app, cb, data);
+  if (kind === "dl") {
+    // "We agreed on the work" (plan: deals): the person introduced confirms it, or says not yet.
+    const mem = await memberByTg(app.db, cb.from.id);
+    if (!mem) {
+      await answerCb(pre.notAvailable);
+      return [];
+    }
+    const r = await dealAnswer(app, mem, a, b === "y");
+    await answerCb(r.text);
+    await clearButtons();
+    return r.keys;
+  }
   if (kind === "cg") {
     // Concierge replay report and review (operators only).
     if (!isOwner(app, cb.from.id)) {

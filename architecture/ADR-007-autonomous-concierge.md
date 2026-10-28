@@ -1,6 +1,6 @@
 # ADR-007: Autonomous concierge on Workers AI — a permission envelope, earned autonomy
 
-**Status:** accepted for the prototype (2026-10-28). Built: history replay and review; the owner's board; live suggestions; join screening; spam guard; best answers; introduction rounds.
+**Status:** accepted for the prototype (2026-10-28). Built: history replay and review; the owner's board; live suggestions; join screening; spam guard; best answers; introduction rounds; the census of jobs; recommendations; hiring; introductions on request; deals; newcomers without contact.
 **Context:** `docs/CONCIERGE.md`, `docs/AI.md`, ADR-002 (disclosure and consent).
 
 ## The job
@@ -97,3 +97,23 @@ resources, and how the concierge is priced. Each needs its own evidence from ste
 - **Known gaps, by design:** the spam guard doesn't see account age or lookalike names (Telegram does
   not expose them to bots); best answers are topic-level; hints are per group; automatic decisions are
   logged but not re-reviewed.
+
+## Build record (2026-10-28, third slice: jobs)
+
+- **Measure the jobs before building for them.** `/jobs` counts what a club is asked, by kind, from
+  stored messages (`concierge/jobs.ts`): answered, how soon, thanked, bumped and asked again. The
+  replay's sibling, not a new model step, so the prompt version and the autonomy record stay as they were.
+- **Recommendations come from words that already exist.** A reply that points at a person or a service
+  for the same topic is quoted with its date and link, from groups the asker can read. Nothing is
+  ranked, scored or named unless that person opted in.
+- **Hiring asks one question, then invites people who opted in to projects.** The request routes through
+  the existing introduction state machine with a filter (`needs.want`, `openWork` in `eligibleCandidates`).
+  Consent stays where it was: `/optin`, then `/open on`.
+- **Introductions on request are matched on a line people wrote about their doors.** The line is matched,
+  never shown, and only in groups whose owner switched the feature on after the census showed the need.
+- **A deal counts only when both sides confirm it.** The proposal and the confirmation are rows in `deals`;
+  a confirmed deal closes the request as solved, and the card names it.
+- **Newcomers without contact** are a board item, not a message: one press runs this week's round or
+  sends the onboarding card, once a week per group. Nobody who didn't opt in is reached by a round.
+- **Known gaps:** partner and investor requests are counted but have no path of their own yet; the census
+  reads at most 4,000 requests and 20,000 replies; newcomers are members new to the bot, not to the group.

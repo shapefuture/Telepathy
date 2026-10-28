@@ -87,7 +87,7 @@ export async function deleteDue(app: App, budget = 5, now = new Date()): Promise
  * Newcomer onboarding (plan: journey 2): the questions this group asks most, the topics it talks
  * about (tap one to say what you can help with), and two lines on what is kept and how to delete it.
  */
-export async function onboarding(app: App, userChat: number, sourceId: string, lang: Lang): Promise<void> {
+export async function onboardingCard(app: App, sourceId: string, lang: Lang): Promise<{ text: string; buttons: InlineButton[][] }> {
   const m = T(lang);
   const { results: qs } = await app.db
     .prepare(
@@ -102,8 +102,14 @@ export async function onboarding(app: App, userChat: number, sourceId: string, l
   for (let i = 0; i < chips.length; i += 2) rows.push(chips.slice(i, i + 2));
   rows.push([{ text: m.bSkip, callback_data: "ob:skip" } as InlineButton]);
   const parts = [...(qs.length ? [m.onbQuestions] : []), m.onbPick, m.onbPrivacy];
+  return { text: parts.join("\n\n"), buttons: rows };
+}
+
+/** The onboarding card sent to one person now. A refused private message is not an error. */
+export async function onboarding(app: App, userChat: number, sourceId: string, lang: Lang): Promise<void> {
+  const card = await onboardingCard(app, sourceId, lang);
   try {
-    await app.tg.sendMessage(userChat, parts.join("\n\n"), { buttons: rows });
+    await app.tg.sendMessage(userChat, card.text, { buttons: card.buttons });
   } catch (e) {
     if (!(e instanceof DefiniteFailure)) throw e;
   }

@@ -32,6 +32,9 @@ export async function forgetMember(db: D1Database, memberId: string, tgId: numbe
     db.prepare("DELETE FROM spam_flags WHERE author_tg=?").bind(tgId),
     db.prepare("DELETE FROM intro_rounds WHERE member_id=?").bind(memberId),
     db.prepare("UPDATE members SET rounds=0 WHERE id=?").bind(memberId),
+    db.prepare("UPDATE members SET open_work=0, doors=NULL WHERE id=?").bind(memberId), // what they offered to do, and who they can introduce
+    db.prepare("DELETE FROM deals WHERE intro_id IN (SELECT id FROM intros WHERE requester_id=? OR candidate_id=?)").bind(memberId, memberId),
+    db.prepare("DELETE FROM pending_inputs WHERE member_id=? AND kind='clarify'").bind(memberId),
   ]);
   const report = { passages: p!.results.length, skills: s!.results.length, intros: i!.results.length };
   await audit(db, "member.forget", memberId, memberId, report);

@@ -4,7 +4,8 @@
 // on to the next candidate (max 3). Every send goes through the effect ledger.
 
 import { defaultLang } from "./i18n";
-import { eligibleCandidates, helpCount, labelsFor, matchSkills } from "./experts";
+import { doorCandidates, eligibleCandidates, helpCount, labelsFor, matchSkills, type Candidate } from "./experts";
+import { T2 } from "./concierge/texts";
 import { T, type Lang } from "./i18n";
 import { effectStatement } from "./outbox";
 import { syncNeed } from "./thread-card";
@@ -14,6 +15,8 @@ import { DAY, HOUR, addMs, audit, newId, nowIso } from "./util";
 export type Status = "invited" | "accepted" | "mutually_confirmed" | "completed" | "declined" | "expired" | "cancelled";
 export type Event = "accept" | "decline" | "confirm" | "complete" | "expire" | "cancel";
 export type Actor = "requester" | "candidate" | "system";
+/** How a request finds people: by its skills (default), by people open to projects ("hire"), or by the doors they can open ("door"). */
+export type Want = "hire" | "door";
 
 export const TERMINAL: ReadonlySet<Status> = new Set(["completed", "declined", "expired", "cancelled"]);
 export const REVEAL: ReadonlySet<Status> = new Set(["mutually_confirmed", "completed"]);
@@ -72,10 +75,12 @@ export async function requestIntro(
   now = nowIso(),
   lang: Lang = "en",
   pickedSkills?: string[],
+  want?: Want,
 ): Promise<{ needId: string; introId: string | null; skills: string[]; keys: string[] }> {
   const text = rawText.split(/\s+/).join(" ").trim().slice(0, 500);
   const skills = pickedSkills?.length ? pickedSkills : matchSkills(text);
-  if (!skills.length) {
+  // A warm introduction is found by the doors people name, not by skills, so it needs no skill.
+  if (!skills.length && want !== "door") {
     throw new NoSkillError(T(lang).introNoSkill);
   }
   const open = await db
@@ -87,8 +92,8 @@ export async function requestIntro(
   }
   const needId = newId();
   await db
-    .prepare("INSERT INTO needs(id, member_id, text, skills_json, status, expires_at, created_at) VALUES (?,?,?,?, 'open', ?, ?)")
-    .bind(needId, requesterId, text, JSON.stringify(skills), addMs(now, REQUEST_TTL), now)
+    .prepare("INSERT INTO needs(id, member_id, text, skills_json, status, expires_at, created_at, want) VALUES (?,?,?,?, 'open', ?, ?, ?)")
+    .bind(needId, requesterId, text, JSON.stringify(skills), addMs(now, REQUEST_TTL), now, want ?? null)
     .run();
   await audit(db, "intro.request", requesterId, needId, { skills });
   const { introId, keys } = await nextCandidate(db, needId, now, false);
@@ -104,7 +109,7 @@ async function nextCandidate(db: D1Database, needId: string, now: string, notify
 export async function inviteCandidate(
   db: D1Database,
   needId: string,
-  need: { member_id: string; text: string; skills_json: string },
+  need: { member_id: string; text: string; skills_json: string; want?: string | null },
   c: { member_id: string; total: number; components: Record<string, number> },
   now: string,
 ): Promise<{ introId: string; keys: string[] }> {
@@ -114,7 +119,11 @@ export async function inviteCandidate(
   const cand = await contact(db, c.member_id);
   const cm = T(cand.lang);
   // "Why you" (plan: journey 4): the expert sees why they were picked, never the asker's name.
-  const why = await helpCount(db, c.member_id, codes[0]!);
+  const why = codes.length ? await helpCount(db, c.member_id, codes[0]!) : 0;
+  const invite =
+    need.want === "door"
+      ? T2(cand.lang).introDoorInvite(escapeHtml(need.text))
+      : cm.introInvite(escapeHtml(labelsFor(codes, cand.lang)), escapeHtml(need.text), why ? cm.introWhy(escapeHtml(labelsFor([codes[0]!], cand.lang)), why) : "");
   await db.batch([
     db
       .prepare(
@@ -127,7 +136,7 @@ export async function inviteCandidate(
       .prepare("INSERT INTO audit(at, actor, action, subject, detail) VALUES (?,?,?,?,?)")
       .bind(now, "system", "intro.invite", id, JSON.stringify({ total: c.total, components: c.components })),
     effectStatement(db, key, cand.tg, {
-      text: cm.introInvite(escapeHtml(labelsFor(codes, cand.lang)), escapeHtml(need.text), why ? cm.introWhy(escapeHtml(labelsFor([codes[0]!], cand.lang)), why) : ""),
+      text: invite,
       buttons: [[btn(cm.bAccept, `i:${id}:accept`), btn(cm.bDecline, `i:${id}:decline`)]],
     }),
   ]);
@@ -135,14 +144,16 @@ export async function inviteCandidate(
 }
 
 async function pickCandidate(db: D1Database, needId: string, now: string, notifyNone: boolean): Promise<{ introId: string | null; keys: string[] }> {
-  const need = await db.prepare("SELECT * FROM needs WHERE id=?").bind(needId).first<{ member_id: string; text: string; skills_json: string; status: string; expires_at: string }>();
+  const need = await db
+    .prepare("SELECT * FROM needs WHERE id=?")
+    .bind(needId)
+    .first<{ member_id: string; text: string; skills_json: string; want: string | null; status: string; expires_at: string }>();
   if (!need || !["open", "matching"].includes(need.status)) return { introId: null, keys: [] };
   const tried = new Set(
     (await db.prepare("SELECT candidate_id FROM intros WHERE need_id=?").bind(needId).all<{ candidate_id: string }>()).results.map((r) => r.candidate_id),
   );
   const codes = JSON.parse(need.skills_json) as string[];
-  const candidates =
-    tried.size >= MAX_CANDIDATES || need.expires_at <= now ? [] : await eligibleCandidates(db, need.member_id, codes, now, tried);
+  const candidates = tried.size >= MAX_CANDIDATES || need.expires_at <= now ? [] : await candidatesFor(db, need, codes, now, tried);
   const requester = await contact(db, need.member_id);
   if (!candidates.length) {
     const key = `need:${needId}:no_match`;
@@ -156,6 +167,18 @@ async function pickCandidate(db: D1Database, needId: string, now: string, notify
     return { introId: null, keys: notifyNone ? [key] : [] };
   }
   return inviteCandidate(db, needId, need, candidates[0]!, now);
+}
+
+/** Who may be invited depends on the request: people with the skills, people open to projects, or people who opened doors. */
+async function candidatesFor(
+  db: D1Database,
+  need: { member_id: string; text: string; want: string | null },
+  codes: string[],
+  now: string,
+  tried: Set<string>,
+): Promise<Candidate[]> {
+  if (need.want === "door") return doorCandidates(db, need.member_id, need.text, now, tried);
+  return eligibleCandidates(db, need.member_id, codes, now, tried, { openWork: need.want === "hire" });
 }
 
 /** Apply a button press. Returns a short reply and the effect keys to dispatch. */

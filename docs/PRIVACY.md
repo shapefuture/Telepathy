@@ -31,6 +31,11 @@ group. Backups roll over after 14 days.
 which everyone there can already read. If the owner turned on hints, the bot may reply to a
 question with a link to an earlier answer in the same group.
 
+**Jobs.** `/introduce` keeps one line you write about the doors you can open, to match against
+introduction requests; `/introduce off` or `/forget_me` removes it, and nobody sees it. `/open on` shows
+that you're open to projects, and `/forget_me` removes that too. A deal you confirm keeps only the dates
+and its status. Counts of what a group asks (`/jobs`) use stored messages and show no names.
+
 **Answer feedback.** 👍/👎 and "wrong source" buttons are private. Nobody sees who voted;
 totals only nudge search ranking. `/forget_me` deletes your votes.
 

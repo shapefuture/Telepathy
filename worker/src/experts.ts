@@ -3,7 +3,7 @@
 
 import type { Lang } from "./i18n";
 import skillsData from "./skills.json";
-import { normalize, stemKey, tokens } from "./text";
+import { contentTerms, normalize, stemKey, termPresent, tokens } from "./text";
 import { DAY, nowIso } from "./util";
 
 export interface Skill {
@@ -130,12 +130,14 @@ export async function offeredSkills(db: D1Database, requesterId: string, limit =
   return results.map((r) => r.code).filter((c) => TAXONOMY.has(c));
 }
 
+/** `openWork`: only people who said they're open to projects (hiring requests, plan: «Ищу исполнителя»). */
 export async function eligibleCandidates(
   db: D1Database,
   requesterId: string,
   codes: string[],
   now: string,
   exclude: Set<string> = new Set(),
+  opts: { openWork?: boolean } = {},
 ): Promise<Candidate[]> {
   if (!codes.length) return [];
   const weekAgo = nowIso(new Date(Date.parse(now) - 7 * DAY));
@@ -154,6 +156,7 @@ export async function eligibleCandidates(
        FROM members m
        JOIN skills s ON s.member_id = m.id AND s.state = 'confirmed' AND s.code IN (SELECT value FROM json_each(?))
        WHERE m.discoverable = 1 AND m.available = 1 AND m.removed_at IS NULL AND m.collection_opt_out = 0
+         AND (? = 0 OR m.open_work = 1)
          AND NOT (m.quiet_from IS NOT NULL AND ((m.quiet_from <= m.quiet_to AND ? >= m.quiet_from AND ? < m.quiet_to)
                   OR (m.quiet_from > m.quiet_to AND (? >= m.quiet_from OR ? < m.quiet_to))))
          AND m.id != ?
@@ -161,7 +164,16 @@ export async function eligibleCandidates(
                          AND i.status IN ('invited','accepted'))
        GROUP BY m.id`,
     )
-    .bind(weekAgo, requesterId, requesterId, JSON.stringify(codes), ...Array(4).fill(new Date(now).getUTCHours()), requesterId, requesterId)
+    .bind(
+      weekAgo,
+      requesterId,
+      requesterId,
+      JSON.stringify(codes),
+      opts.openWork ? 1 : 0,
+      ...Array(4).fill(new Date(now).getUTCHours()),
+      requesterId,
+      requesterId,
+    )
     .all<{ member_id: string; matched: number; kinds: string; pending: number; completed: number; helpful: number; shared: number; req_sources: number }>();
   const out: Candidate[] = [];
   for (const r of results) {
@@ -180,6 +192,45 @@ export async function eligibleCandidates(
       pending: r.pending,
     });
     out.push({ member_id: r.member_id, total, components });
+  }
+  return out.sort((a, b) => b.total - a.total || a.member_id.localeCompare(b.member_id));
+}
+
+/** Whether `hour` (UTC) falls inside someone's quiet hours. */
+export const inQuiet = (from: number | null, to: number | null, hour: number): boolean =>
+  from !== null && to !== null && ((from <= to && hour >= from && hour < to) || (from > to && (hour >= from || hour < to)));
+
+/**
+ * Warm introductions («Нужен выход на…»): people who wrote which doors they can open, in a group whose
+ * owner turned introductions on. Matched on the words of their own line; nothing is inferred.
+ */
+export async function doorCandidates(db: D1Database, requesterId: string, text: string, now: string, exclude: Set<string> = new Set()): Promise<Candidate[]> {
+  const terms = contentTerms(text).filter((t) => t.length >= 4);
+  if (!terms.length) return [];
+  const weekAgo = nowIso(new Date(Date.parse(now) - 7 * DAY));
+  const { results } = await db
+    .prepare(
+      `SELECT DISTINCT m.id AS member_id, m.doors AS doors, m.quiet_from AS quiet_from, m.quiet_to AS quiet_to,
+              (SELECT COUNT(*) FROM intros i WHERE i.candidate_id = m.id AND i.created_at >= ?
+                 AND i.status IN ('invited','accepted')) AS pending
+       FROM members m
+       JOIN source_access a ON a.member_id = m.id AND a.revoked_at IS NULL
+       JOIN source_access b ON b.source_id = a.source_id AND b.member_id = ? AND b.revoked_at IS NULL
+       JOIN sources s ON s.id = a.source_id AND s.enabled = 1 AND s.doors = 1
+       WHERE m.doors IS NOT NULL AND m.discoverable = 1 AND m.available = 1 AND m.removed_at IS NULL AND m.collection_opt_out = 0
+         AND m.id != ?
+         AND NOT EXISTS (SELECT 1 FROM intros i WHERE i.candidate_id = m.id AND i.requester_id = ? AND i.status IN ('invited','accepted'))`,
+    )
+    .bind(weekAgo, requesterId, requesterId, requesterId)
+    .all<{ member_id: string; doors: string; quiet_from: number | null; quiet_to: number | null; pending: number }>();
+  const hour = new Date(now).getUTCHours();
+  const out: Candidate[] = [];
+  for (const r of results) {
+    if (exclude.has(r.member_id) || r.pending >= EXPERT_WEEKLY_CAP || inQuiet(r.quiet_from, r.quiet_to, hour)) continue;
+    const folded = normalize(r.doors);
+    const hits = terms.filter((t) => termPresent(t, folded)).length;
+    if (!hits) continue;
+    out.push({ member_id: r.member_id, total: Math.round((hits / terms.length) * 10_000) / 10_000, components: { matched: hits, needed: terms.length } });
   }
   return out.sort((a, b) => b.total - a.total || a.member_id.localeCompare(b.member_id));
 }

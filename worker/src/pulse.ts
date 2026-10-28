@@ -8,6 +8,8 @@ import { T, defaultLang, type Lang } from "./i18n";
 import { escapeHtml } from "./text";
 import { DAY, nowIso } from "./util";
 import { dueDay } from "./digest";
+import { closedOf, JOB_KINDS, type JobKind } from "./concierge/jobs";
+import { T2 } from "./concierge/texts";
 import type { App } from "./bot";
 import type { InlineButton } from "./telegram";
 
@@ -72,6 +74,15 @@ const hoursText = (h: number | null, lang: Lang) => {
   return `${Math.max(1, Math.round(h * 60))} ${lang === "ru" ? "мин" : "min"}`;
 };
 
+/** What closed this week, by kind of request, and the introductions and deals both sides confirmed. */
+function closedLine(c: { answered: Record<JobKind, number>; connected: number; agreed: number }, lang: Lang): string {
+  const t = T2(lang);
+  const byKind = JOB_KINDS.filter((k) => c.answered[k] > 0)
+    .map((k) => `${t.jobKind[k]} ${c.answered[k]}`)
+    .join(" · ");
+  return t.pulseClosed(byKind || "0", c.connected, c.agreed);
+}
+
 /** The card the owner gets, and the celebratory line the group may get (no private details). */
 export async function pulseCard(db: D1Database, sourceId: string, title: string, since: string, lang: Lang): Promise<{ text: string; quiet: boolean; shareText: string }> {
   const m = T(lang);
@@ -84,6 +95,7 @@ export async function pulseCard(db: D1Database, sourceId: string, title: string,
   else {
     lines.push(m.pulseQuestions(p.questions), m.pulseAnswered(p.answered), m.pulseWaiting(p.waiting), m.pulseSpeed(hoursText(p.medianHours, lang)));
     lines.push(p.top ? m.pulseTop(helper, p.top.n) : m.pulseNoHelp);
+    lines.push(closedLine(await closedOf(db, sourceId, since), lang));
   }
   const shareText = p.questions ? m.pulseShare(escapeHtml(title), p.questions, p.answered, p.top ? helper : m.memberAnon) : "";
   return { text: lines.join("\n"), quiet: !p.questions, shareText };

@@ -10,14 +10,20 @@ import { citation } from "../ingest";
 import { effectStatement, type Payload } from "../outbox";
 import { digestHour, ownerIds, timezone } from "../env";
 import { escapeHtml, snippet } from "../text";
-import { localParts, nowIso } from "../util";
+import { DAY, localParts, nowIso } from "../util";
 import type { InlineButton } from "../telegram";
 import { decideBest, topicLabel } from "./best";
 import { setVerdict } from "./gate";
 import { decideJoin } from "./join";
 import { executeLive } from "./live";
 import { dismissSpam, executeModerate } from "./spam";
+import { census, censusView, CENSUS_DAYS, NEWCOMER_MIN, newcomersOf } from "./jobs";
+import { isoWeek, launchRounds } from "./rounds";
+import { onboardingCard } from "../welcome";
 import { btn, T2 } from "./texts";
+
+/** Newcomers who get the onboarding card from one press of "Познакомить". The rest wait for the next week. */
+const NEWCOMER_SEND_MAX = 30;
 
 export interface Scope {
   ids: string[];
@@ -29,10 +35,12 @@ export interface Counts {
   p: number;
   l: number;
   b: number;
+  /** Groups with newcomers who have had no useful contact (plan: the board's action line). */
+  n: number;
   g: number;
 }
 
-const ZERO: Counts = { j: 0, p: 0, l: 0, b: 0, g: 0 };
+const ZERO: Counts = { j: 0, p: 0, l: 0, b: 0, n: 0, g: 0 };
 
 /** The groups a person may decide for: operators see all; others, the groups where they are an admin. */
 export async function scopeOf(app: App, tgId: number): Promise<Scope> {
@@ -62,6 +70,7 @@ export async function countsOf(db: D1Database, scope: Scope): Promise<Counts> {
       ids,
     ),
     b: await n("SELECT COUNT(*) AS n FROM answer_proposals WHERE status='pending' AND source_id IN (SELECT value FROM json_each(?))", ids),
+    n: (await openNewcomers(db, scope.ids)).length,
     g: scope.operator ? await n("SELECT COUNT(*) AS n FROM gap_signals WHERE status IN ('new','notified')") : 0,
   };
 }
@@ -157,6 +166,16 @@ async function itemAt(app: App, sec: string, offset: number, scope: Scope, lang:
       actions: [[btn(t.bMakeBest, `bd:b:y:${r.id}`), btn(t.bNotThat, `bd:b:n:${r.id}`)], [btn(t.bSkip, `bd:b:s:${r.id}`)]],
     };
   }
+  if (sec === "n") {
+    // One group at a time: the one with the most newcomers without contact first.
+    const g = (await openNewcomers(db, scope.ids))[offset];
+    if (!g) return null;
+    const src = await db.prepare("SELECT title FROM sources WHERE id=?").bind(g.id).first<{ title: string | null }>();
+    return {
+      text: t.newcomersItem(escapeHtml(src?.title ?? ""), g.n),
+      actions: [[btn(t.bRound, `bd:n:r:${g.id}`), btn(t.bIntro, `bd:n:i:${g.id}`)]],
+    };
+  }
   if (sec === "g" && scope.operator) {
     const g = await db
       .prepare("SELECT job_code, members FROM gap_signals WHERE status IN ('new','notified') ORDER BY members DESC LIMIT 1 OFFSET ?")
@@ -175,7 +194,7 @@ async function itemAt(app: App, sec: string, offset: number, scope: Scope, lang:
 export async function boardView(app: App, scope: Scope, lang: "en" | "ru", sec: string | null, offset = 0): Promise<{ text: string; buttons: InlineButton[][] }> {
   const t = T2(lang);
   const c = await countsOf(app.db, scope);
-  const total = c.j + c.p + c.l + c.b + c.g;
+  const total = c.j + c.p + c.l + c.b + c.n + c.g;
   if (!sec) {
     if (!total) return { text: t.boardQuiet, buttons: [] };
     const rows: [string, number, string][] = [
@@ -183,6 +202,7 @@ export async function boardView(app: App, scope: Scope, lang: "en" | "ru", sec: 
       ["p", c.p, t.secSpam(c.p)],
       ["l", c.l, t.secLive(c.l)],
       ["b", c.b, t.secBest(c.b)],
+      ["n", c.n, t.secNewcomers(c.n)],
       ["g", c.g, t.secGaps(c.g)],
     ];
     return {
@@ -217,6 +237,7 @@ async function targetOf(db: D1Database, sec: string, id: string): Promise<Target
       .prepare("SELECT a.source_id AS sourceId, s.chat_id AS chatId FROM answer_proposals a JOIN sources s ON s.id = a.source_id WHERE a.id=?")
       .bind(id)
       .first<Target>();
+  if (sec === "n") return db.prepare("SELECT id AS sourceId, chat_id AS chatId FROM sources WHERE id=?").bind(id).first<Target>();
   return null;
 }
 
@@ -281,6 +302,10 @@ export async function boardCallback(app: App, cb: CallbackQueryLike, data: strin
       await setVerdict(app.db, subject, r.skipped ? "skip" : "good", now);
       note = r.skipped ? t.liveSkipped : t.done;
     }
+  } else if (sec === "n") {
+    const r = await newcomerAction(app, id, act, now, lang);
+    note = r.note;
+    keys = r.keys;
   } else if (sec === "b") {
     const verdict = yes ? "accept" : act === "n" ? "decline" : "skip";
     note = (await decideBest(app.db, id, verdict, now)) === "ok" ? t.done : t.alreadyDone;
@@ -328,8 +353,9 @@ export async function boardDaily(app: App, now = new Date()): Promise<number> {
   const recipients = new Map<number, Set<string>>();
   const add = (tg: number, id: string) => recipients.set(tg, (recipients.get(tg) ?? new Set()).add(id));
   for (const s of sources) {
+    await storeNewcomers(app.db, s.id, now);
     const c = await countsOf(app.db, { ids: [s.id], operator: false });
-    if (!c.j && !c.p && !c.l && !c.b) continue;
+    if (!c.j && !c.p && !c.l && !c.b && !c.n) continue;
     for (const tg of await chatAdminIds(app, s.chat_id)) add(tg, s.id);
   }
   for (const tg of ownerIds(app.env)) for (const s of sources) add(tg, s.id);
@@ -345,4 +371,110 @@ export async function boardDaily(app: App, now = new Date()): Promise<number> {
     sent += 1;
   }
   return sent;
+}
+
+// ---- newcomers without contact (plan: the board's action line) ------------------------------------
+
+interface NewcomerNote {
+  id: string;
+  /** People in the group, as the daily run counted them. */
+  n: number;
+  /** The ISO week the owner last acted on this group's newcomers, or null. */
+  acted: string | null;
+}
+
+async function newcomerNotes(db: D1Database, ids: string[]): Promise<NewcomerNote[]> {
+  if (!ids.length) return [];
+  const { results } = await db
+    .prepare("SELECT key, value FROM settings WHERE key IN (SELECT 'newcomers.' || value FROM json_each(?))")
+    .bind(JSON.stringify(ids))
+    .all<{ key: string; value: string }>();
+  return results.map((r) => ({ id: r.key.slice("newcomers.".length), ...(JSON.parse(r.value) as { n: number; acted: string | null }) }));
+}
+
+/** The groups with a newcomers item this week: enough people, and no action taken on them this week yet. */
+async function openNewcomers(db: D1Database, ids: string[], now = new Date()): Promise<NewcomerNote[]> {
+  const week = isoWeek(now);
+  return (await newcomerNotes(db, ids))
+    .filter((x) => x.n >= NEWCOMER_MIN && x.acted !== week)
+    .sort((a, b) => b.n - a.n || a.id.localeCompare(b.id));
+}
+
+/** The daily run's count for one group. The week the owner acted is kept, so the item stays hidden. */
+async function storeNewcomers(db: D1Database, sourceId: string, now: Date): Promise<void> {
+  const key = `newcomers.${sourceId}`;
+  const n = (await newcomersOf(db, sourceId, now)).length;
+  const cur = await db.prepare("SELECT value FROM settings WHERE key=?").bind(key).first<{ value: string }>();
+  const acted = cur ? (JSON.parse(cur.value) as { acted: string | null }).acted : null;
+  await db
+    .prepare("INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+    .bind(key, JSON.stringify({ n, acted }))
+    .run();
+}
+
+async function markActed(db: D1Database, sourceId: string, week: string): Promise<void> {
+  const key = `newcomers.${sourceId}`;
+  const cur = await db.prepare("SELECT value FROM settings WHERE key=?").bind(key).first<{ value: string }>();
+  const v = cur ? (JSON.parse(cur.value) as { n: number; acted: string | null }) : { n: 0, acted: null };
+  await db
+    .prepare("INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+    .bind(key, JSON.stringify({ ...v, acted: week }))
+    .run();
+}
+
+/** "Познакомить": each newcomer without contact gets the onboarding card (what they can help with, what they seek). */
+async function introduceNewcomers(app: App, sourceId: string, now: Date): Promise<string[]> {
+  const keys: string[] = [];
+  const cards = new Map<"en" | "ru", { text: string; buttons: InlineButton[][] }>();
+  for (const id of (await newcomersOf(app.db, sourceId, now)).slice(0, NEWCOMER_SEND_MAX)) {
+    const who = await app.db.prepare("SELECT tg_id, lang FROM members WHERE id=?").bind(id).first<{ tg_id: number; lang: string | null }>();
+    if (!who) continue;
+    const lang = who.lang === "ru" ? "ru" : "en";
+    let card = cards.get(lang);
+    if (!card) {
+      card = await onboardingCard(app, sourceId, lang);
+      cards.set(lang, card);
+    }
+    const key = `newcomer:${sourceId}:${who.tg_id}`;
+    await effectStatement(app.db, key, who.tg_id, { text: card.text, buttons: card.buttons }).run();
+    keys.push(key);
+  }
+  return keys;
+}
+
+/** The two buttons on a newcomers item: run this week's round, or introduce them to the club. One per week. */
+async function newcomerAction(app: App, sourceId: string, act: string, now: Date, lang: "en" | "ru"): Promise<{ note: string; keys: string[] }> {
+  const t = T2(lang);
+  const week = isoWeek(now);
+  const current = (await newcomerNotes(app.db, [sourceId]))[0];
+  if (current?.acted === week) return { note: t.newcomersDone, keys: [] };
+  if (act === "r") {
+    const n = await launchRounds(app, sourceId, now);
+    await markActed(app.db, sourceId, week);
+    return { note: n ? t.roundLaunched(n) : t.roundNone, keys: [] };
+  }
+  if (act === "i") {
+    const keys = await introduceNewcomers(app, sourceId, now);
+    await markActed(app.db, sourceId, week);
+    return { note: t.newcomersSent(keys.length), keys };
+  }
+  return { note: t.alreadyDone, keys: [] };
+}
+
+/** /jobs in private: what the groups this person manages were asked over the census window. */
+export async function jobsCommand(app: App, chat: number, tgId: number, langCode?: string): Promise<string[]> {
+  const mem = await ensureMember(app.db, tgId, undefined, langCode);
+  const lang = langOf(mem);
+  const scope = await scopeOf(app, tgId);
+  if (!scope.ids.length) {
+    await app.tg.sendMessage(chat, T2(lang).jobsCommandNone);
+    return [];
+  }
+  const c = await census(app.db, scope.ids, nowIso(new Date(Date.now() - CENSUS_DAYS * DAY)));
+  const doors = await app.db
+    .prepare("SELECT COUNT(*) AS n FROM sources WHERE doors=1 AND enabled=1 AND id IN (SELECT value FROM json_each(?))")
+    .bind(JSON.stringify(scope.ids))
+    .first<{ n: number }>();
+  await app.tg.sendMessage(chat, censusView(c, lang, (doors?.n ?? 0) > 0));
+  return [];
 }

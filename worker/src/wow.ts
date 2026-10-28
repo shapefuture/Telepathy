@@ -3,10 +3,13 @@
 // read from the group just imported, and only the owner (who can already read it) sees it.
 
 import { btn, namesFor, personLabel } from "./thread-card";
+import { CENSUS_DAYS, census } from "./concierge/jobs";
+import { T2 } from "./concierge/texts";
 import { labelIn, matchSkills, TAXONOMY } from "./experts";
 import { T, type Lang } from "./i18n";
 import type { InlineButton } from "./telegram";
 import { escapeHtml, snippet } from "./text";
+import { DAY, nowIso } from "./util";
 
 export const WOW_SAMPLE = 1500;
 
@@ -62,6 +65,14 @@ export async function wowCard(db: D1Database, sourceId: string, lang: Lang, impo
   if (topics.length) lines.push("", `<b>${m.wowTopics}</b>`, topics.map((t) => `<code>${escapeHtml(t)}</code>`).join(" · "));
   if (helpers.length) lines.push("", `<b>${m.wowHelpers}</b>`, ...helpers.map((h) => `${personLabel(h.author_id, names.get(h.author_id), m)} — ${h.n}`));
   lines.push("", forgotten ? `<b>${m.wowForgotten(forgotten)}</b>` : m.wowNoneForgotten);
+  // What the group is asked most, over the census window (plan: the census). Counted from what was imported.
+  const asked = await census(db, [sourceId], nowIso(new Date(Date.now() - CENSUS_DAYS * DAY)));
+  const top = asked.rows
+    .filter((r) => r.n > 0)
+    .sort((a, b) => b.n - a.n)
+    .slice(0, 3)
+    .map((r) => `${T2(lang).jobKind[r.kind]} ${r.n}`);
+  if (top.length) lines.push("", T2(lang).wowJobs(top.join(" · ")));
   return { text: lines.join("\n"), buttons: forgotten ? [[btn(m.bLook, `wow:${sourceId}`)]] : undefined };
 }
 

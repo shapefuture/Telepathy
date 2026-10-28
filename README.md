@@ -29,6 +29,9 @@ called; the egress guard denies them by default.
   request to a result. For now it only replays past requests for the owner to judge (`/concierge`);
   it messages nobody, and anything it may later do alone is capped in code and earned from those
   verdicts. See [`docs/CONCIERGE.md`](docs/CONCIERGE.md).
+- **Jobs:** what a club is asked, by kind (`/jobs`); who recommends a topic, quoted with links; hiring
+  and introductions that go only to people who opted in; a deal counts when both sides confirm it.
+  See [`docs/CONCIERGE.md`](docs/CONCIERGE.md).
 - **Daily digest:** opt-in summary (`/digest on`) of activity, open/answered questions and new
   documents in the groups you can read.
 - **Data rights:** full history by default. `/forget_me` and `/forget` (reply to a message)

@@ -8,15 +8,17 @@ import { langOf, type Member } from "./acl";
 import { brief } from "./ai/beam";
 import { recordAnswer, vote } from "./feedback";
 import { bridgeFromThread, closeBridgeHelpful } from "./alliance";
+import { kindOf } from "./concierge/jobs";
+import { T2 } from "./concierge/texts";
 import { T, defaultLang, type Lang } from "./i18n";
-import { cancelNeed, IntroError, NoSkillError, requestIntro } from "./intros";
+import { cancelNeed, IntroError, NoSkillError, requestIntro, type Want } from "./intros";
 import { labelIn, offeredSkills, TAXONOMY } from "./experts";
 import { effectStatement } from "./outbox";
 import { answer, type AnswerStatus, type Quote, type SearchFilters } from "./search";
-import { applyCard, btn, helpedCount, outcomeButtons, OUTCOMES, renderThread, type Outcome, type ThreadRow, type ThreadState } from "./thread-card";
+import { applyCard, btn, dealStatus, helpedCount, outcomeButtons, OUTCOMES, renderThread, type Outcome, type ThreadRow, type ThreadState } from "./thread-card";
 import { DefiniteFailure } from "./telegram";
-import { escapeHtml } from "./text";
-import { addMs, HOUR, newId, nowIso } from "./util";
+import { escapeHtml, snippet } from "./text";
+import { addMs, audit, HOUR, newId, nowIso } from "./util";
 
 export interface Ask {
   memberId: string;
@@ -122,9 +124,14 @@ async function askPeople(app: App, mem: Member, t: ThreadRow, now: Date, picked?
     return [];
   }
   const lang = langOf(mem);
+  // Hiring asks for people open to projects, and the answers to the clarifying question go with it.
+  // A request for an introduction is matched on the doors people have named (plan: «Нужен выход на…»).
+  const kind = kindOf(t.question);
+  const want: Want | undefined = kind === "hiring" ? "hire" : kind === "introduction" ? "door" : undefined;
+  const text = want === "hire" && t.clarify ? `${t.question}\n${t.clarify}` : t.question;
   try {
     const at = nowIso(now);
-    const r = await requestIntro(app.db, mem.id, t.question, at, lang, picked ? [picked] : undefined);
+    const r = await requestIntro(app.db, mem.id, text, at, lang, picked ? [picked] : undefined, want);
     await app.db
       .prepare("UPDATE threads SET need_id=?, state='asking', updated_at=?, rev=rev+1 WHERE id=?")
       .bind(r.needId, at, t.id)
@@ -190,7 +197,53 @@ export async function threadAction(
       await toast(m.notAvailable);
       return [];
     }
+    // A hiring request gets one question first: budget, deadline, format (or skip).
+    if (kindOf(t.question) === "hiring" && t.clarify === null && !t.need_id) return askClarify(app, mem, t, now);
     return askPeople(app, mem, t, now);
+  }
+  if (action === "clr0") {
+    // "Пропустить" on the clarifying question: ask people with the request as it is.
+    if (t.need_id || t.clarify !== null) {
+      await toast(m.notAvailable);
+      return [];
+    }
+    await db.batch([
+      db.prepare("UPDATE threads SET clarify='', updated_at=?, rev=rev+1 WHERE id=?").bind(at, t.id),
+      db.prepare("DELETE FROM pending_inputs WHERE member_id=? AND kind='clarify'").bind(mem.id),
+    ]);
+    await toast("");
+    return askPeople(app, mem, { ...t, clarify: "" }, now);
+  }
+  if (action === "open" || action === "openoff") {
+    // Open to projects: a person's own switch, needing /optin first so that they can be found.
+    const tt = T2(lang);
+    const on = action === "open";
+    if (on && !mem.discoverable) {
+      await toast(tt.openNeedsOptIn, true);
+      return [];
+    }
+    await db.prepare("UPDATE members SET open_work=? WHERE id=?").bind(on ? 1 : 0, mem.id).run();
+    await audit(db, "consent.open_work", mem.id, mem.id, { granted: on });
+    await paint(app, t.id);
+    await toast(on ? tt.openOn : tt.openOff);
+    return [];
+  }
+  if (action === "deal") {
+    // "We agreed on the work": only after the introduction connected, and only the asker can propose it.
+    const tt = T2(lang);
+    const intro = t.need_id ? await connectedIntro(db, t.need_id) : null;
+    if (!intro || t.outcome || t.state === "closed" || kindOf(t.question) !== "hiring") {
+      await toast(tt.dealNotYet);
+      return [];
+    }
+    if ((await dealStatus(db, intro.id)) === "proposed") {
+      await toast(tt.dealWaiting);
+      return [];
+    }
+    const keys = await proposeDeal(app, t, intro, at);
+    await paint(app, t.id);
+    await toast(tt.dealAskSent);
+    return keys;
   }
   if (action === "sk") {
     // A topic picked for "Спросить людей" when the question named none.
@@ -301,6 +354,92 @@ async function sendThanks(app: App, mem: Member, t: ThreadRow, words: string | n
   return [key];
 }
 
+/** The clarifying question for a hiring request: one message, and the asker's next private text answers it. */
+async function askClarify(app: App, mem: Member, t: ThreadRow, now: Date): Promise<string[]> {
+  const tt = T2(langOf(mem));
+  await app.db
+    .prepare(
+      "INSERT INTO pending_inputs(member_id, kind, ref, expires_at) VALUES (?, 'clarify', ?, ?) " +
+        "ON CONFLICT(member_id) DO UPDATE SET kind='clarify', ref=excluded.ref, expires_at=excluded.expires_at",
+    )
+    .bind(mem.id, t.id, addMs(nowIso(now), HOUR))
+    .run();
+  await app.tg.sendMessage(t.chat_id, tt.clarifyAsk, { buttons: [[btn(tt.bClarifySkip, `t:${t.id}:clr0`)]] });
+  return [];
+}
+
+/** The answer to the clarifying question is kept on the card, and the people are asked with it. */
+async function clarifyAnswer(app: App, mem: Member, t: ThreadRow | null, text: string, now: Date): Promise<string[] | null> {
+  if (!t || t.need_id || t.clarify !== null) {
+    await app.db.prepare("DELETE FROM pending_inputs WHERE member_id=?").bind(mem.id).run();
+    return null;
+  }
+  const words = text.trim().slice(0, 300);
+  if (!words) return null;
+  await app.db.batch([
+    app.db.prepare("UPDATE threads SET clarify=?, updated_at=?, rev=rev+1 WHERE id=?").bind(words, nowIso(now), t.id),
+    app.db.prepare("DELETE FROM pending_inputs WHERE member_id=?").bind(mem.id),
+  ]);
+  return askPeople(app, mem, { ...t, clarify: words }, now);
+}
+
+/** The introduction a deal is about: the latest one for the request, once contacts are open. */
+async function connectedIntro(db: D1Database, needId: string): Promise<{ id: string; candidate_id: string } | null> {
+  return db
+    .prepare("SELECT id, candidate_id FROM intros WHERE need_id=? AND status IN ('mutually_confirmed','completed') ORDER BY created_at DESC, rowid DESC LIMIT 1")
+    .bind(needId)
+    .first<{ id: string; candidate_id: string }>();
+}
+
+/** "We agreed on the work": the person the asker was introduced to is asked to confirm it. */
+async function proposeDeal(app: App, t: ThreadRow, intro: { id: string; candidate_id: string }, at: string): Promise<string[]> {
+  const db = app.db;
+  const who = await db.prepare("SELECT tg_id, lang FROM members WHERE id=?").bind(intro.candidate_id).first<{ tg_id: number; lang: Lang | null }>();
+  if (!who) return [];
+  const tt = T2(who.lang ?? defaultLang());
+  const key = `deal:${intro.id}:${at}`;
+  await db.batch([
+    db
+      .prepare(
+        "INSERT INTO deals(intro_id, requester_at, candidate_at, status, updated_at) VALUES (?, ?, NULL, 'proposed', ?) " +
+          "ON CONFLICT(intro_id) DO UPDATE SET requester_at=excluded.requester_at, candidate_at=NULL, status='proposed', updated_at=excluded.updated_at",
+      )
+      .bind(intro.id, at, at),
+    effectStatement(db, key, who.tg_id, {
+      text: tt.dealAsk(escapeHtml(snippet(t.question, [], 120))),
+      buttons: [[btn(tt.bDealYes, `dl:${intro.id}:y`), btn(tt.bDealNo, `dl:${intro.id}:n`)]],
+    }),
+  ]);
+  return [key];
+}
+
+/**
+ * The introduced person's answer to a proposed deal. "Yes" closes the thread as a deal, now that both
+ * have confirmed it; "not yet" leaves the thread open, and the asker can ask again.
+ */
+export async function dealAnswer(app: App, mem: Member, introId: string, yes: boolean, now = new Date()): Promise<{ text: string; keys: string[] }> {
+  const db = app.db;
+  const m = T(langOf(mem));
+  const at = nowIso(now);
+  const intro = await db
+    .prepare("SELECT id, need_id, candidate_id, status FROM intros WHERE id=?")
+    .bind(introId)
+    .first<{ id: string; need_id: string; candidate_id: string; status: string }>();
+  if (!intro || intro.candidate_id !== mem.id || !["mutually_confirmed", "completed"].includes(intro.status)) return { text: m.notAvailable, keys: [] };
+  const t = await db.prepare("SELECT * FROM threads WHERE need_id=? AND outcome IS NULL ORDER BY created_at DESC LIMIT 1").bind(intro.need_id).first<ThreadRow>();
+  if (!t) return { text: m.notAvailable, keys: [] };
+  if (yes) {
+    const r = await db.prepare("UPDATE deals SET status='agreed', candidate_at=?, updated_at=? WHERE intro_id=? AND status='proposed'").bind(at, at, intro.id).run();
+    if (!r.meta.changes) return { text: m.notAvailable, keys: [] };
+    await close(db, t.id, "solved", intro.candidate_id, at); // shown as a deal: see dealAgreed in thread-card.ts
+    await paint(app, t.id);
+    return { text: T2(langOf(mem)).dealConfirmed, keys: [] };
+  }
+  const r = await db.prepare("UPDATE deals SET status='declined', candidate_at=NULL, updated_at=? WHERE intro_id=? AND status='proposed'").bind(at, intro.id).run();
+  if (r.meta.changes) await paint(app, t.id);
+  return { text: T2(langOf(mem)).dealDeclinedHelper, keys: [] };
+}
+
 /**
  * The asker's next private message after 🙏 is the thank-you's words, if the prompt is still open
  * (an hour). Returns the effect keys to dispatch, or null when the message is an ordinary one.
@@ -309,12 +448,13 @@ export async function answerPending(app: App, mem: Member, text: string, now = n
   const at = nowIso(now);
   const pending = await app.db.prepare("SELECT kind, ref, expires_at FROM pending_inputs WHERE member_id=?").bind(mem.id).first<{ kind: string; ref: string; expires_at: string }>();
   if (!pending) return null;
-  if (pending.kind !== "thanks") return null; // e.g. a join screening: answered by that flow
+  if (pending.kind !== "thanks" && pending.kind !== "clarify") return null; // e.g. a join screening: answered by that flow
   if (pending.expires_at <= at) {
     await app.db.prepare("DELETE FROM pending_inputs WHERE member_id=?").bind(mem.id).run();
     return null;
   }
   const t = await ownThread(app.db, pending.ref, mem.id);
+  if (pending.kind === "clarify") return clarifyAnswer(app, mem, t, text, now);
   if (!t || !t.helper_id || t.thanked_at) {
     await app.db.prepare("DELETE FROM pending_inputs WHERE member_id=?").bind(mem.id).run();
     return null;

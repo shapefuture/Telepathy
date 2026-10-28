@@ -89,6 +89,26 @@ async function roundFor(app: App, m: Member, week: string, now: Date): Promise<v
   await effectStatement(db, `round:${week}:${m.id}`, m.tg_id, { text: T2(langOf(m)).roundRequester(labelsFor(topics, langOf(m))) }).run();
 }
 
+export const LAUNCH_PER_PRESS = 50;
+
+/**
+ * "Запустить раунд" on the owner's board: this week's round now, for the opted-in people in one group
+ * who don't have one yet. The same rules as the Monday round, so nobody new is reached.
+ */
+export async function launchRounds(app: App, sourceId: string, now = new Date()): Promise<number> {
+  const week = isoWeek(now);
+  const { results: members } = await app.db
+    .prepare(
+      "SELECT m.* FROM members m WHERE m.rounds = 1 AND m.discoverable = 1 AND m.available = 1 AND m.removed_at IS NULL AND m.collection_opt_out = 0 " +
+        "AND EXISTS (SELECT 1 FROM source_access a WHERE a.member_id = m.id AND a.source_id = ? AND a.revoked_at IS NULL) " +
+        "AND NOT EXISTS (SELECT 1 FROM intro_rounds r WHERE r.week = ? AND r.member_id = m.id) LIMIT ?",
+    )
+    .bind(sourceId, week, LAUNCH_PER_PRESS)
+    .all<Member>();
+  for (const m of members) await roundFor(app, m, week, now);
+  return members.length;
+}
+
 /** The topics a member asked about most in the lookback window. */
 async function topicsOf(db: D1Database, memberId: string, now: Date): Promise<string[]> {
   const { results } = await db

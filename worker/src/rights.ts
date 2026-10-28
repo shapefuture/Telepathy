@@ -1,5 +1,6 @@
 // Data rights and retention (P08-09, P11-07, C06, C13, K15).
 
+import { scrubStatement } from "./concierge/replay";
 import { audit, DAY, nowIso } from "./util";
 
 export async function forgetMember(db: D1Database, memberId: string, tgId: number): Promise<{ passages: number; skills: number; intros: number }> {
@@ -25,6 +26,7 @@ export async function forgetMember(db: D1Database, memberId: string, tgId: numbe
       .bind(memberId),
     // AI summaries can quote anyone; they're only a cache, so drop them all rather than keep their words.
     db.prepare("DELETE FROM ai_cache"),
+    scrubStatement(db), // concierge replay text, for the same reason
   ]);
   const report = { passages: p!.results.length, skills: s!.results.length, intros: i!.results.length };
   await audit(db, "member.forget", memberId, memberId, report);
@@ -47,7 +49,7 @@ export async function applyRetention(db: D1Database, now = new Date(), batch = 5
     total += r.results.length;
   }
   if (total) {
-    await db.prepare("DELETE FROM ai_cache").run();
+    await db.batch([db.prepare("DELETE FROM ai_cache"), scrubStatement(db)]);
     await audit(db, "retention.purge", "system", null, { passages: total });
   }
   return total;

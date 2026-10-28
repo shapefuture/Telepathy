@@ -2,6 +2,7 @@
 // inside the free plan's CPU and subrequest limits; leftovers are picked up next run.
 
 import { pruneCache } from "./ai/cache";
+import { pruneText, replayStep } from "./concierge/replay";
 import type { App } from "./bot";
 import { digestStep } from "./digest";
 import { routeUnanswered, suggestSkills } from "./features";
@@ -99,10 +100,11 @@ export async function runCron(base: App, now = new Date()): Promise<Record<strin
     const today = localParts(now, timezone(app.env)).date;
     const last = await app.db.prepare("SELECT value FROM settings WHERE key='retention.day'").first<{ value: string }>();
     if (last?.value === today) return 0;
-    const n = await applyRetention(app.db, now);
+    const n = (await applyRetention(app.db, now)) + (await pruneText(app.db, now));
     await app.db.prepare("INSERT INTO settings(key, value) VALUES ('retention.day', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(today).run();
     return n;
   });
+  await step("concierge_replay", () => replayStep(app, now));
   await step("routed", async () => (await routeUnanswered(app.db, now)).length);
   await step("suggestions", async () => {
     const today = localParts(now, timezone(app.env)).date;

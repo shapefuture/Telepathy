@@ -1,6 +1,7 @@
 // Telegram ingestion (P03). One idempotent upsert per message:
 // UNIQUE(source_id, msg_id, part) dedupes replays; edits apply only if newer (P03-03).
 
+import { scrubStatement } from "./concierge/replay";
 import { ensureMember, grantStatement, type Visibility } from "./acl";
 import { classify } from "./classify";
 import { nowIso } from "./util";
@@ -117,7 +118,7 @@ export async function removeMessage(db: D1Database, sourceId: string, msgId: num
     .prepare("UPDATE passages SET body=NULL, removed_at=? WHERE source_id=? AND msg_id=? AND removed_at IS NULL")
     .bind(nowIso(), sourceId, msgId)
     .run();
-  if (r.meta.changes > 0) await db.prepare("DELETE FROM ai_cache").run(); // summaries may quote it
+  if (r.meta.changes > 0) await db.batch([db.prepare("DELETE FROM ai_cache"), scrubStatement(db)]); // summaries and concierge cases may quote it
   return r.meta.changes > 0;
 }
 

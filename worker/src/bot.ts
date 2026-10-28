@@ -21,6 +21,7 @@ import { forgetPerson, personForMember } from "./continuity/people";
 import { cmdPassport, CONTINUITY_OWNER, ownerContinuity } from "./continuity/bot";
 import { hydraStatus } from "./hydra/bot";
 import { touchOwners } from "./hydra/notices";
+import { conciergeCallback, conciergeCommand } from "./concierge/bot";
 import { assistCallback, clubDeskCommand, cmdHelpNeed, forgetMissions, listMissions, ownerAssistCommand, OWNER_COMMANDS } from "./assist/bot";
 import { brief } from "./ai/beam";
 import { answer, parseFilters, renderAnswer } from "./search";
@@ -505,6 +506,10 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
     const asker = await knownMember(app, msg);
     return asker ? clubDeskCommand(app, chat, from.id, langOf(asker)) : [];
   }
+  if (cmd === "concierge") {
+    if (!isOwner(app, from.id)) return [];
+    return conciergeCommand(app, chat, from.id, args, from.language_code);
+  }
   if (OWNER_COMMANDS.has(cmd)) {
     if (!isOwner(app, from.id)) return [];
     const owner = await ensureMember(app.db, from.id, "owner", from.language_code);
@@ -903,6 +908,14 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
     // The message carries the group's title: no need to ask Telegram for it again.
     if (!(await enabledSource(app.db, chat.id))) await connectGroup(app, { id: chat.id, title: chat.title, username: chat.username }, cb.from);
     return [];
+  }
+  if (kind === "cg") {
+    // Concierge replay report and review (operators only).
+    if (!isOwner(app, cb.from.id)) {
+      await answerCb();
+      return [];
+    }
+    return conciergeCallback(app, cb, data);
   }
   if (kind === "hy") {
     // Hydra status button on incident notices (owners only).

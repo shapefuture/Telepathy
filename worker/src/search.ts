@@ -50,6 +50,8 @@ interface Row {
 /** P13-08 filters. They only narrow results; the readable set is never widened. */
 export interface SearchFilters {
   since?: string; // ISO timestamp
+  /** Only messages strictly before this time (history replay must not see the future). */
+  before?: string;
   hasFile?: boolean;
 }
 
@@ -60,6 +62,7 @@ function candidatesSql(f: SearchFilters): string {
     "WHERE passages_fts MATCH ? AND p.removed_at IS NULL AND p.body IS NOT NULL AND s.enabled = 1 " +
     "AND p.source_id IN (SELECT value FROM json_each(?)) " +
     (f.since ? "AND p.event_at >= ? " : "") +
+    (f.before ? "AND p.event_at < ? " : "") +
     (f.hasFile ? "AND p.part > 0 " : "") +
     "ORDER BY bm25(passages_fts) LIMIT ?"
   );
@@ -149,7 +152,7 @@ export async function search(
   const src = JSON.stringify([...readable].sort());
   const queries = [lexical, fuzzy].filter((q): q is string => !!q);
   const sql = candidatesSql(filters);
-  const bind = (q: string) => (filters.since ? [q, src, filters.since, TOP_K] : [q, src, TOP_K]);
+  const bind = (q: string) => [q, src, ...(filters.since ? [filters.since] : []), ...(filters.before ? [filters.before] : []), TOP_K];
   const results = await db.batch(queries.map((q) => db.prepare(sql).bind(...bind(q))));
   const rows = new Map<number, Row>();
   const lists = results.map((r) =>

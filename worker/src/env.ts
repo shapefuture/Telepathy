@@ -102,6 +102,11 @@ export interface Env {
   AI?: Ai;
   /** Workers AI model (default @cf/meta/llama-3.3-70b-instruct-fp8-fast); "off" disables the backup. */
   WORKERS_AI_MODEL?: string;
+  // ---- Autonomous concierge (ADR-007, docs/CONCIERGE.md): Workers AI only ----
+  /** Workers AI model for the concierge (default as WORKERS_AI_MODEL's default); "off" disables it. */
+  CONCIERGE_MODEL?: string;
+  /** Owner's autonomy per action, e.g. "clarify:auto,answer:suggest". Missing = off; code caps it. */
+  CONCIERGE_AUTONOMY?: string;
 }
 
 export function ownerIds(env: Env): Set<number> {

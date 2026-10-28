@@ -69,7 +69,14 @@
     "TG_MCP_URL": "",
     // Optional: your Telegram app's api_id (my.telegram.org; api_hash is the TG_API_HASH secret).
     // With both set, group admins load past messages in the app with just phone + code.
-    "TG_API_ID": ""
+    "TG_API_ID": "",
+    // Autonomous concierge (ADR-007, docs/CONCIERGE.md). Workers AI only; "off" disables it.
+    // Empty = the summaries' default model. Nothing messages members yet: this slice only replays
+    // past requests for the owner to review.
+    "CONCIERGE_MODEL": "",
+    // Per-action autonomy the owner allows, e.g. "clarify:auto,answer:suggest". Code still caps
+    // each action and grants "auto" only after 50 reviewed cases with 90% judged right.
+    "CONCIERGE_AUTONOMY": ""
   },
   // Secrets (set with `wrangler secret put NAME`, never committed):
   //   BOT_TOKEN, WEBHOOK_SECRET, ADMIN_TOKEN, OWNER_IDS, FEDERATION_PRIVATE_KEY (only with federation),

@@ -25,6 +25,10 @@ called; the egress guard denies them by default.
 - **Introductions:** `/intro <need>` invites the best-matching expert anonymously. Contacts
   are exchanged only after the expert accepts **and** the requester confirms. Weekly caps,
   72 h expiry, one reminder, private feedback.
+- **Concierge (first step):** an AI agent on Cloudflare Workers AI that will move each member
+  request to a result. For now it only replays past requests for the owner to judge (`/concierge`);
+  it messages nobody, and anything it may later do alone is capped in code and earned from those
+  verdicts. See [`docs/CONCIERGE.md`](docs/CONCIERGE.md).
 - **Daily digest:** opt-in summary (`/digest on`) of activity, open/answered questions and new
   documents in the groups you can read.
 - **Data rights:** full history by default. `/forget_me` and `/forget` (reply to a message)

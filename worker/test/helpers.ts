@@ -136,3 +136,16 @@ export function shownButtons(calls: Call[], chatId: number): { text: string; cal
 export async function enableGroup(app: App, visibility = "") {
   await feed(app, groupCmd(OWNER, `/enable ${visibility}`.trim()));
 }
+
+/** Telegram's signed initData for one person, as the Mini App sends it. `token` is the bot token the app checks against. */
+export async function signInit(fields: Record<string, string>, token = "123456:TEST"): Promise<string> {
+  const enc = new TextEncoder();
+  const key = (k: BufferSource) => crypto.subtle.importKey("raw", k, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const secret = await crypto.subtle.sign("HMAC", await key(enc.encode("WebAppData")), enc.encode(token));
+  const check = Object.keys(fields)
+    .sort()
+    .map((k) => `${k}=${fields[k]}`)
+    .join("\n");
+  const hash = [...new Uint8Array(await crypto.subtle.sign("HMAC", await key(secret), enc.encode(check)))].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return new URLSearchParams({ ...fields, hash }).toString();
+}

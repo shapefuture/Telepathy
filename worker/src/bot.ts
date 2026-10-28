@@ -7,6 +7,8 @@
 import { ensureMember, grantStatement, langOf, memberByTg, readable, revoke, VISIBILITIES, type Member, type Visibility } from "./acl";
 import { digestHour, ownerIds, timezone, type Env } from "./env";
 import { applyBio, lonelyUrl } from "./bio";
+import { answerPrompt, armPrompt, closePrompts, introFromText, openPrompt, skillKeysAfter } from "./prompts";
+import { digestCard, moreCard, profileAction, profileFor } from "./profile";
 import { eligibleCandidates, label, labelIn, labelsFor, matchSkills, resolveSkill, skillName, TAXONOMY } from "./experts";
 import { recordAnswer, vote } from "./feedback";
 import { build as buildDigest } from "./digest";
@@ -14,7 +16,7 @@ import { answerSuggestion, detectEvent, eventUrl, markCanonical, toIcs, upcoming
 import { maybeHint } from "./hints";
 import { defaultLang, langFromCode, T, type Lang, type Messages } from "./i18n";
 import { citation, docOffloadable, docSupported, EDGE_DOC_MAX_BYTES, enabledSource, ingestMessage, removeMessage, storeDocument, type TgMessage, type TgUser } from "./ingest";
-import { act, cancelNeed, IntroError, requestIntro } from "./intros";
+import { act, cancelNeed, requestIntro, retryWaiting } from "./intros";
 import { reconcile } from "./outbox";
 import { forgetMember } from "./rights";
 import { forgetPerson, personForMember } from "./continuity/people";
@@ -26,7 +28,7 @@ import { boardCallback, boardCommand, jobsCommand } from "./concierge/board";
 import { startScreen, screenAnswer } from "./concierge/join";
 import { spamCheck } from "./concierge/spam";
 import { roundsCommand } from "./concierge/rounds";
-import { introduceCommand, openCommand } from "./concierge/people";
+import { introduceCommand, openCommand, withdrawIntroductions } from "./concierge/people";
 import { T2 } from "./concierge/texts";
 import { assistCallback, clubDeskCommand, cmdHelpNeed, forgetMissions, listMissions, ownerAssistCommand, OWNER_COMMANDS } from "./assist/bot";
 import { brief } from "./ai/beam";
@@ -229,6 +231,8 @@ async function onMessage(app: App, msg: TgMessage, edited: boolean): Promise<str
     const asker = msg.from ? await memberByTg(app.db, msg.from.id) : null;
     const screened = asker ? await screenAnswer(app, asker, q) : null; // a join screening's answer
     if (screened) return screened;
+    const prompted = asker ? await answerPrompt(app, asker, q) : null; // an open prompt: /intro, /optin, skills
+    if (prompted) return prompted;
     const words = asker ? await answerPending(app, asker, q) : null; // the words for a 🙏 just pressed
     if (words) return words;
     // "What can you do?" is about the bot, not a question for the community's memory.
@@ -236,6 +240,8 @@ async function onMessage(app: App, msg: TgMessage, edited: boolean): Promise<str
     if (lonelyUrl(q)) return privateCommand(app, msg, "bio", q);
     return privateCommand(app, msg, ABOUT_BOT.test(q) ? "help" : "ask", ABOUT_BOT.test(q) ? "" : q);
   }
+  const who = await memberByTg(app.db, msg.from.id);
+  if (who) await closePrompts(app.db, who.id);
   return privateCommand(app, msg, command.cmd, command.args);
 }
 
@@ -411,52 +417,6 @@ async function cmdForgetMessage(app: App, msg: TgMessage): Promise<string[]> {
 
 // ---- private commands -------------------------------------------------------------------
 
-/** Quiet hours are stored in UTC; shown in the club's own timezone. */
-function quietLocal(mem: Member, tz: string): string | null {
-  if (mem.quiet_from === null || mem.quiet_from === undefined || mem.quiet_to === null || mem.quiet_to === undefined) return null;
-  const off = Math.round(tzOffsetMinutes(new Date(), tz) / 60);
-  const hh = (utc: number) => String((utc + off + 24) % 24).padStart(2, "0") + ":00";
-  return `${hh(mem.quiet_from)}–${hh(mem.quiet_to)}`;
-}
-
-function profileView(mem: Member, skills: { code: string; state: string }[], helped = 0, tz = "UTC"): { text: string; buttons: InlineButton[][] } {
-  const lang = langOf(mem);
-  const m = T(lang);
-  const t2 = T2(lang);
-  const list =
-    skills.map((s) => `${skillName(s.code, lang)}${s.state === "confirmed" ? "" : ` (${m.suggested})`}`).join(", ") ||
-    m.noneYet;
-  const yn = (v: number) => (v ? m.yes : m.no);
-  const oo = (v: number) => (v ? m.on : m.off);
-  return {
-    text:
-      `${m.profileTitle}\n` +
-      `${m.pDigest}: <b>${oo(mem.digest)}</b>\n` +
-      `${m.pDiscoverable}: <b>${yn(mem.discoverable)}</b>\n` +
-      `${m.pAvailable}: <b>${yn(mem.available)}</b>\n` +
-      `${m.pReminders}: <b>${oo(mem.reminders)}</b>\n` +
-      `${m.pCollection}: <b>${mem.collection_opt_out ? m.pStopped : m.on}</b>\n` +
-      `${m.pLanguage}: <b>${lang === "ru" ? "русский" : "English"}</b>\n` +
-      `${m.pSkills}: ${escapeHtml(list)}\n` +
-      `${t2.pDoors}: <b>${escapeHtml(mem.doors ?? m.off)}</b>\n` +
-      `${m.pHelped(helped)}\n` +
-      `${m.pQuiet}: <b>${escapeHtml(quietLocal(mem, tz) ?? m.off)}</b>\n\n${m.addSkillHint}`,
-    buttons: [
-      [btn(mem.digest ? m.bDigestOff : m.bDigestOn, `p:digest:${mem.digest ? 0 : 1}`)],
-      [btn(mem.discoverable ? m.bDiscoverOff : m.bDiscoverOn, `p:discoverable:${mem.discoverable ? 0 : 1}`)],
-      [
-        btn(mem.available ? m.bPause : m.bResume, `p:available:${mem.available ? 0 : 1}`),
-        btn(mem.reminders ? m.bRemindersOff : m.bRemindersOn, `p:reminders:${mem.reminders ? 0 : 1}`),
-      ],
-      [btn(mem.display_name ? m.bNameOff : m.bNameOn, `p:name:${mem.display_name ? 0 : 1}`)],
-      [btn(mem.quiet_from !== null && mem.quiet_from !== undefined ? m.bQuietOff : m.bQuietOn, `p:quiet:${mem.quiet_from !== null && mem.quiet_from !== undefined ? 0 : 1}`)],
-      [btn(mem.doors ? t2.bDoorsEdit : t2.bDoorsOn, "dr:ask")],
-      ...(mem.doors ? [[btn(t2.bDoorsOff, "dr:off")]] : []),
-      [btn(lang === "ru" ? "English" : "Русский", `p:lang:${lang === "ru" ? "en" : "ru"}`)],
-    ],
-  };
-}
-
 async function mySkills(app: App, memberId: string) {
   return (await app.db.prepare("SELECT code, state FROM skills WHERE member_id=? ORDER BY code").bind(memberId).all<{ code: string; state: string }>()).results;
 }
@@ -499,7 +459,7 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
         return [];
       }
       // One short message: what I do, where things work (owners: their tools). Private, so only them.
-      await reply(app, chat, pre.start + pre.whereMember + (isOwner(app, from.id) ? pre.whereOwner : pre.whereGroupAdmin));
+      await reply(app, chat, pre.start + pre.whereMember + (isOwner(app, from.id) ? pre.whereOwner : pre.whereGroupAdmin), [[btn(pre.bHelpMe, "p:helpme")]]);
       return [];
     }
     case "help":
@@ -547,7 +507,8 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
   }
   if (cmd === "introduce") {
     await reply(app, chat, await introduceCommand(app, mem, args));
-    return [];
+    // A new door may open a request that waits for exactly this (the same consent follows as before).
+    return args.trim().toLowerCase() === "off" ? [] : retryWaiting(app.db, nowIso(), { doors: true });
   }
   if (cmd === "language") {
     const want = args.trim().toLowerCase();
@@ -636,7 +597,7 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
       }
       const f = await parseFilters(app.db, await readable(app.db, mem), args);
       if (!f.query) {
-        await reply(app, chat, m.askUsage);
+        await reply(app, chat, m.askPrompt);
         return [];
       }
       await openThread(app, { memberId: mem.id, tgId: chat, question: f.query, readable: f.readable, filters: f.filters, lang });
@@ -648,32 +609,61 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
         await reply(app, chat, m.nameUsage);
         return [];
       }
+      if (!!mem.display_name === (arg === "on")) {
+        await reply(app, chat, m.alreadySet);
+        return [];
+      }
       await app.db.prepare("UPDATE members SET display_name=? WHERE id=?").bind(arg === "on" ? (from.first_name ?? null) : null, mem.id).run();
       await reply(app, chat, arg === "on" ? m.nameOn : m.nameOff);
       return [];
     }
     case "profile": {
-      const v = profileView(mem, await mySkills(app, mem.id), await helpedCount(app.db, mem.id), timezone(app.env));
+      const v = await profileFor(app, mem);
       await reply(app, chat, v.text, v.buttons);
       return [];
     }
     case "digest": {
-      const arg = args.toLowerCase();
+      const arg = args.trim().toLowerCase();
       if (arg !== "on" && arg !== "off") {
-        await reply(app, chat, m.digestState(!!mem.digest));
+        const v = digestCard(mem, lang, digestHour(app.env));
+        await reply(app, chat, v.text, v.buttons);
         return [];
       }
-      await app.db.prepare("UPDATE members SET digest=? WHERE id=?").bind(arg === "on" ? 1 : 0, mem.id).run();
-      await reply(app, chat, arg === "on" ? m.digestOn(digestHour(app.env)) : m.digestOff);
+      const on = arg === "on";
+      if (!!mem.digest === on) {
+        await reply(app, chat, m.digestAlready(on));
+        return [];
+      }
+      await app.db.prepare("UPDATE members SET digest=? WHERE id=?").bind(on ? 1 : 0, mem.id).run();
+      await reply(app, chat, on ? m.digestOn(digestHour(app.env)) : m.digestOff);
       return [];
     }
     case "optin":
     case "optout": {
       const on = cmd === "optin";
-      await app.db.prepare("UPDATE members SET discoverable=? WHERE id=?").bind(on ? 1 : 0, mem.id).run();
-      await audit(app.db, "consent.discovery", mem.id, mem.id, { granted: on });
-      await reply(app, chat, on ? m.optin : m.optout);
-      return [];
+      if (!on) {
+        // Off: projects, the introductions line and rounds go off with it (concierge/people.ts).
+        const wasOn = !!mem.discoverable;
+        const cleared = await withdrawIntroductions(app.db, mem.id);
+        if (wasOn) {
+          await app.db.prepare("UPDATE members SET discoverable=0 WHERE id=?").bind(mem.id).run();
+          await audit(app.db, "consent.discovery", mem.id, mem.id, { granted: false });
+        }
+        const any = cleared.projects || cleared.doors || cleared.rounds;
+        await reply(app, chat, !wasOn && !any ? m.optoutAlready : any ? `${m.optout}\n${m.optoutCleared}` : m.optout);
+        return [];
+      }
+      if (mem.discoverable) {
+        const codes = (await mySkills(app, mem.id)).filter((x) => x.state === "confirmed").map((x) => x.code);
+        await reply(app, chat, m.optinAlready(labelsFor(codes, lang)));
+        await armPrompt(app.db, mem.id, "bio");
+        return [];
+      }
+      await app.db.prepare("UPDATE members SET discoverable=1 WHERE id=?").bind(mem.id).run();
+      await audit(app.db, "consent.discovery", mem.id, mem.id, { granted: true });
+      await reply(app, chat, m.optin);
+      await armPrompt(app.db, mem.id, "bio");
+      return skillKeysAfter(app, mem.id);
     }
     case "skills":
       return cmdSkills(app, chat, mem, args, m);
@@ -689,7 +679,7 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
       const r = await applyBio(app, mem, args, "bot");
       const say: Record<string, string> = { none: m.bioNone, empty: m.bioNone, short: m.bioShort, blocked: m.bioBlocked, bad_url: m.bioBadUrl, failed: m.bioFailed };
       await reply(app, chat, r.status === "ok" ? (r.added.length ? m.bioAdded(r.added.map(escapeHtml).join(", "), r.known) : m.bioKnown) : say[r.status]!);
-      return [];
+      return r.status === "ok" ? skillKeysAfter(app, mem.id) : [];
     }
     case "expert": {
       if (!rateOk(from.id, rateLimit(app))) {
@@ -711,27 +701,21 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
         await reply(app, chat, m.tooMany);
         return [];
       }
-      if (args.length < 10) {
-        await reply(app, chat, m.introUsage);
+      const text = args.trim();
+      if (!text) {
+        await openPrompt(app, mem, "intro", m.introPrompt);
         return [];
       }
-      try {
-        const r = await requestIntro(app.db, mem.id, args, nowIso(), lang);
-        const labels = escapeHtml(labelsFor(r.skills, lang));
-        await reply(app, chat, r.introId ? m.introCreated(labels) : m.introNoMatch(labels));
-        return r.keys;
-      } catch (e) {
-        if (e instanceof IntroError) {
-          await reply(app, chat, e.message);
-          return [];
-        }
-        throw e;
+      if (text.length < 10) {
+        await openPrompt(app, mem, "intro", m.introUsage);
+        return [];
       }
+      return introFromText(app, mem, text, chat);
     }
     case "cancel":
     case "requests": {
       const listed = await listMissions(app, chat, mem);
-      const rows = (await app.db.prepare("SELECT id, text, status FROM needs WHERE member_id=? AND status IN ('open','matching') ORDER BY created_at DESC").bind(mem.id).all<{ id: string; text: string; status: string }>()).results;
+      const rows = (await app.db.prepare("SELECT id, text, status FROM needs WHERE member_id=? AND status IN ('open','matching','waiting') ORDER BY created_at DESC").bind(mem.id).all<{ id: string; text: string; status: string }>()).results;
       if (!rows.length && !listed) await reply(app, chat, m.noRequests);
       for (const r of rows) await reply(app, chat, m.requestStatus(escapeHtml(r.text), r.status), [[btn(m.bCancelRequest, `n:${r.id}:cancel`)]]);
       return [];
@@ -756,33 +740,19 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
       const end = nowIso(new Date(now.getTime() + 1000));
       const text = await buildDigest(app.db, await readable(app.db, mem), start, end, localParts(now, timezone(app.env)).date, lang);
       await app.db.prepare("UPDATE members SET catchup_at=? WHERE id=?").bind(end, mem.id).run();
-      await reply(app, chat, text ?? m.catchupNothing);
+      await reply(app, chat, text ?? m.catchupNothing, [[btn(m.bEvents, "c:ev")], [btn(mem.digest ? m.bDigestOff : m.bDigestOn, `c:dg:${mem.digest ? 0 : 1}:k`)]]);
       return [];
     }
-    case "events": {
-      const evs = await upcomingEvents(app.db, await readable(app.db, mem));
-      if (!evs.length) {
-        await reply(app, chat, m.eventsNone);
-        return [];
-      }
-      const fmt = new Intl.DateTimeFormat(lang === "ru" ? "ru-RU" : "en-GB", { timeZone: timezone(app.env), dateStyle: "medium", timeStyle: "short" });
-      const lines = evs.map((e) => {
-        const url = eventUrl(e);
-        return `• ${fmt.format(new Date(e.starts_at))} — ${url ? `<a href="${escapeHtml(url)}">${escapeHtml(e.title)}</a>` : escapeHtml(e.title)}`;
-      });
-      await reply(app, chat, `${m.eventsTitle}\n${lines.join("\n")}`);
-      // Each of the next few gets its own card: I'm going, not this time, who's going (journey 8).
-      for (const e of evs.slice(0, 4)) {
-        const k = shortKey(e.source_id, e.msg_id);
-        await reply(app, chat, `<b>${escapeHtml(e.title)}</b>\n${escapeHtml(fmt.format(new Date(e.starts_at)))}`, [[btn(m.gatherGo, `rv:${k}:go`), btn(m.gatherNo, `rv:${k}:no`)], [btn(m.gatherWhoBtn, `rw:${k}`)]]);
-      }
-      await app.tg.sendFile(chat, "telepathy-events.ics", toIcs(evs), "text/calendar", m.eventsIcs);
-      return [];
-    }
+    case "events":
+      return eventsReply(app, chat, mem, lang);
     case "pings": {
       const arg = args.trim().toLowerCase();
       if (arg !== "on" && arg !== "off") {
         await reply(app, chat, m.pingsUsage);
+        return [];
+      }
+      if (!!mem.routing === (arg === "on")) {
+        await reply(app, chat, m.alreadySet);
         return [];
       }
       await app.db.prepare("UPDATE members SET routing=? WHERE id=?").bind(arg === "on" ? 1 : 0, mem.id).run();
@@ -803,6 +773,29 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
 }
 
 /** /union: this member's alliances, with the credit both ways, and the invitations they can send. */
+/** /events: the upcoming meetups, each with its own card, and the calendar file. */
+async function eventsReply(app: App, chat: number, mem: Member, lang: Lang): Promise<string[]> {
+  const m = T(lang);
+  const evs = await upcomingEvents(app.db, await readable(app.db, mem));
+  if (!evs.length) {
+    await reply(app, chat, m.eventsNone);
+    return [];
+  }
+  const fmt = new Intl.DateTimeFormat(lang === "ru" ? "ru-RU" : "en-GB", { timeZone: timezone(app.env), dateStyle: "medium", timeStyle: "short" });
+  const lines = evs.map((e) => {
+    const url = eventUrl(e);
+    return `• ${fmt.format(new Date(e.starts_at))} — ${url ? `<a href="${escapeHtml(url)}">${escapeHtml(e.title)}</a>` : escapeHtml(e.title)}`;
+  });
+  await reply(app, chat, `${m.eventsTitle}\n${lines.join("\n")}`);
+  // Each of the next few gets its own card: I'm going, not this time, who's going (journey 8).
+  for (const e of evs.slice(0, 4)) {
+    const k = shortKey(e.source_id, e.msg_id);
+    await reply(app, chat, `<b>${escapeHtml(e.title)}</b>\n${escapeHtml(fmt.format(new Date(e.starts_at)))}`, [[btn(m.gatherGo, `rv:${k}:go`), btn(m.gatherNo, `rv:${k}:no`)], [btn(m.gatherWhoBtn, `rw:${k}`)]]);
+  }
+  await app.tg.sendFile(chat, "telepathy-events.ics", toIcs(evs), "text/calendar", m.eventsIcs);
+  return [];
+}
+
 async function unionView(app: App, mem: Member, lang: Lang): Promise<{ text: string; buttons: InlineButton[][] }> {
   const m = T(lang);
   const rows = await alliancesOf(app.db, mem.id);
@@ -834,11 +827,17 @@ async function cmdSkills(app: App, chat: number, mem: Member, args: string, m: M
       return [];
     }
     if (verb === "add") {
+      const had = await app.db.prepare("SELECT state FROM skills WHERE member_id=? AND code=?").bind(mem.id, code).first<{ state: string }>();
+      if (had?.state === "confirmed") {
+        await reply(app, chat, m.skillAlready(escapeHtml(labelIn(TAXONOMY.get(code)!, langOf(mem)))));
+        return [];
+      }
       await app.db
         .prepare("INSERT INTO skills(member_id, code, state, kind) VALUES (?,?,'confirmed','self_claim') ON CONFLICT(member_id, code) DO UPDATE SET state='confirmed'")
         .bind(mem.id, code)
         .run();
       await reply(app, chat, m.skillAdded(escapeHtml(labelIn(TAXONOMY.get(code)!, langOf(mem))), !!mem.discoverable));
+      return skillKeysAfter(app, mem.id);
     } else {
       const r = await app.db.prepare("DELETE FROM skills WHERE member_id=? AND code=?").bind(mem.id, code).run();
       await reply(app, chat, r.meta.changes ? m.skillRemoved : m.skillNotOnProfile);
@@ -884,7 +883,7 @@ export async function status(db: D1Database): Promise<Record<string, string | nu
     q("SELECT COUNT(*) AS n FROM effects WHERE state='pending'"),
     q("SELECT COUNT(*) AS n FROM effects WHERE state='uncertain'"),
     q("SELECT COUNT(*) AS n FROM effects WHERE state='failed'"),
-    q("SELECT COUNT(*) AS n FROM needs WHERE status IN ('open','matching')"),
+    q("SELECT COUNT(*) AS n FROM needs WHERE status IN ('open','matching','waiting')"),
     q("SELECT COUNT(*) AS n FROM intros WHERE status IN ('mutually_confirmed','completed')"),
     q("SELECT COUNT(*) AS n FROM doc_queue WHERE status='pending'"),
     q("SELECT COALESCE(SUM(up),0) || ' / ' || COALESCE(SUM(down),0) || ' / ' || COALESCE(SUM(bad),0) AS n FROM passage_votes"),
@@ -956,16 +955,13 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
       await answerCb(tt.doorsNeedOptIn, true);
       return [];
     } else {
-      await app.db
-        .prepare("INSERT INTO pending_inputs(member_id, kind, ref, expires_at) VALUES (?, 'doors', '', ?) ON CONFLICT(member_id) DO UPDATE SET kind='doors', ref='', expires_at=excluded.expires_at")
-        .bind(mem.id, addMs(nowIso(), HOUR))
-        .run();
       await answerCb();
-      await app.tg.sendMessage(cb.from.id, tt.doorsAsk);
+      await openPrompt(app, mem, "doors", tt.doorsAsk);
       return [];
     }
+    // Draw again the card the press came from: the profile, or its «Ещё» sheet.
     const fresh = (await memberByTg(app.db, cb.from.id))!;
-    const v = profileView(fresh, await mySkills(app, fresh.id), await helpedCount(app.db, fresh.id), timezone(app.env));
+    const v = data.split(":")[2] === "m" ? moreCard(fresh, langOf(fresh), timezone(app.env)) : await profileFor(app, fresh);
     if (cb.message) {
       await app.tg.call("editMessageText", { chat_id: cb.message.chat.id, message_id: cb.message.message_id, text: v.text, parse_mode: "HTML", reply_markup: { inline_keyboard: v.buttons } }).catch(() => undefined);
     }
@@ -1289,6 +1285,13 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
     return [];
   }
 
+  // The start card's "I can help too": a newcomer may not be a member yet, so this comes before the membership check.
+  if (kind === "p" && a === "helpme") {
+    const who = await ensureMember(app.db, cb.from.id, undefined, cb.from.language_code);
+    await answerCb();
+    await openPrompt(app, who, "bio", T(langOf(who)).bioPrompt);
+    return [];
+  }
   const mem = await memberByTg(app.db, cb.from.id);
   if (!mem) {
     await answerCb(pre.notAvailable);
@@ -1305,7 +1308,7 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
     const ok = await answerSuggestion(app.db, mem.id, a, b === "add");
     await answerCb(!ok ? m.notAvailable : b === "add" ? m.suggestAdded : m.suggestDismissed);
     await clearButtons();
-    return [];
+    return ok && b === "add" ? skillKeysAfter(app, mem.id) : [];
   }
   if (kind === "f") {
     // Feedback stays on the message (others in a group may vote too); only a toast confirms it.
@@ -1316,31 +1319,49 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
     keys = r.keys;
     await answerCb(r.reply, r.reply.length > 60);
     await clearButtons();
+  } else if (kind === "n" && b === "team") {
+    // A request waiting for someone: the club's team gets it, once the person confirms the draft.
+    const need = await app.db.prepare("SELECT text FROM needs WHERE id=? AND member_id=?").bind(a, mem.id).first<{ text: string }>();
+    await answerCb();
+    if (need) await cmdHelpNeed(app, cb.from.id, mem, need.text);
   } else if (kind === "n") {
     const r = await cancelNeed(app.db, mem.id, a);
     keys = r.keys;
     await answerCb(r.ok ? m.requestCancelled : m.alreadyClosed);
     await clearButtons();
-  } else if (kind === "p" && ["digest", "discoverable", "available", "reminders", "lang", "name", "quiet"].includes(a)) {
-    if (a === "lang") {
-      if (b === "en" || b === "ru") await setLanguage(app, mem.id, b);
-    } else if (a === "quiet") {
-      // 22:00–08:00 in the club's timezone, stored in UTC.
-      const off = Math.round(tzOffsetMinutes(new Date(), timezone(app.env)) / 60);
-      const utc = (h: number) => (h - off + 24) % 24;
-      await app.db.prepare("UPDATE members SET quiet_from=?, quiet_to=? WHERE id=?").bind(b === "1" ? utc(22) : null, b === "1" ? utc(8) : null, mem.id).run();
-    } else if (a === "name") {
-      await app.db.prepare("UPDATE members SET display_name=? WHERE id=?").bind(b === "1" ? (cb.from.first_name ?? null) : null, mem.id).run();
+  } else if (kind === "p") {
+    const r = await profileAction(app, mem, a, b, data.split(":")[3] === "m", cb.from.first_name);
+    keys = r.keys;
+    await answerCb(r.toast);
+    if (r.view && cb.message) {
+      await app.tg.call("editMessageText", { chat_id: cb.message.chat.id, message_id: cb.message.message_id, text: r.view.text, parse_mode: "HTML", reply_markup: { inline_keyboard: r.view.buttons } });
+    }
+  } else if (kind === "c" && a === "ev") {
+    await answerCb();
+    keys = await eventsReply(app, cb.from.id, mem, langOf(mem));
+  } else if (kind === "c" && a === "dg") {
+    // The digest switch: on /digest itself (the text changes), or under the catch-up (k: only the button).
+    const on = b === "1";
+    if (!!mem.digest === on) {
+      await answerCb(m.digestAlready(on));
     } else {
-      await app.db.prepare(`UPDATE members SET ${a}=? WHERE id=?`).bind(b === "1" ? 1 : 0, mem.id).run();
-      if (a === "discoverable") await audit(app.db, "consent.discovery", mem.id, mem.id, { granted: b === "1" });
+      await app.db.prepare("UPDATE members SET digest=? WHERE id=?").bind(on ? 1 : 0, mem.id).run();
+      await answerCb(on ? m.digestOn(digestHour(app.env)) : m.digestOff);
     }
-    const fresh = (await memberByTg(app.db, cb.from.id))!;
-    const v = profileView(fresh, await mySkills(app, mem.id), await helpedCount(app.db, mem.id), timezone(app.env));
-    await answerCb(T(langOf(fresh)).saved);
+    const fresh = (await memberByTg(app.db, cb.from.id)) ?? mem;
+    const v = digestCard(fresh, langOf(fresh), digestHour(app.env));
     if (cb.message) {
-      await app.tg.call("editMessageText", { chat_id: cb.message.chat.id, message_id: cb.message.message_id, text: v.text, parse_mode: "HTML", reply_markup: { inline_keyboard: v.buttons } });
+      const k = data.split(":")[3] === "k";
+      const markup = { inline_keyboard: k ? [[btn(m.bEvents, "c:ev")], [btn(fresh.digest ? m.bDigestOff : m.bDigestOn, `c:dg:${fresh.digest ? 0 : 1}:k`)]] : v.buttons };
+      const target = { chat_id: cb.message.chat.id, message_id: cb.message.message_id, reply_markup: markup };
+      if (k) await app.tg.call("editMessageReplyMarkup", target).catch(() => undefined);
+      else await app.tg.call("editMessageText", { ...target, text: v.text, parse_mode: "HTML" }).catch(() => undefined);
     }
+  } else if (kind === "pc") {
+    // «Отмена» on a prompt: nothing is waiting for an answer any more.
+    await closePrompts(app.db, mem.id);
+    await answerCb(m.promptCancelled);
+    await clearButtons();
   } else if (kind === "fm") {
     if (a === "yes") {
       // Their living cards hold their questions and quotes: remove the messages too (best effort).

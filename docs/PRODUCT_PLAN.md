@@ -1,4 +1,4 @@
-# Миндальная связь: the product plan
+# Миндальная Связь: the product plan
 
 Brings together the landing page (telepathy-landing), the map of 18 community and networking
 platforms, reviewer feedback, and what's already in this repository. It is a priority order, not
@@ -10,7 +10,7 @@ a schedule.
 partner club. And everyone sees it happen.**
 
 Today chats swallow questions, knowledge disappears into the scroll, and help depends on whether
-the organiser happened to see a message. Миндальная связь turns a community into something that
+the organiser happened to see a message. Миндальная Связь turns a community into something that
 **remembers everything, knows who to ask, and closes the loop**. It lives inside Telegram, where
 people already are, and nobody has to move anywhere.
 

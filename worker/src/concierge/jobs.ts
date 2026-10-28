@@ -259,6 +259,16 @@ export function censusView(c: Census, lang: Lang, doorsOn: boolean): string {
   return lines.join("\n");
 }
 
+/** The census for the groups in scope, as text: the lines /jobs sends, and the Mini App's census card. */
+export async function censusText(db: D1Database, sourceIds: string[], lang: Lang): Promise<string> {
+  const c = await census(db, sourceIds, nowIso(new Date(Date.now() - CENSUS_DAYS * DAY)));
+  const doors = await db
+    .prepare("SELECT COUNT(*) AS n FROM sources WHERE doors=1 AND enabled=1 AND id IN (SELECT value FROM json_each(?))")
+    .bind(JSON.stringify(sourceIds))
+    .first<{ n: number }>();
+  return censusView(c, lang, (doors?.n ?? 0) > 0);
+}
+
 /** The answered requests as one line: "Recommendations 3 · Questions 1", or "0". */
 export function answeredText(answered: Record<JobKind, number>, lang: Lang): string {
   const t = T2(lang);

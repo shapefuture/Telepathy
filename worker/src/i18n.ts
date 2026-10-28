@@ -17,6 +17,15 @@ export function langFromCode(_code?: string): Lang {
   return defaultLanguage;
 }
 
+/** Russian plural by the number: 1 раз, 2 раза, 5 раз (the one/few/many forms). */
+export function ruPlural(n: number, one: string, few: string, many: string): string {
+  const m10 = n % 10;
+  const m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+  return many;
+}
+
 const EN = {
   // general
   dontKnowYou: "We haven't met yet 🙂 Write something in a community group I'm in, then come back.",
@@ -28,27 +37,42 @@ const EN = {
   no: "no",
   on: "on",
   off: "off",
-  start: "👋 Hi! I'm the Миндальная связь assistant.\n\n" +
-    "🔎 <b>I find answers.</b> Just type a question — I'll search everything discussed in your groups and show where it was.\n" +
-    "🤝 <b>I find people.</b> No answer? I'll point you to someone who knows. Introductions only if you both agree.\n" +
+  start: "👋 Hi! I'm the Миндальная Связь assistant.\n\n" +
+    "🔎 <b>I find answers.</b> Type a question — I search everything discussed in your groups and show where it came up.\n" +
+    "🤝 <b>I find people.</b> No answer? I ask those ready to help. Contacts open only when you both agree.\n" +
     "📅 <b>I keep you posted.</b> What's new and what's coming up.\n\n" +
-    "Easiest in the app: the <b>Menu</b> button, bottom left.\n\n",
+    "Try it now: type “who can recommend an accountant for a sole trader?”.\n\n",
   help: "<b>How to use me</b>\n\n" +
-    "🔎 <b>Ask</b>\nJust type your question here.\nIn a group: /ask <i>question</i> — I'll answer from that group.\n\n" +
-    "🤝 <b>Find a person</b>\n/intro <i>what you need</i> — I'll find who can help\n/help <i>what you need</i> — ask the community team for help\n/requests — your requests\n\n" +
-    "📅 <b>Stay in the loop</b>\n/catchup — what's new\n/events — upcoming meetups\n/digest on — a daily summary\n\n" +
-    "🙂 <b>About you</b>\n/profile — settings\n/skills — what you're good at\n/optin — let people find you as an expert\n/language ru — по-русски\n\n" +
-    "🔒 <b>Privacy</b>\n/privacy — what I keep\n/forget_me — delete everything about you",
+    "💬 <b>Ask.</b> Just type your question. I'll find the answer in your groups and show where it was discussed.\n" +
+    "🙋 <b>Help others.</b> Tell me what you know well — I'll call on you only when a request fits.\n" +
+    "🗞 <b>What's new.</b> /catchup — the highlights from your groups; /events — upcoming meetups.\n\n" +
+    "<blockquote expandable>All commands\n" +
+    "/intro — find someone who can help\n" +
+    "/help <i>what you need</i> — pass a request to the club's team\n" +
+    "/requests — your requests\n" +
+    "/skills — skills and topics you help with\n" +
+    "/optin and /optout — whether you can be called on for help\n" +
+    "/open on | off — be offered projects\n" +
+    "/introduce — introductions on request\n" +
+    "/jobs — what people ask in your groups (group admins)\n" +
+    "/digest on | off — a daily digest\n" +
+    "/language ru — по-русски\n" +
+    "/privacy — what I keep\n" +
+    "/forget_me — delete everything about you</blockquote>",
   privacy:
     "<b>Telepathy privacy notice</b>\n" +
-    "• Only groups an owner explicitly enabled are stored. Each group shows a notice.\n" +
-    "• Your name, username and phone number are not stored; you get a random internal ID.\n" +
+    "• I keep only groups an owner has enabled. Each one shows a notice.\n" +
     "• Answers quote messages verbatim with a link, only from groups you can read.\n" +
-    "• Data is stored in Cloudflare D1. Nothing is sent to AI services. PDF, Word and PowerPoint files are converted to text on GitHub's servers and not kept there.\n" +
-    "• You are not discoverable as an expert unless you run /optin yourself.\n" +
-    "• Introductions need both people to agree before any contact is shared.\n" +
+    "• Nobody can call you for help until you turn it on yourself (/optin).\n" +
+    "<blockquote expandable>More details\n" +
+    "• Your Telegram ID is kept so I can message you. Your username and phone number are not stored. Your name shows in answers only if you turn it on (/name on).\n" +
+    "• An AI summary is written when the club has it switched on. It gets your question and the found messages, without authors or links; phone numbers and emails are removed from them.\n" +
+    "• Data is stored in Cloudflare D1. PDF, Word and PowerPoint files are turned into text on GitHub's servers, and the files themselves are not kept there.\n" +
+    "• An introduction happens only when you both agree; contacts open after that.\n" +
+    "• Hiring offers (/open) and introductions on request (/introduce) stay off until you turn them on. The /introduce line is matched only against requests and is never shown. Turning off “Can call me for help” also turns off /open, /introduce and /rounds, and deletes the /introduce line.\n" +
+    "• Group admins see only counts of request kinds (/jobs), never who asked.\n" +
     "• Answer feedback (👍/👎) is private and only improves ranking.\n" +
-    "• Full history is kept. /forget_me deletes your messages and profile and stops collection; reply /forget to one of your messages in the group to delete it.",
+    "• Full history is kept. /forget_me deletes your messages, your profile, your /open and /introduce settings, and stops collection. Reply /forget to one of your messages in a group to delete only that one.</blockquote>",
   languageSet: "Language set to English.",
   languageUsage: "Usage: <code>/language en</code> or <code>/language ru</code>",
 
@@ -73,8 +97,8 @@ const EN = {
     "Past messages and help: here, in private — /app and /help.",
   welcomeDm: (title: string) =>
     `👋 Hi! I'm the assistant of <b>${title}</b>.\n\n` +
-    "I'll help you find your way around this community and find anything that was ever discussed here. And if needed, I'll find the person who knows the answer to your question.\n\n" +
-    "Just type your question — or tap <b>Menu</b> at the bottom left to open the app. All commands: /help.",
+    "I'll help you find your way around this community and find anything that was ever discussed here. And if needed, I'll find the person who knows the answer.\n\n" +
+    "Just type your question — or tap <b>App</b> at the bottom left. All commands: /help.",
   welcomeGroup: (name: string) =>
     `👋 ${name}, welcome! I'll help you find anything that was ever discussed here, and if needed, the person who knows the answer. Start a private chat with me to begin.`,
   welcomeButton: "Start a chat",
@@ -115,8 +139,9 @@ const EN = {
   earlierAnswer: "earlier thread",
 
   // search
-  askUsage: "Usage: <code>/ask your question</code>",
-  aiNote: "AI summary — check it against the sources below.",
+  askUsage: "Usage: <code>/ask your question</code>, for example <code>/ask who built the club's site?</code>",
+  askPrompt: "What do you want to know? Send the question as your next message and I'll search your groups.",
+  aiNote: "✨ AI summary. Check it against the quotes below.",
   noAccess: "I don't have any community sources you're allowed to read yet. Post in an enabled group first, or ask an admin.",
   insufficient: "<b>No reliable answer found</b> in sources you can access.\nTry different wording, or ask the community directly.",
   insufficientGroup: "<b>No reliable answer found</b> in this group.\nTry different wording.",
@@ -132,43 +157,65 @@ const EN = {
   fbAlready: "Already recorded.",
 
   // profile
-  profileTitle: "<b>Your profile</b> (only you see this)",
+  profileTitle: "👤 <b>Your profile</b> · only you see this",
   pDigest: "Daily digest",
-  pDiscoverable: "Discoverable as expert",
-  pAvailable: "Available for introductions",
+  pDiscoverable: "🙋 Can call me for help",
+  pAvailable: "⏸ Introductions",
   pReminders: "Reminders",
-  pCollection: "Message collection",
-  pLanguage: "Language",
+  pCollection: "💾 Keep my messages",
+  pLanguage: "🌐 Language",
   pStopped: "stopped",
-  pSkills: "Skills",
+  pSkills: "🙋 I can help with",
   noneYet: "none yet",
   suggested: "suggested",
-  addSkillHint: "Add skills with <code>/skills add accounting</code>.",
-  bDigestOn: "Digest on",
-  bDigestOff: "Digest off",
-  bDiscoverOn: "Become discoverable",
-  bDiscoverOff: "Stop being discoverable",
-  bResume: "Resume introductions",
-  bPause: "Pause introductions",
+  bDigestOn: "🗞 Digest on",
+  bDigestOff: "🗞 Digest off",
+  bDiscoverOn: "🙋 Call me for help",
+  bDiscoverOff: "🙋 Don't call me",
+  bResume: "▶️ Resume",
+  bPause: "⏸ Pause",
   bRemindersOn: "Reminders on",
   bRemindersOff: "Reminders off",
+  pNoSkills: "nothing yet — tap “What I can help with”",
+  pName: "🪪 Name in answers",
+  pGoing: "on",
+  pPaused: "paused",
+  pOpenLine: "💼 Offer projects",
+  bHelpWith: "✏️ What I can help with",
+  bHelpMe: "🙋 I can help too",
+  bMore: "⚙️ More",
+  bBack: "← Back",
+  bTeam: "📨 Pass to the club's team",
+  bioPrompt: "What else can you help with? Write one line — e.g. “sole-trader taxes, accounting” — or send a link to your profile. I'll find the skills and add them.",
+  alreadySet: "Already set that way.",
+  bEvents: "📅 Upcoming events",
+  moreTitle: "⚙️ <b>More</b>",
+  moreNote: "Delete everything: /forget_me.",
+  promptCancelled: "Cancelled.",
 
   // digest & consent
-  digestState: (on: boolean) => `Daily digest is <b>${on ? "on" : "off"}</b>. Change with <code>/digest on</code> or <code>/digest off</code>.`,
-  digestOn: (hour: number) => `You'll get a daily digest (${hour}:00 local) covering the groups you can read.`,
+  digestState: (on: boolean, hour: number) =>
+    `🗞 <b>Daily digest</b>: <b>${on ? "on" : "off"}</b>.\nThe highlights from groups you can read, at ${hour}:00 local time.`,
+  digestOn: (hour: number) => `Digest on: every day at ${hour}:00 local time — the highlights from your groups.`,
+  digestAlready: (on: boolean): string => (on ? "The digest is already on." : "The digest is already off."),
   digestOff: "Daily digest turned off.",
-  optin: "You're now discoverable for introductions <b>in the skills you list</b>. Nobody sees your identity unless you accept a specific request and the requester confirms.\nAdd skills: <code>/skills add python</code> · undo anytime: /optout",
-  optout: "You're no longer discoverable. Pending invitations stay answerable.",
+  optin: "Done: you can now be called on for help. Nobody sees your name until you accept a specific request.\nWhat can you help with? Send one line, e.g. “accounting for sole traders”.",
+  optinAlready: (labels: string) =>
+    labels ? `You can already be called on for help: <b>${labels}</b>. Add a topic by sending it in a line. Pause: /optout.` : "You can already be called on for help. What can you help with? Send one line.",
+  optout: "You're no longer called on for help. Invitations you already got can still be answered.",
+  optoutCleared: "Projects, introductions on request and introduction rounds are off too, and the introductions line is deleted. Turn any of them on again to get it back.",
+  optoutAlready: "You're not being called on for help already.",
 
   // skills & experts
   skillsTitle: "<b>Skills</b>",
   unknownSkill: "Unknown skill. See /skills all.",
   skillAdded: (label: string, discoverable: boolean) =>
-    `Added <b>${label}</b>.${discoverable ? "" : " You're not discoverable yet — run /optin when ready."}`,
+    `Added <b>${label}</b>.${discoverable ? "" : " You won't be called on for help yet — turn it on with /optin."}`,
+  skillAlready: (label: string) => `<b>${label}</b> is already on your profile.`,
   skillRemoved: "Removed.",
   skillNotOnProfile: "That skill wasn't on your profile.",
-  bioUsage: "Send me a link to your site or profile, or paste a few lines about yourself after <code>/bio</code>, and I'll add the skills I find. I keep only the skills, not the page or the text.",
-  bioAdded: (list: string, known: number) => `Added to your skills: <b>${list}</b>.${known ? ` ${known} you already had.` : ""}\nChange anything in /skills. I didn't keep the page or the text.`,
+  bioUsage: "Send me a link to your site or profile, or write a few lines about yourself after <code>/bio</code>. I'll add the skills I find. I don't keep the page or the text, only the skills.",
+  bioAdded: (list: string, known: number) => `Added to your skills: <b>${list}</b>.${known ? ` ${known} you already had.` : ""}\nChange anything in /skills. I don't keep the page or the text.`,
   bioKnown: "Everything I found is already on your profile.",
   bioNone: "I couldn't find skills in that. Try pasting a few lines about what you do.",
   bioShort: "That's too short to read skills from. Send a link or a few lines about what you do.",
@@ -179,23 +226,27 @@ const EN = {
   yourSkills: (list: string) => `<b>Your skills</b>\n${list}\n\n<code>/skills add …</code> · <code>/skills remove …</code> · /skills all · /bio`,
   expertUsage: "Tell me a topic, e.g. <code>/expert tax advice</code> (see /skills all).",
   expertCount: (n: number, labels: string) =>
-    `<b>${n}</b> opted-in, available member(s) match <i>${labels}</i>.\n` +
-    (n ? "Use <code>/intro …</code> to request an introduction." : "Try a broader topic, or ask in the community."),
+    `<b>${n}</b> helper(s) ready now for <i>${labels}</i>.\n` +
+    (n ? "Use <code>/intro …</code> to ask for help." : "Try a broader topic, or ask in the community."),
 
   // introductions
-  introUsage: "Describe what you need in a sentence, e.g.\n<code>/intro need an accountant for a 3-person startup</code>\n\nYour text is shown to matching experts <b>without your name</b>.",
+  introUsage: "Describe what you need in a sentence, e.g.\n<code>/intro need an accountant for a 3-person startup</code>\n\nOnly people who can help see your text, <b>without your name</b>.",
+  introPrompt: "Who are you looking for? Write one line — e.g. “an accountant for a three-person startup”. Only people who can help see it, <b>without your name</b>.",
   introCreated: (labels: string) =>
-    `Request created (<i>${labels}</i>). I've invited the best-matching available expert anonymously. You'll be asked to confirm before any contact is shared. Invitations expire after 72h; I'll try up to 3 experts.`,
-  introNoMatch: (labels: string) => `No opted-in, available expert matches <i>${labels}</i> right now. Try again later or ask in the community.`,
-  askPickTopic: "Who should I ask? Pick the topic, and I'll find someone in your community who offered to help with it.",
-  askNoHelpers: "Nobody in your community has offered to help with a topic yet, so there's no one to ask for now. You can be the first: /skills. Or ask the community's team: /help <i>what you need</i>.",
-  introNoSkill: "I couldn't match that to a skill. Try naming the area, e.g. <code>/intro accountant for a small startup</code>, or see /skills all.",
-  introCap: (n: number, cap: number) => `You already have ${n} open requests this week (limit ${cap}). Cancel one with /requests or wait.`,
-  introClosedNoMatch: "No available expert accepted your request this time, so it is closed. You can try again later or ask in the community.",
+    `✅ Request sent: <i>${labels}</i>. The best-matching helper got an anonymous invitation. The answer comes here. Valid for 72 hours.`,
+  introNoMatch: (labels: string) =>
+    `Nobody who helps with <i>${labels}</i> can take it right now. I've kept your request for two weeks and will tell you here as soon as someone can help.`,
+  introWaiting: "Nobody answered this time. The request is waiting: I'll tell you as soon as someone who can help appears.",
+  waitingFound: (labels: string) => `🙋 Someone who can help with <i>${labels}</i> turned up. The invitation went out anonymously. I'll tell you when they reply.`,
+  askPickTopic: "Pick a topic and I'll find someone in your community who offered to help with it.",
+  askNoHelpers: "Nobody in your community has offered help with anything yet, so there's no one to ask. Pass the request to the club's team, and I'll let you know if someone appears.",
+  introNoSkill: "I couldn't tell what to look for. Name the area, e.g. <code>/intro accountant for a small startup</code>. All topics: /skills all.",
+  introCap: (n: number, cap: number) => `You already have ${n} open requests this week (limit ${cap}). Cancel one in /requests or wait for an answer.`,
+  introClosedNoMatch: "There's no one left to ask. The request is closed. Rephrase it, or pass it to the club's team.",
   introInvite: (labels: string, need: string, why: string) =>
-    `<b>Introduction request</b>\nA community member is looking for help with: <i>${labels}</i>\n\n<blockquote>${need}</blockquote>\n` +
+    `<b>Request for help</b>\nSomeone in the community needs help with: <i>${labels}</i>\n\n<blockquote>${need}</blockquote>\n` +
     (why ? `${why}\n` : "") +
-    "Your identity stays private unless you accept <b>and</b> they confirm. This invitation expires in 72 hours.",
+    "Your name stays hidden until you accept and they confirm. Valid for 72 hours.",
   bAccept: "Accept",
   bDecline: "Not now",
   bConfirm: "Confirm & exchange contacts",
@@ -209,19 +260,20 @@ const EN = {
   inviteExpired: "This invitation has expired.",
   alreadyHandledOrNA: "Already handled, or no longer available.",
   alreadyHandled: "Already handled.",
-  introAcceptedToRequester: (quote: string) => `<b>Good news:</b> an expert accepted your introduction request.\n${quote}\nConfirm to exchange contacts with them.`,
+  introAcceptedToRequester: (quote: string) => `<b>Good news:</b> someone accepted your request for help.\n${quote}\nConfirm to open contacts.`,
   introAcceptedReply: "Thanks! The requester will now be asked to confirm. Nothing is shared yet.",
   introDeclinedReply: "Declined. Nobody is told who you are.",
-  introConnectedReq: "<b>You're connected.</b> Here is the expert's contact:",
+  introConnectedReq: "<b>You're connected.</b> Their contact:",
   introConnectedCand: (quote: string) => `<b>You're connected.</b> The requester confirmed.\n${quote}\nTheir contact:`,
   introConfirmedReply: "Confirmed. Contacts have been shared with both of you.",
   introCancelledNotice: "An introduction you were part of was cancelled. Nothing was shared.",
   introCancelledReply: "Cancelled.",
   introCompletedReply: "Thanks for the feedback! It is private and only improves future matching.",
-  introReminder: "Reminder: an introduction request is waiting for your answer. Ignore this if you're not interested; it expires automatically.",
+  introReminder: "Reminder: a request for help is waiting for your answer. If you can't help, just ignore it — it expires by itself.",
   done: "Done.",
   noRequests: "You have no open requests.",
-  requestStatus: (text: string, status: string) => `<blockquote>${text}</blockquote>Status: ${status === "matching" ? "looking for an expert" : status}`,
+  requestStatus: (text: string, status: string) =>
+    `<blockquote>${text}</blockquote>Status: ${status === "matching" ? "looking for someone who can help" : status === "waiting" ? "waiting for someone who can help" : status}`,
   requestCancelled: "Request cancelled.",
   alreadyClosed: "Already closed.",
 
@@ -259,10 +311,10 @@ const EN = {
 
   // v2.1b
   routingUsage: "Usage: /routing on or /routing off (owner, in an enabled group).",
-  routingOn: "Asking the experts is <b>on</b>: questions with no reply after 4 hours are sent privately to up to 2 opted-in experts who can read this group.",
+  routingOn: "Asking helpers is <b>on</b>: questions with no reply after 4 hours go privately to at most two opted-in helpers who can read this group.",
   routingOff: "Asking the experts is off.",
   routePing: (labels: string, snippet: string, link: string) =>
-    `<b>A question in your group is waiting for an answer</b> (<i>${labels}</i>):\n<blockquote>${snippet}</blockquote>\n${link}\n\nYou get this because you opted in as an expert. Stop these: /pings off`,
+    `<b>A question in your group is waiting for an answer</b> (<i>${labels}</i>):\n<blockquote>${snippet}</blockquote>\n${link}\n\nYou get this because you agreed to help. Stop these: /pings off`,
   openQuestion: "open the question",
   pingsUsage: "Usage: /pings on or /pings off",
   pingsOn: "You'll get occasional pings about unanswered questions in your skills.",
@@ -275,12 +327,14 @@ const EN = {
   outdatedTag: "⚠️ outdated",
   suggestSkill: (label: string) =>
     `You've answered several questions about <b>${label}</b>. Add it to your skills? Only you can see this suggestion, and nothing changes unless you accept.`,
+  suggestSkillUnmet: (label: string, n: number) =>
+    `Questions about <b>${label}</b> came up ${n} times this month and nobody was there to answer. You've answered similar ones: add it to your skills? Only you see this, and nothing changes without your say.`,
   bAddSkill: "Add skill",
   bNoThanks: "No thanks",
   suggestAdded: "Added to your skills.",
   suggestDismissed: "OK, I won't suggest it again.",
   eventsTitle: "<b>Upcoming events</b>",
-  eventsNone: "No upcoming events found in your groups.",
+  eventsNone: "No upcoming events are announced in your groups yet.",
   eventsIcs: "Calendar file for these events:",
   eventHidden: "Hidden from /events.",
   appButton: "Open app",
@@ -289,9 +343,9 @@ const EN = {
   threadSearching: "🔍 Searching the community's memory…",
   threadMemoryHead: "💡 Found in the community's memory",
   threadMemoryAsk: "Is this what you need?",
-  threadNothing: "Nothing in the community's memory on this yet. Ask the people who know it?",
+  threadNothing: "Nothing in the community's memory on this yet. You can ask the people who know it.",
   threadAsking: (n: number) => `🙋 Asked ${n} people who know this. I'll write here as soon as someone replies.`,
-  threadNoMatch: "No one suitable has taken it yet. I'll keep looking and write here.",
+  threadNoMatch: "⏳ Nobody has answered yet. I'm still looking and will write here as soon as someone who can help appears.",
   threadCancelled: "Request cancelled.",
   threadExpired: "This request expired. You can ask again.",
   threadCandidate: (who: string) => `🤝 ${who} is ready to help. Confirm to open the contacts.`,
@@ -496,8 +550,8 @@ const EN = {
 export type Messages = typeof EN;
 
 const RU: Messages = {
-  dontKnowYou: "Мы пока не знакомы 🙂 Напиши что-нибудь в группе сообщества, где я есть, — и возвращайся.",
-  privateOnly: "Это работает в личном чате со мной — напиши мне туда 🙂",
+  dontKnowYou: "Мы пока не знакомы 🙂 Напишите что-нибудь в группе сообщества, где я есть, — и возвращайтесь.",
+  privateOnly: "Это работает в личном чате со мной — напишите мне туда 🙂",
   tooMany: "Слишком много запросов. Подождите минуту.",
   notAvailable: "Недоступно.",
   saved: "Сохранено.",
@@ -505,39 +559,54 @@ const RU: Messages = {
   no: "нет",
   on: "вкл",
   off: "выкл",
-  start: "👋 Привет! Я — помощник «Миндальной связи».\n\n" +
-    "🔎 <b>Найду ответ.</b> Просто напиши вопрос — поищу во всём, что обсуждали в твоих группах, и покажу, где это было.\n" +
-    "🤝 <b>Найду человека.</b> Если ответа нет — подскажу, кто в сообществе разбирается. Познакомлю, только если вы оба согласны.\n" +
+  start: "👋 Здравствуйте! Я — помощник «Миндальной Связи».\n\n" +
+    "🔎 <b>Найду ответ.</b> Напишите вопрос — поищу во всём, что обсуждали в ваших группах, и покажу, где это было.\n" +
+    "🤝 <b>Найду человека.</b> Если ответа нет — спрошу тех, кто готов помочь. Контакты открываются, только если согласны оба.\n" +
     "📅 <b>Не дам пропустить важное.</b> Что нового и какие встречи впереди.\n\n" +
-    "Удобнее всего — в приложении: кнопка <b>Меню</b> слева внизу.\n\n",
+    "Попробуйте прямо сейчас: напишите «кто посоветует бухгалтера для ИП?».\n\n",
   help: "<b>Как пользоваться</b>\n\n" +
-    "🔎 <b>Спросить</b>\nПросто напиши вопрос сюда.\nВ группе: /ask <i>вопрос</i> — отвечу из этой группы.\n\n" +
-    "🤝 <b>Найти человека</b>\n/intro <i>что нужно</i> — найду, кто поможет\n/help <i>что нужно</i> — попросить помощи у команды сообщества\n/requests — твои запросы\n\n" +
-    "📅 <b>Быть в курсе</b>\n/catchup — что нового\n/events — ближайшие встречи\n/digest on — сводка раз в день\n\n" +
-    "🙂 <b>О тебе</b>\n/profile — настройки\n/skills — что ты умеешь\n/optin — разрешить находить тебя как эксперта\n/language en — English\n\n" +
-    "🔒 <b>Приватность</b>\n/privacy — что я храню\n/forget_me — удалить всё о тебе",
+    "💬 <b>Спросить.</b> Просто напишите вопрос. Я найду ответ в ваших группах и покажу, где его обсуждали.\n" +
+    "🙋 <b>Помогать.</b> Расскажите, в чём разбираетесь, — позову вас, только когда запрос подходит.\n" +
+    "🗞 <b>Что нового.</b> /catchup — главное из групп, /events — ближайшие встречи.\n\n" +
+    "<blockquote expandable>Все команды\n" +
+    "/intro — найти того, кто поможет\n" +
+    "/help <i>что нужно</i> — передать запрос команде клуба\n" +
+    "/requests — ваши запросы\n" +
+    "/skills — навыки и темы, с которыми помогаете\n" +
+    "/optin и /optout — звать вас на помощь или нет\n" +
+    "/open on | off — предлагать проекты\n" +
+    "/introduce — знакомства по запросу\n" +
+    "/jobs — что спрашивают в группах (для админов групп)\n" +
+    "/digest on | off — сводка каждый день\n" +
+    "/language en — English\n" +
+    "/privacy — что я храню\n" +
+    "/forget_me — удалить всё обо мне</blockquote>",
   privacy:
-    "<b>Миндальная связь: конфиденциальность</b>\n" +
-    "• Сохраняются только группы, которые явно подключил владелец. В каждой такой группе есть уведомление.\n" +
-    "• Ваше имя, юзернейм и телефон не сохраняются; у вас случайный внутренний ID.\n" +
+    "<b>Миндальная Связь: конфиденциальность</b>\n" +
+    "• Сохраняю только группы, которые подключил владелец. В каждой есть уведомление.\n" +
     "• Ответы — дословные цитаты со ссылкой, только из групп, которые вы можете читать.\n" +
-    "• Данные хранятся в Cloudflare D1. Ничего не отправляется в ИИ-сервисы. Файлы PDF, Word и PowerPoint превращаются в текст на серверах GitHub и там не хранятся.\n" +
-    "• Вас не видно как эксперта, пока вы сами не выполните /optin.\n" +
-    "• Для знакомства нужно согласие обоих, прежде чем кто-то получит контакт.\n" +
+    "• Вас не зовут на помощь, пока вы сами не включите это (/optin).\n" +
+    "<blockquote expandable>Подробнее\n" +
+    "• Сохраняется ваш Telegram-ID — чтобы я мог писать вам. Юзернейм и телефон не сохраняются. Имя видно в ответах, только если вы сами его включили (/name on).\n" +
+    "• Пересказ ответа пишет ИИ, если он подключён в клубе. Ему уходят ваш вопрос и найденные сообщения — без авторов и ссылок; телефоны и почту из них убираю.\n" +
+    "• Данные хранятся в Cloudflare D1. Файлы PDF, Word и PowerPoint переводятся в текст на серверах GitHub, сами файлы там не хранятся.\n" +
+    "• Знакомство происходит, только когда согласны оба; контакты открываются после этого.\n" +
+    "• Предложение проектов (/open) и знакомства по запросу (/introduce) выключены, пока вы их не включите. Строка из /introduce сверяется только с запросами и никому не показывается. Если выключить «Звать меня на помощь», проекты, знакомства по запросу и круги (/rounds) тоже выключаются, а строка из /introduce удаляется.\n" +
+    "• Администраторы групп видят только количество запросов по видам (/jobs), но не того, кто спрашивал.\n" +
     "• Оценки ответов (👍/👎) приватны и только улучшают поиск.\n" +
-    "• История хранится полностью. /forget_me удаляет ваши сообщения и профиль и останавливает сбор; ответьте /forget на своё сообщение в группе, чтобы удалить его.",
+    "• История хранится полностью. /forget_me удаляет ваши сообщения, профиль и настройки /open и /introduce и останавливает сбор. Ответьте /forget на своё сообщение в группе, чтобы удалить только его.</blockquote>",
   languageSet: "Язык интерфейса: русский.",
   languageUsage: "Использование: <code>/language ru</code> или <code>/language en</code>",
 
   visibilityMust: (list: string) => `Видимость должна быть одной из: ${list}`,
   whereMember: "💡 <b>Где что работает</b>\n" +
-    "Здесь, в личке, — всё.\n" +
+    "В личке — всё.\n" +
     "В группе — только /ask <i>вопрос</i> (отвечу из этой группы) и /forget ответом на своё сообщение, чтобы его удалить.",
   whereOwner: "\n\n🛠 <b>Для владельца</b>\n" +
-    "Здесь: /status — всё ли в порядке, /desk — твой пульт: просьбы о помощи, /sources — подключённые группы.\n" +
-    "В группе, где ты админ: /enable — подключить, /disable — отключить, /welcome — приветствие новичков, /hints — подсказки, /routing — спрашивать знающих, если ответа нет.",
+    "Здесь: /status — всё ли в порядке, /desk — ваш пульт: просьбы о помощи, /sources — подключённые группы.\n" +
+    "В группе, где вы админ: /enable — подключить, /disable — отключить, /welcome — приветствие новичков, /hints — подсказки, /routing — спрашивать тех, кто помогает, если ответа нет.",
   adminGuide: (title: string) =>
-    `✅ <b>«${title}» подключена.</b> Это видишь только ты.\n\n` +
+    `✅ <b>«${title}» подключена.</b> Это видите только вы.\n\n` +
     "Теперь участники могут спрашивать меня о том, что здесь обсуждали, — в группе через /ask или в личке.\n\n" +
     "<b>Что можно настроить в группе</b>\n" +
     "/welcome on|off — приветствовать новичков (сейчас включено)\n" +
@@ -548,16 +617,16 @@ const RU: Messages = {
     "Ответом на сообщение: /canonical — лучший ответ, /notevent — это не событие.\n" +
     "Старые сообщения и помощь — здесь, в личке: /app и /help.",
   welcomeDm: (title: string) =>
-    `👋 Привет! Я помощник сообщества <b>${title}</b>.\n\n` +
-    "Я помогу тебе ориентироваться в этом сообществе и найти любую информацию, которая когда-то обсуждалась. А если потребуется — найду человека, который знает ответ на твой вопрос.\n\n" +
-    "Просто напиши мне вопрос — или нажми <b>Меню</b> слева внизу, чтобы открыть приложение. Все команды — /help.",
+    `👋 Здравствуйте! Я помощник сообщества <b>${title}</b>.\n\n` +
+    "Помогу сориентироваться в сообществе и найти всё, что здесь когда-либо обсуждали. А если нужно — найду человека, который знает ответ.\n\n" +
+    "Просто напишите вопрос — или нажмите <b>Приложение</b> внизу слева. Все команды — /help.",
   welcomeGroup: (name: string) =>
-    `👋 ${name}, добро пожаловать! Я помогу найти любую информацию, которая здесь когда-то обсуждалась, а если потребуется — человека, который знает ответ. Создай личный чат со мной, чтобы начать.`,
+    `👋 ${name}, добро пожаловать! Я помогу найти всё, что здесь когда-либо обсуждали, а если нужно — человека, который знает ответ. Откройте личный чат со мной, чтобы начать.`,
   welcomeButton: "Начать",
   connected: () =>
     "✨ Я подключился к этой группе. Теперь любой участник может спросить меня о том, что здесь обсуждали, — /ask прямо здесь или в личке. " +
     "Чтобы искать, я сохраняю сообщения группы: как именно — /privacy в личке со мной, удалить свои данные — /forget_me.",
-  guideInGroup: (name: string) => `${name}, настройки и кнопка для загрузки старых сообщений ждут тебя у меня в личке.`,
+  guideInGroup: (name: string) => `${name}, настройки и кнопка для загрузки старых сообщений ждут вас в личке у меня.`,
   guideButton: "⚙️ Открыть настройки",
   askToConnect: "👋 Привет! Я помогаю найти всё, что здесь когда-либо обсуждали, — и человека, который знает ответ. Чтобы начать, админ группы нажимает кнопку.",
   connectButton: "✨ Подключить",
@@ -565,24 +634,24 @@ const RU: Messages = {
   whereGroupAdmin: "\n\n🛠 <b>Ведёшь сообщество?</b>\nДобавь меня в свою группу — это вся настройка.",
   historyOffer: (button: boolean) =>
     "\n\n📜 <b>Старые сообщения</b>\nСейчас я знаю только то, что напишут начиная с сегодня. " +
-    (button ? "Нажми кнопку ниже — и я загружу прошлые сообщения группы. Это займёт несколько секунд, остальное я сделаю сам в фоне." : "Чтобы я загрузил и прошлые сообщения группы, открой приложение → Пульт → История."),
+    (button ? "Нажмите кнопку ниже — и я загружу прошлые сообщения группы. Это займёт несколько секунд, остальное сделаю в фоне." : "Чтобы я загрузил и прошлые сообщения группы, откройте приложение → Пульт → История."),
   historyButton: "📜 Загрузить старые сообщения",
-  historyAuto: "\n\n📜 <b>Старые сообщения</b>\nЗагружаю прошлые сообщения группы сам — через твой Telegram MCP-сервер. Напишу, когда всё можно будет найти.",
+  historyAuto: "\n\n📜 <b>Старые сообщения</b>\nЗагружаю прошлые сообщения группы через ваш Telegram MCP-сервер. Сообщу, когда всё можно будет найти.",
   historyMcpFailed: (title: string, button: boolean) =>
-    `📜 Не получилось прочитать историю <b>${title}</b> через твой Telegram MCP-сервер (10 минут подряд ошибки). Проверь ключ и что сервер работает. ` +
-    (button ? "Или загрузи её из приложения кнопкой ниже." : "Или загрузи её из приложения → Пульт → История."),
+    `📜 Не получилось прочитать историю <b>${title}</b> через ваш Telegram MCP-сервер (10 минут подряд ошибки). Проверьте ключ и что сервер работает. ` +
+    (button ? "Или загрузите её из приложения кнопкой ниже." : "Или загрузите её из приложения → Пульт → История."),
   historyRemind: (title: string, read: number, button: boolean) =>
     `📜 Чтение истории <b>${title}</b> остановилось раньше начала чата (прочитано ${read} сообщений). ` +
-    (button ? "Нажми кнопку, чтобы дочитать, — это займёт несколько секунд." : "Открой приложение → Пульт → История, чтобы дочитать, — это займёт несколько секунд."),
+    (button ? "Нажмите кнопку, чтобы дочитать, — это займёт несколько секунд." : "Откройте приложение → Пульт → История, чтобы дочитать, — это займёт несколько секунд."),
   historyDone: (title: string, n: number) => `✅ История <b>${title}</b> загружена: ${n} прошлых сообщений теперь можно найти.`,
   welcomeUsage: "Использование: /welcome on или /welcome off (владелец, в подключённой группе).",
   welcomeOn: "Приветствие <b>включено</b>: новые участники получат от меня короткое интро — лично, когда Telegram это позволяет.",
   welcomeOff: "Приветствие в этой группе <b>выключено</b>.",
-  disabled: "Миндальная связь больше не сохраняет этот чат. Уже сохранённые сообщения исключены из всех ответов.",
+  disabled: "Миндальная Связь больше не сохраняет этот чат. Уже сохранённые сообщения исключены из всех ответов.",
   retentionUsage: "Использование: /retention &lt;дни 1..3650&gt; — удалять старые сообщения, или /retention 0 — хранить всю историю.",
   retentionKeepAll: "История будет храниться полностью. Ничего не удаляется автоматически.",
   retentionSet: (days: number) => `Срок хранения: ${days} дн. Более старые сообщения удаляются ежедневно.`,
-  removed: "Удалено из «Миндальной связи».",
+  removed: "Удалено из «Миндальной Связи».",
   nothingStored: "Для этого сообщения ничего не сохранено.",
   hintsUsage: "Использование: /hints on или /hints off (владелец, в подключённой группе).",
   hintsOn: "Подсказки <b>включены</b>: если кто-то задаст вопрос, на который в группе уже отвечали, я один раз отвечу ссылкой на прошлый ответ.",
@@ -590,8 +659,9 @@ const RU: Messages = {
   hint: (link: string) => `💡 Похоже, здесь уже отвечали на это: ${link}`,
   earlierAnswer: "прошлое обсуждение",
 
-  askUsage: "Напиши вопрос после <code>/ask</code> — или просто отправь его мне в личку.",
-  aiNote: "Кратко от ИИ — сверься с источниками ниже.",
+  askUsage: "Напишите вопрос после <code>/ask</code>, например: <code>/ask кто делал сайт клуба?</code>",
+  askPrompt: "Что хотите узнать? Напишите вопрос следующим сообщением — я поищу ответ в ваших группах.",
+  aiNote: "✨ Пересказ от ИИ. Сверьте с цитатами ниже.",
   noAccess: "Пока нет источников, которые вам разрешено читать. Сначала напишите в подключённой группе или обратитесь к админу.",
   insufficient: "<b>Надёжного ответа не нашлось</b> в доступных вам источниках.\nПопробуйте переформулировать или спросите в сообществе.",
   insufficientGroup: "<b>Надёжного ответа не нашлось</b> в этой группе.\nПопробуйте переформулировать.",
@@ -606,67 +676,95 @@ const RU: Messages = {
   fbThanks: "Спасибо! Оценка приватна и только улучшает поиск.",
   fbAlready: "Уже учтено.",
 
-  profileTitle: "<b>Ваш профиль</b> (видите только вы)",
-  pDigest: "Ежедневная сводка",
-  pDiscoverable: "Видимость как эксперта",
-  pAvailable: "Доступен для знакомств",
-  pReminders: "Напоминания",
-  pCollection: "Сбор сообщений",
-  pLanguage: "Язык",
+  profileTitle: "👤 <b>Ваш профиль</b> · видите только вы",
+  pDigest: "🗞 Сводка каждый день",
+  pDiscoverable: "🙋 Звать меня на помощь",
+  pAvailable: "⏸ Знакомства",
+  pReminders: "🔔 Напоминания",
+  pCollection: "💾 Сохранять мои сообщения",
+  pLanguage: "🌐 Язык",
   pStopped: "остановлен",
-  pSkills: "Навыки",
+  pSkills: "🙋 Помогаю с",
   noneYet: "пока нет",
   suggested: "предложено",
-  addSkillHint: "Добавить навык: <code>/skills add бухгалтерия</code>.",
-  bDigestOn: "Включить сводку",
-  bDigestOff: "Выключить сводку",
-  bDiscoverOn: "Стать видимым",
-  bDiscoverOff: "Скрыть меня",
-  bResume: "Возобновить знакомства",
-  bPause: "Пауза в знакомствах",
-  bRemindersOn: "Включить напоминания",
-  bRemindersOff: "Выключить напоминания",
+  bDigestOn: "🗞 Включить сводку",
+  bDigestOff: "🗞 Выключить сводку",
+  bDiscoverOn: "🙋 Звать меня на помощь",
+  bDiscoverOff: "🙋 Не звать меня",
+  bResume: "▶️ Продолжить",
+  bPause: "⏸ Пауза",
+  bRemindersOn: "🔔 Включить напоминания",
+  bRemindersOff: "🔔 Выключить напоминания",
+  pNoSkills: "пока ничего — нажмите «С чем помогаю»",
+  pName: "🪪 Имя в ответах",
+  pGoing: "идут",
+  pPaused: "на паузе",
+  pOpenLine: "💼 Предлагать проекты",
+  bHelpWith: "✏️ С чем помогаю",
+  bHelpMe: "🙋 Я тоже могу помогать",
+  bMore: "⚙️ Ещё",
+  bBack: "← Назад",
+  bTeam: "📨 Передать команде клуба",
+  moreTitle: "⚙️ <b>Ещё</b>",
+  moreNote: "Удалить все данные: /forget_me.",
+  promptCancelled: "Отменено.",
+  bioPrompt: "С чем ещё можете помочь? Напишите одной строкой — например: «налоги для ИП, бухгалтерия» — или пришлите ссылку на свой профиль. Найду навыки и добавлю их.",
+  alreadySet: "Уже так.",
+  bEvents: "📅 Ближайшие встречи",
 
-  digestState: (on: boolean) => `Ежедневная сводка <b>${on ? "включена" : "выключена"}</b>. Изменить: <code>/digest on</code> или <code>/digest off</code>.`,
-  digestOn: (hour: number) => `Вы будете получать ежедневную сводку (в ${hour}:00 по местному времени) по группам, которые вы можете читать.`,
-  digestOff: "Ежедневная сводка выключена.",
-  optin: "Теперь вас можно найти для знакомств <b>по навыкам, которые вы укажете</b>. Никто не узнает, кто вы, пока вы не примете конкретный запрос и автор его не подтвердит.\nДобавить навык: <code>/skills add python</code> · отменить: /optout",
-  optout: "Вас больше не видно как эксперта. На уже полученные приглашения можно ответить.",
+  digestState: (on: boolean, hour: number) =>
+    `🗞 <b>Сводка каждый день</b>: <b>${on ? "включена" : "выключена"}</b>.\nГлавное из групп, которые вы можете читать, — в ${hour}:00 по местному времени.`,
+  digestOn: (hour: number) => `Сводка включена: каждый день в ${hour}:00 по местному времени — главное из ваших групп.`,
+  digestOff: "Сводка выключена.",
+  digestAlready: (on: boolean): string => (on ? "Сводка уже включена." : "Сводка уже выключена."),
+  optin: "Готово: теперь вас могут позвать на помощь. Имя никто не увидит, пока вы сами не согласитесь на конкретный запрос.\nС чем можете помочь? Напишите одной строкой, например: «бухгалтерия для ИП».",
+  optinAlready: (labels: string) =>
+    labels
+      ? `Вас уже могут позвать на помощь: <b>${labels}</b>. Добавить тему — напишите её одной строкой. Пауза — /optout.`
+      : "Вас уже могут позвать на помощь. С чем можете помочь? Напишите одной строкой.",
+  optout: "Вас больше не зовут на помощь. Уже полученные приглашения можно принять или отклонить.",
+  optoutCleared: "Проекты, знакомства по запросу и круги знакомств тоже выключены, а строка знакомств удалена. Чтобы вернуть что-то из этого, включите это заново.",
+  optoutAlready: "Вас и так не зовут на помощь.",
 
   skillsTitle: "<b>Навыки</b>",
   unknownSkill: "Неизвестный навык. Список: /skills all.",
   skillAdded: (label: string, discoverable: boolean) =>
-    `Добавлено: <b>${label}</b>.${discoverable ? "" : " Вас пока не видно — выполните /optin, когда будете готовы."}`,
+    `Добавлено: <b>${label}</b>.${discoverable ? "" : " Звать вас на помощь пока не будут: включите — /optin."}`,
+  skillAlready: (label: string) => `«${label}» уже в вашем профиле.`,
   skillRemoved: "Удалено.",
   skillNotOnProfile: "Этого навыка не было в профиле.",
-  bioUsage: "Пришлите ссылку на сайт или профиль, или впишите пару строк о себе после <code>/bio</code>, и я добавлю найденные навыки. Страницу и текст я не храню, остаются только навыки.",
-  bioAdded: (list: string, known: number) => `Добавил в ваши навыки: <b>${list}</b>.${known ? ` Ещё ${known} у вас уже были.` : ""}\nМожно поправить в /skills. Страницу и текст я не сохранял.`,
+  bioUsage: "Пришлите ссылку на сайт или профиль — или напишите пару строк о себе после <code>/bio</code>. Я добавлю найденные навыки. Страницу и текст не храним, остаются только навыки.",
+  bioAdded: (list: string, known: number) => `Добавлено в ваши навыки: <b>${list}</b>.${known ? ` Ещё ${known} уже были.` : ""}\nПоправить можно в /skills. Страницу и текст не храним.`,
   bioKnown: "Всё, что нашёл, уже есть в вашем профиле.",
-  bioNone: "Навыков в этом не нашёл. Попробуйте вставить пару строк о том, чем вы занимаетесь.",
+  bioNone: "Навыков в этом не нашлось. Попробуйте вставить пару строк о том, чем вы занимаетесь.",
   bioShort: "Слишком коротко, чтобы найти навыки. Пришлите ссылку или пару строк о том, чем вы занимаетесь.",
-  bioBlocked: "Этот сайт не даёт мне себя читать (LinkedIn не даёт никогда). Скопируйте текст из «О себе» и «Опыт» и пришлите так: <code>/bio …ваш текст…</code>.",
-  bioBadUrl: "Я читаю открытые страницы, которые начинаются с https://. Пришлите такую ссылку или вставьте текст.",
+  bioBlocked: "Этот сайт не даёт прочитать страницу (LinkedIn не даёт никогда). Скопируйте текст из «О себе» и «Опыт» и пришлите так: <code>/bio …ваш текст…</code>.",
+  bioBadUrl: "Читаю только открытые страницы, которые начинаются с https://. Пришлите такую ссылку или вставьте текст.",
   bioFailed: "Не получилось открыть страницу. Вставьте текст: <code>/bio …ваш текст…</code>.",
   bioBusy: "Секунду, и попробуйте ещё раз.",
   yourSkills: (list: string) => `<b>Ваши навыки</b>\n${list}\n\n<code>/skills add …</code> · <code>/skills remove …</code> · /skills all · /bio`,
-  expertUsage: "Назовите тему, например <code>/expert налоги</code> (список: /skills all).",
+  expertUsage: "Назовите тему, например <code>/expert налоги</code> (все темы: /skills all).",
   expertCount: (n: number, labels: string) =>
-    `Подходит участников, согласных на знакомства: <b>${n}</b> (<i>${labels}</i>).\n` +
-    (n ? "Чтобы запросить знакомство: <code>/intro …</code>" : "Попробуйте тему шире или спросите в сообществе."),
+    `Сейчас готовы помочь по теме: <b>${n}</b> (<i>${labels}</i>).\n` +
+    (n ? "Чтобы попросить помощи: <code>/intro …</code>" : "Попробуйте тему шире или спросите в клубе."),
 
-  introUsage: "Опишите одним предложением, что вам нужно, например:\n<code>/intro нужен бухгалтер для стартапа из 3 человек</code>\n\nВаш текст увидят подходящие эксперты, <b>но не ваше имя</b>.",
+  introUsage: "Опишите одной фразой, что вам нужно, — например: <code>/intro нужен бухгалтер для стартапа из 3 человек</code>\n\nТекст увидят только те, кто может помочь, <b>без вашего имени</b>.",
+  introPrompt: "Кого ищете? Напишите одной строкой — например: «бухгалтер для стартапа из трёх человек». Текст увидят только те, кто может помочь, <b>без вашего имени</b>.",
   introCreated: (labels: string) =>
-    `Запрос создан (<i>${labels}</i>). Я анонимно пригласил самого подходящего эксперта. Перед обменом контактами вас попросят подтвердить. Приглашение действует 72 часа; я попробую до 3 экспертов.`,
-  introNoMatch: (labels: string) => `Сейчас нет доступных экспертов по теме <i>${labels}</i>. Попробуйте позже или спросите в сообществе.`,
-  askPickTopic: "Кого спросить? Выберите тему, и я найду в сообществе того, кто вызвался в ней помогать.",
-  askNoHelpers: "Пока никто в сообществе не отметил, в чём готов помогать, так что спросить некого. Можно стать первым: /skills. Или написать команде сообщества: /help <i>что нужно</i>.",
-  introNoSkill: "Не удалось сопоставить запрос с навыком. Назовите область, например <code>/intro бухгалтер для небольшого стартапа</code>, или посмотрите /skills all.",
-  introCap: (n: number, cap: number) => `У вас уже ${n} открытых запроса на этой неделе (лимит ${cap}). Отмените один через /requests или подождите.`,
-  introClosedNoMatch: "На этот раз ни один эксперт не принял запрос, поэтому он закрыт. Попробуйте позже или спросите в сообществе.",
+    `✅ Запрос отправлен: <i>${labels}</i>. Анонимное приглашение получил тот, кто подходит лучше всего. Ответ придёт сюда. Срок — 72 часа.`,
+  introNoMatch: (labels: string) =>
+    `Сейчас никто из тех, кто помогает с «${labels}», не может взяться. Запрос сохранён на две недели: как только такой человек появится, сообщу сюда.`,
+  introWaiting: "На этот раз никто не откликнулся. Запрос ждёт: сообщу, как только появится тот, кто может помочь.",
+  waitingFound: (labels: string) => `🙋 Нашёлся тот, кто может помочь с «${labels}». Приглашение отправлено анонимно. Сообщу, как только будет ответ.`,
+  askPickTopic: "Выберите тему — найду в клубе того, кто готов помогать в ней.",
+  askNoHelpers: "Пока никто в клубе не отметил, с чем готов помогать, так что спросить некого. Передайте запрос команде клуба — и я сообщу, если кто-то появится.",
+  introNoSkill: "Не поняли, с чем помочь. Назовите тему, например: <code>/intro бухгалтер для небольшого стартапа</code>. Все темы — /skills all.",
+  introCap: (n: number, cap: number) => `У вас уже ${n} открытых запроса на этой неделе (лимит ${cap}). Отмените один в /requests или дождитесь ответа.`,
+  introClosedNoMatch: "Больше никого не осталось, кого можно спросить. Запрос закрыт — переформулируйте его или передайте команде клуба.",
   introInvite: (labels: string, need: string, why: string) =>
-    `<b>Запрос на знакомство</b>\nУчастнику сообщества нужна помощь: <i>${labels}</i>\n\n<blockquote>${need}</blockquote>\n` +
+    `<b>Просьба о помощи</b>\nВ клубе нужна помощь: <i>${labels}</i>\n\n<blockquote>${need}</blockquote>\n` +
     (why ? `${why}\n` : "") +
-    "Вы останетесь анонимны, пока не примете запрос <b>и</b> автор не подтвердит. Приглашение действует 72 часа.",
+    "Ваше имя не увидят, пока вы не согласитесь и автор запроса не подтвердит. Срок — 72 часа.",
   bAccept: "Принять",
   bDecline: "Не сейчас",
   bConfirm: "Подтвердить и обменяться контактами",
@@ -680,29 +778,29 @@ const RU: Messages = {
   inviteExpired: "Срок приглашения истёк.",
   alreadyHandledOrNA: "Уже обработано или недоступно.",
   alreadyHandled: "Уже обработано.",
-  introAcceptedToRequester: (quote: string) => `<b>Хорошая новость:</b> эксперт принял ваш запрос на знакомство.\n${quote}\nПодтвердите, чтобы обменяться контактами.`,
+  introAcceptedToRequester: (quote: string) => `<b>Хорошая новость:</b> на вашу просьбу откликнулись.\n${quote}\nПодтвердите, чтобы открыть контакты.`,
   introAcceptedReply: "Спасибо! Теперь автор запроса должен подтвердить. Пока ничего не передано.",
   introDeclinedReply: "Отклонено. Никто не узнает, кто вы.",
-  introConnectedReq: "<b>Вы на связи.</b> Контакт эксперта:",
-  introConnectedCand: (quote: string) => `<b>Вы на связи.</b> Автор запроса подтвердил.\n${quote}\nЕго контакт:`,
+  introConnectedReq: "<b>Вы на связи.</b> Контакт:",
+  introConnectedCand: (quote: string) => `<b>Вы на связи.</b> Автор запроса подтвердил.\n${quote}\nКонтакт автора:`,
   introConfirmedReply: "Подтверждено. Контакты отправлены вам обоим.",
   introCancelledNotice: "Знакомство, в котором вы участвовали, отменено. Ничего не было передано.",
   introCancelledReply: "Отменено.",
   introCompletedReply: "Спасибо за отзыв! Он приватен и только улучшает подбор.",
-  introReminder: "Напоминание: запрос на знакомство ждёт вашего ответа. Если неинтересно — просто проигнорируйте, он истечёт сам.",
+  introReminder: "Напоминание: просьба о помощи ждёт ответа. Если не можете — просто проигнорируйте: она истечёт сама.",
   done: "Готово.",
   noRequests: "У вас нет открытых запросов.",
   requestStatus: (text: string, status: string) =>
-    `<blockquote>${text}</blockquote>Статус: ${status === "matching" ? "ищу эксперта" : status === "open" ? "открыт" : status}`,
+    `<blockquote>${text}</blockquote>Статус: ${status === "matching" ? "ищем того, кто поможет" : status === "open" ? "открыт" : status === "waiting" ? "ждём, кто поможет" : status}`,
   requestCancelled: "Запрос отменён.",
   alreadyClosed: "Уже закрыт.",
 
-  forgetConfirm: "<b>Удалить мои данные?</b>\nБудут удалены все ваши сохранённые сообщения, навыки и открытые знакомства, а новые сообщения перестанут сохраняться. Отменить нельзя.",
+  forgetConfirm: "<b>Удалить ваши данные?</b>\nУдалим все ваши сохранённые сообщения, навыки и открытые запросы, а новые сообщения перестанем сохранять. Отменить нельзя.",
   bForgetYes: "Да, удалить всё",
   deleted: "Удалено.",
   nothingDeleted: "Ничего не удалено.",
   forgetDone: (p: number, s: number, i: number) =>
-    `Готово: удалено сообщений — ${p}, навыков — ${s}, знакомств — ${i}. Новые сообщения сохраняться не будут. /resume_collection снова включит сбор.`,
+    `Готово: удалено сообщений — ${p}, навыков — ${s}, запросов — ${i}. Новые сообщения сохраняться не будут. /resume_collection — снова сохранять.`,
   resumeOk: "Ваши новые сообщения в подключённых группах снова будут сохраняться.",
 
   dTitle: (day: string) => `<b>Сводка за день · ${day}</b>`,
@@ -727,10 +825,10 @@ const RU: Messages = {
   alreadyResolved: "Уже решено.",
 
   routingUsage: "Использование: /routing on или /routing off (владелец, в подключённой группе).",
-  routingOn: "Спрашивание знающих <b>включено</b>: вопросы без ответа через 4 часа приватно отправляются максимум 2 экспертам, которые согласились и могут читать эту группу.",
+  routingOn: "Спрашивать тех, кто помогает, <b>включено</b>: вопросы без ответа через 4 часа приватно отправляются не больше чем двум из них — тех, кто согласился и может читать эту группу.",
   routingOff: "Спрашивание знающих выключено.",
   routePing: (labels: string, snippet: string, link: string) =>
-    `<b>Вопрос в вашей группе ждёт ответа</b> (<i>${labels}</i>):\n<blockquote>${snippet}</blockquote>\n${link}\n\nВы получили это, потому что согласились быть экспертом. Отключить: /pings off`,
+    `<b>Вопрос в вашей группе ждёт ответа</b> (<i>${labels}</i>):\n<blockquote>${snippet}</blockquote>\n${link}\n\nВы получили это, потому что согласились помогать. Отключить: /pings off`,
   openQuestion: "открыть вопрос",
   pingsUsage: "Использование: /pings on или /pings off",
   pingsOn: "Иногда буду присылать вопросы без ответа по вашим навыкам.",
@@ -743,56 +841,59 @@ const RU: Messages = {
   outdatedTag: "⚠️ устарело",
   suggestSkill: (label: string) =>
     `Вы ответили на несколько вопросов по теме <b>${label}</b>. Добавить её в ваши навыки? Это предложение видите только вы, и ничего не изменится без вашего согласия.`,
+  suggestSkillUnmet: (label: string, n: number) =>
+    `По теме <b>${label}</b> за месяц спрашивали ${n} ${ruPlural(n, "раз", "раза", "раз")}, и ответить было некому. Вы уже отвечали на похожие вопросы: добавить тему в ваши навыки? Это видите только вы, и без вашего согласия ничего не меняется.`,
   bAddSkill: "Добавить навык",
   bNoThanks: "Нет, спасибо",
   suggestAdded: "Добавлено в ваши навыки.",
   suggestDismissed: "Хорошо, больше не предложу.",
   eventsTitle: "<b>Ближайшие события</b>",
-  eventsNone: "В ваших группах не найдено предстоящих событий.",
+  eventsNone: "Ближайших встреч в ваших группах пока не объявлено.",
   eventsIcs: "Файл календаря с этими событиями:",
   eventHidden: "Скрыто из /events.",
   appButton: "Открыть приложение",
   // «Нить»: живая карточка запроса (одно сообщение, которое правится на месте)
   memberAnon: "Участник",
   threadSearching: "🔍 Ищу в памяти клуба…",
-  threadMemoryHead: "💡 Нашёл в памяти клуба",
+  threadMemoryHead: "💡 Нашлось в памяти клуба",
   threadMemoryAsk: "Это то, что нужно?",
-  threadNothing: "В памяти клуба пока ничего нет. Спросить тех, кто в этом разбирается?",
-  threadAsking: (n: number) => `🙋 Спросил ${n} чел., которые в этом разбираются. Напишу сюда, как только кто-то откликнется.`,
-  threadNoMatch: "Пока никто подходящий не взялся. Я продолжу искать и напишу сюда.",
+  threadNothing: "В памяти клуба пока ничего нет. Можно спросить тех, кто в этом разбирается.",
+  threadAsking: (n: number) => `🙋 Спросили ${n} чел. из тех, кто помогает. Сообщу сюда, как только кто-то откликнется.`,
+  threadNoMatch: "⏳ Пока никто не откликнулся. Продолжаю искать и сообщу сюда, как только появится тот, кто может помочь.",
   threadCancelled: "Запрос отменён.",
   threadExpired: "Срок запроса истёк. Можно спросить ещё раз.",
-  threadCandidate: (who: string) => `🤝 ${who} готов помочь. Подтверди, чтобы открыть контакты.`,
+  threadCandidate: (who: string) => `🤝 ${who} готов помочь. Подтвердите, чтобы открыть контакты.`,
   threadConnected: "🤝 Вы на связи. Контакты открыты.",
-  threadFollowup: "Помогло? Выбери, как вышло.",
-  threadFollowupAsk: "Ну что, помогло? Выбери, как вышло, — это секунда.",
+  threadFollowup: "Помогло? Выберите, как получилось.",
+  threadFollowupAsk: "Ну что, помогло? Выберите, как получилось — это секунда.",
   threadClosed: (label: string) => `✅ Итог: ${label}`,
   threadThanked: "🙏 Спасибо отправлено.",
   threadStopped: "Этот запрос закрыт.",
   threadSolvedToast: "Рад, что помогло!",
   threadNotThatToast: "Спасибо, учту.",
   threadThanksSent: "Спасибо отправлено.",
-  thanksReceived: (q: string, n: number) => `🙏 Тебя поблагодарили за помощь с вопросом «${q}». Ты уже помог ${n} людям.`,
-  outcomeContactLabel: "получил контакт",
+  thanksReceived: (q: string, n: number) =>
+    `🙏 Вас поблагодарили за помощь с вопросом «${q}». Вы уже помогли ${n === 1 ? "одному человеку" : `${n} людям`}.`,
+  outcomeContactLabel: "контакт получен",
   outcomeAdviceLabel: "дали совет",
-  outcomeSolvedLabel: "решил задачу",
-  bOutcomeContact: "📇 Получил контакт",
+  outcomeSolvedLabel: "задача решена",
+  bOutcomeContact: "📇 Контакт получен",
   bOutcomeAdvice: "💬 Дали совет",
-  bOutcomeSolved: "✅ Решил задачу",
+  bOutcomeSolved: "✅ Задача решена",
   bThatsIt: "✅ Это то, что нужно",
   bAskPeople: "🙋 Спросить людей",
   bNotThat: "👎 Не то",
   bThanks: "🙏 Спасибо",
   bCancelAsk: "✖ Отменить запрос",
   bOpenPrivately: "💬 Открыть в личке",
-  threadGroupFound: (n: number) => `💡 Нашёл ответов в памяти клуба: ${n}. Отправил тебе в личку.`,
-  threadGroupNothing: "🔍 В памяти пока пусто. Следующие шаги отправил тебе в личку.",
+  threadGroupFound: (n: number) => `💡 Нашлось ответов в памяти клуба: ${n}. Отправлено вам в личку.`,
+  threadGroupNothing: "🔍 В памяти пока пусто. Следующие шаги — в личке.",
   // Wow moment после загрузки истории, и вопросы без ответа
   wowTopics: "О чём говорит ваше сообщество",
   wowHelpers: "Кто помогает чаще всех",
-  wowForgotten: (n: number) => `Я нашёл ${n} вопросов, на которые никто не ответил`,
+  wowForgotten: (n: number) => `Нашлось ${n} ${ruPlural(n, "вопрос", "вопроса", "вопросов")} без ответа`,
   wowNoneForgotten: "На все вопросы нашлись ответы. Здорово!",
-  wowForgottenHead: "Вопросы без ответа. Нажми на один — я поищу ответ.",
+  wowForgottenHead: "Вопросы без ответа. Нажмите на один — поищу ответ.",
   bLook: "Посмотреть",
   bAnswerIt: "Ответить",
   // Пилот: показатели для владельца
@@ -811,22 +912,23 @@ const RU: Messages = {
   setWelcome: "Приветствовать новичков",
   setRetention: (days: number) => (days ? `Храню сообщения ${days} дн.` : "Храню всю историю (изменить: /retention 90)"),
   // Имя в карточках ответов (по умолчанию скрыто)
-  nameOn: "Теперь в ответах будет видно твоё имя.",
-  nameOff: "Имя скрыто: ты снова участник в толпе 🙂",
+  nameOn: "Теперь в ответах будет видно ваше имя.",
+  nameOff: "Имя скрыто: вы снова участник в толпе 🙂",
   bNameOn: "🪪 Показывать моё имя",
   bNameOff: "🪪 Скрыть моё имя",
-  nameUsage: "Напиши <code>/name on</code>, чтобы в ответах видели твоё имя, или <code>/name off</code>, чтобы скрыть.",
+  nameUsage: "Напишите <code>/name on</code>, чтобы в ответах видели ваше имя, или <code>/name off</code>, чтобы скрыть.",
   // Сторона эксперта (путь 4): почему ты, паузы, тихие часы, слова благодарности
-  introWhy: (label: string, n: number) => `Почему вам: вы отвечали про «${label}» ${n} раз.`,
-  pauseSuggest: "Ты дважды подряд ответил «Не сейчас». Поставить паузу? Запросы перестанут приходить, пока ты сам не включишь их снова.",
+  introWhy: (label: string, n: number) => `Почему вам: вы отвечали про «${label}» ${n} ${ruPlural(n, "раз", "раза", "раз")}.`,
+  pauseSuggest: "Вы дважды подряд ответили «Не сейчас». Поставить паузу? Запросы перестанут приходить, пока вы сами не включите их снова.",
   bKeepOn: "Оставить как есть",
   pQuiet: "Тихие часы",
   bQuietOn: "🌙 Тихо с 22:00 до 08:00",
   bQuietOff: "🌙 Выключить тихие часы",
-  pHelped: (n: number) => `Ты помог ${n} людям`,
-  thanksAsk: "Напиши пару слов для него — он их увидит. Или нажми «Без слов».",
+  pHelped: (n: number) => `Помогли людям: ${n}`,
+  thanksAsk: "Напишите пару слов — автор запроса их увидит. Или нажмите «Без слов».",
   bNoWords: "Без слов, просто спасибо",
-  thanksWithWords: (q: string, words: string, n: number) => `🙏 Тебя поблагодарили за помощь с вопросом «${q}»: «${words}». Ты уже помог ${n} людям.`,
+  thanksWithWords: (q: string, words: string, n: number) =>
+    `🙏 Вас поблагодарили за помощь с вопросом «${q}»: «${words}». Вы уже помогли ${n === 1 ? "одному человеку" : `${n} людям`}.`,
   // Пульс: еженедельная сводка по одной группе (путь 9)
   pulseTitle: (group: string) => `<b>Пульс · ${group}</b> — за неделю`,
   pulseQuestions: (n: number) => `Вопросов: <b>${n}</b>`,
@@ -851,15 +953,15 @@ const RU: Messages = {
   unionCardTopics: (topics: string) => `Говорят о: ${topics}`,
   unionWhatCrosses: "Что перетечёт, если принять:",
   unionGone: "Это приглашение уже не действует.",
-  unionNoClub: "Сначала подключи бота к своей группе — тогда у твоего клуба будет место в Союзе.",
-  unionSame: "Это твой собственный клуб.",
+  unionNoClub: "Сначала подключите бота к своей группе — тогда у вашего клуба будет место в Союзе.",
+  unionSame: "Это ваш собственный клуб.",
   unionExists: "Союз с этим клубом уже есть.",
   unionAccepted: (partner: string, level: string) => `🌉 «${partner}» принял Союз (${level}).`,
   unionJoined: (inviter: string, level: string) => `🌉 Союз с «${inviter}» открыт (${level}). Запросы идут в обе стороны.`,
   unionNotice: (status: string): string => (status === "paused" ? "🌉 Союз на паузе. Ничего не перетекает, пока его не включат снова." : status === "ended" ? "🌉 Союз завершён. Ничего больше не перетекает." : "🌉 Союз снова работает."),
   unionTitle: "<b>🌉 Союзы</b>",
-  unionNone: "Союзов пока нет. Пригласи клуб-партнёр: выбери свой клуб и что перетекает.",
-  unionPickClub: "Какой из твоих клубов приглашает?",
+  unionNone: "Союзов пока нет. Пригласите клуб-партнёр: выберите свой клуб и то, что перетекает.",
+  unionPickClub: "Какой из ваших клубов приглашает?",
   unionInviteSent: (link: string) => `Отправь эту ссылку владельцу другого клуба. Она работает один раз, 7 дней:\n${link}`,
   unionInviteCode: (code: string) => `Открыть бота и отправить владельцу другого клуба: <code>/start u${code}</code>`,
   unionRow: (mine: string, other: string, level: string, status: string) => `${mine} ↔ ${other} · ${level} · ${status}`,
@@ -871,16 +973,16 @@ const RU: Messages = {
   bUnionResume: "▶️ Возобновить",
   bUnionEnd: "✖ Завершить Союз",
   bInviteFrom: (club: string) => `➕ Пригласить из «${club}»`,
-  bridgeConfirm: "Спросить клубы-партнёры? Они увидят только текст твоего запроса — не твоё имя и не контакт. Контакт откроется, только если ты и помощник оба согласны.",
+  bridgeConfirm: "Спросить клубы-партнёры? Они увидят только текст запроса — ни имени, ни контакта. Контакт откроется, только если вы и помогающий оба согласны.",
   bBridgeGo: "🌉 Спросить клубы-партнёры",
   bBridge: "🌉 Спросить клубы-партнёры",
   bridgeNone: "Пока нет клубов-партнёров, у которых можно спросить.",
   bridgeAsk: (from: string, q: string) => `🌉 Запрос из клуба-партнёра «${from}»:\n<blockquote>${q}</blockquote>\nКто может ответить, может сказать об этом.`,
   bridgeHelp: (to: string) => `🤝 Помощь пришла из «${to}». Открыть контакт?`,
   bOpenContact: "🤝 Открыть контакт",
-  bridgeConnected: (to: string) => `🤝 Ты на связи через «${to}». Контакт помощника ниже.`,
+  bridgeConnected: (to: string) => `🤝 Вы на связи через «${to}». Контакт помогающего ниже.`,
   bridgeConnectedHelper: "🤝 Автор запроса подтвердил. Его контакт ниже.",
-  bridgeThanksHelper: "Спасибо. Автор увидит, что ты можешь помочь, и вы свяжетесь, если он тоже согласится.",
+  bridgeThanksHelper: "Спасибо. Автор увидит, что вы можете помочь, и вы свяжетесь, если он тоже согласится.",
   bridgeGone: "Этот запрос уже не открыт.",
   bridgeTaken: "Кто-то из того клуба уже взялся.",
   bridgeStatusOpen: "открыт",
@@ -888,8 +990,8 @@ const RU: Messages = {
   bridgeStatusConnected: "на связи",
   bridgeStatusClosed: "закрыт",
   bridgeStatusExpired: "без ответа",
-  threadBridgeOpen: (to: string) => `🌉 Спросил в «${to}». Напишу сюда, как только там откликнутся.`,
-  threadBridgeConnected: (to: string) => `🤝 Ты на связи через «${to}». Помогло?`,
+  threadBridgeOpen: (to: string) => `🌉 Спросили в «${to}». Сообщу сюда, как только там откликнутся.`,
+  threadBridgeConnected: (to: string) => `🤝 Вы на связи через «${to}». Помогло?`,
   threadBridgeExpired: (to: string) => `🌉 В «${to}» пока никто не откликнулся.`,
   threadBridgeClosed: "🌉 Закрыто: помогли в клубе-партнёре.",
   threadBridgeEnded: "🌉 Этот запрос закрыт.",
@@ -904,8 +1006,8 @@ const RU: Messages = {
   bHelpIt: "🙋 Помогу",
   // «Главное»: ежедневная карточка (путь 7)
   glavTitle: "Главное",
-  glavNeed: "📌 Ждёт тебя",
-  glavOwnQ: "❓ Твой вопрос без ответа",
+  glavNeed: "📌 Ждёт вас",
+  glavOwnQ: "❓ Ваш вопрос без ответа",
   glavPay: "💸 Деньги и сроки",
   glavMeet: "🗓 Встречи и решения",
   glavTalk: "💬 О чём говорил клуб",
@@ -913,28 +1015,28 @@ const RU: Messages = {
   bDone: "✓ Готово",
   // Знакомство с новичком (путь 2)
   onbQuestions: "Здесь часто спрашивают про:",
-  onbPick: "Чем можешь помочь другим? Или что ищешь? Нажми одно или пропусти.",
+  onbPick: "Чем можете помочь другим? Или что ищете? Нажмите одно или пропустите.",
   onbPrivacy: "Что я храню: сообщения этой группы, пока она подключена.\nУдалить всё: /forget_me.",
   bSkip: "Пропустить",
-  onbSaved: (label: string) => `Записал: ${label}. Если кому-то это понадобится, я дам знать.`,
+  onbSaved: (label: string) => `Записано: ${label}. Если кому-то это понадобится, сообщу.`,
   onbMatch: (label: string) => `Здесь есть человек, который хорошо разбирается в «${label}». Спросить его? Знакомство — только если он согласится.`,
   bAskThem: "🙋 Спросить",
   // Встречи (путь 8)
   gatherGo: "✅ Иду",
   gatherNo: "🤷 Не в этот раз",
   gatherWhoBtn: "👥 Кто будет",
-  gatherSaved: "Записал. Напомню за два часа.",
+  gatherSaved: "Записано. Напомню за два часа.",
   gatherNobody: "Пока никто не написал, что придёт.",
   gatherWhoHead: (n: number) => `Придут: ${n}.`,
   gatherSharedSkill: (label: string) => `вы оба про «${label}»`,
   gatherAlsoGoing: "тоже идёт",
   gatherWhoLine: (who: string, why: string) => `• ${who} — ${why}`,
-  gatherGone: "Это уже не актуально. Открой /events заново.",
-  gatherWantSaved: "Записал. Если и он захочет — я сообщу вам обоим.",
+  gatherGone: "Это уже не актуально. Откройте /events заново.",
+  gatherWantSaved: "Записано. Если и он захочет — сообщу вам обоим.",
   gatherMutual: "🤝 Вы оба хотите оставаться на связи. Контакты ниже.",
-  gatherMutualHere: "🤝 Взаимно! Я отправил вам контакты друг друга.",
-  gatherRemind: (title: string) => `⏰ Примерно через два часа: ${title}. Ты написал, что идёшь.`,
-  gatherAfterAsk: (title: string) => `Как прошло «${title}»? Кого хочешь увидеть снова? Контакт откроется, только если и он захочет.`,
+  gatherMutualHere: "🤝 Взаимно! Контакты отправлены вам обоим.",
+  gatherRemind: (title: string) => `⏰ Примерно через два часа: ${title}. Вы отметили, что идёте.`,
+  gatherAfterAsk: (title: string) => `Как прошло «${title}»? Кого хотите увидеть снова? Контакт откроется, только если и он захочет.`,
   // Ковчег (путь 10)
   arkNotSet: "Ковчег: копии ещё не настроены. Оператор может их подключить.",
   arkSafe: (date: string) => `Ковчег: ваше сообщество в безопасности. Последняя копия: ${date}.`,
@@ -942,19 +1044,19 @@ const RU: Messages = {
   arkCall: (url: string) => `Сообщество переехало. Новый адрес: ${url}`,
   bArkTake: "📦 Забрать всё",
   bArkCall: "📣 Позвать всех",
-  arkMoveUsage: "Использование: <code>/move https://новый-адрес</code>. Когда нажмёшь «Позвать всех», все в твоих клубах узнают новый адрес.",
+  arkMoveUsage: "Использование: <code>/move https://новый-адрес</code>. Когда нажмёте «Позвать всех», все в ваших клубах узнают новый адрес.",
   arkMoveBad: "Это не безопасный адрес. Нужен адрес, который начинается с https://.",
   arkMoveSet: (url: string) => `Новый адрес сохранён: ${url}`, // the caller escapes it
-  arkNoMoveUrl: "Сначала укажи новый адрес через /move.",
+  arkNoMoveUrl: "Сначала укажите новый адрес через /move.",
   arkCalled: (n: number) => `Сообщаю ${n} людям.`,
-  arkTaken: (n: number) => `Выгружено сообщений из твоих клубов: ${n}.`,
-  knowsTitle: "<b>Что я знаю о тебе</b>",
-  knowsMessages: (n: number) => `Сообщения, которые ты написал и я сохранил: <b>${n}</b>`,
+  arkTaken: (n: number) => `Выгружено сообщений из ваших клубов: ${n}.`,
+  knowsTitle: "<b>Что я знаю о вас</b>",
+  knowsMessages: (n: number) => `Сообщения, которые вы написали и которые я сохранил: <b>${n}</b>`,
   knowsSkills: (n: number) => `Навыков в профиле: <b>${n}</b>`,
-  knowsThreads: (n: number) => `Запросов, которые ты открыл: <b>${n}</b>`,
-  knowsRsvps: (n: number) => `Встреч, на которые ты ответил: <b>${n}</b>`,
+  knowsThreads: (n: number) => `Запросов, которые вы открыли: <b>${n}</b>`,
+  knowsRsvps: (n: number) => `Встреч, на которые вы ответили: <b>${n}</b>`,
   knowsIntros: (n: number) => `Знакомств и запросов на знакомство: <b>${n}</b>`,
-  knowsHowTo: "Каждую строку можно убрать её кнопкой. Твои сообщения уходят с /forget_me.",
+  knowsHowTo: "Каждую строку можно убрать её кнопкой. Ваши сообщения удаляются через /forget_me.",
   bKnowSkills: "🗑 Убрать мои навыки",
   bKnowThreads: "🗑 Убрать мои запросы",
   bKnowRsvps: "🗑 Убрать мои встречи",

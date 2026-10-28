@@ -67,7 +67,7 @@ describe("bot behaviour", () => {
     await feed(app, dm(5, "/expert accounting"));
     expect(texts(5).at(-1)).toContain("<b>1</b>");
     await feed(app, dm(5, "/intro need an accountant for my startup"));
-    expect(texts(5).at(-1)).toContain("invited");
+    expect(texts(5).at(-1)).toContain("invitation");
     const invite = sent(6).at(-1)!;
     const acceptData = invite.params.reply_markup.inline_keyboard[0][0].callback_data as string;
     expect(acceptData).toMatch(/:accept$/);

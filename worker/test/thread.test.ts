@@ -35,7 +35,7 @@ describe("the living card", () => {
     expect(card).toContain("Found in the community");
     expect(card).toContain(faceOf(await idOf(2))); // the author's face
     expect(card).toContain("Member"); // no name unless they opted in
-    expect(shownButtons(calls, 1)[0]!.map((b) => b.callback_data.replace(/^t:[^:]+:/, ""))).toEqual(["ok", "ask"]);
+    expect(shownButtons(calls, 1)[0]!.map((b) => b.callback_data.replace(/^t:[^:]+:/, ""))).toEqual(["ok", "team"]);
   });
 
   it("'Это то, что нужно' closes it as solved and counts the answer as useful", async () => {
@@ -43,7 +43,7 @@ describe("the living card", () => {
     await feed(app, dm(1, "where is the venue?"));
     const id = await threadOf(1);
     await feed(app, press(1, `t:${id}:ok`));
-    expect(shown(calls, 1)).toContain("Outcome: solved");
+    expect(calls.filter((c) => c.method === "editMessageText").at(-1)!.params.text).toContain("Outcome: solved");
     expect((await q<{ outcome: string }>("SELECT outcome FROM threads WHERE id=?", id))!.outcome).toBe("solved");
     expect((await q<{ up: number }>("SELECT SUM(up) AS up FROM passage_votes"))!.up).toBeGreaterThan(0);
   });
@@ -53,7 +53,7 @@ describe("the living card", () => {
     await feed(app, dm(1, "who knows about kubernetes ingress?"));
     expect(shown(calls, 1)).toContain("Nothing in the community's memory");
     await feed(app, press(1, `t:${await threadOf(1)}:ask`));
-    expect(shown(calls, 1)).toContain("No one suitable has taken it yet");
+    expect(shown(calls, 1)).toContain("Nobody has answered yet");
   });
 
   it("a question that names no topic: pick one from what the community offers, or learn how to change that", async () => {
@@ -74,7 +74,7 @@ describe("the living card", () => {
     await feed(app, dm(1, "another odd thing, who can look?"));
     const id = await threadOf(1);
     await feed(app, press(1, `t:${id}:ask`));
-    const picker = sent("Who should I ask?").at(-1)!;
+    const picker = sent("Pick a topic").at(-1)!;
     const choice = picker.params.reply_markup.inline_keyboard.flat().map((b: { callback_data: string }) => b.callback_data);
     expect(choice).toEqual([`t:${id}:sk:accounting`]);
     expect(choice[0].length).toBeLessThanOrEqual(64);
@@ -105,7 +105,7 @@ describe("the living card", () => {
     await feed(app, dm(1, "I need an accountant for VAT"));
     await feed(app, press(1, `t:${await threadOf(1)}:ask`));
     expect(shown(calls, 1)).toContain("Asked 1 people");
-    const invite = calls.filter((c) => c.method === "sendMessage" && String(c.params.text).includes("Introduction request")).at(-1)!;
+    const invite = calls.filter((c) => c.method === "sendMessage" && String(c.params.text).includes("Request for help")).at(-1)!;
     const helper = invite.params.chat_id as number;
     const introId = (await q<{ id: string }>("SELECT id FROM intros LIMIT 1"))!.id;
     await feed(app, press(helper, `i:${introId}:accept`));
@@ -127,13 +127,13 @@ describe("the living card", () => {
 
     const id = await threadOf(1);
     await feed(app, press(1, `t:${id}:o:advice`));
-    expect(shown(calls, 1)).toContain("Outcome: got advice");
+    expect(calls.filter((c) => c.method === "editMessageText").at(-1)!.params.text).toContain("Outcome: got advice");
     expect((await q<{ status: string; outcome: string }>("SELECT status, outcome FROM intros WHERE id=?", introId))).toEqual({ status: "completed", outcome: "helpful" });
     expect((await q<{ status: string }>("SELECT status FROM needs WHERE id=(SELECT need_id FROM intros WHERE id=?)", introId))!.status).toBe("closed");
 
     // 🙏 goes to the helper, anonymously, and the card says so.
     // 🙏 asks for a few words first; the next private message is them.
-    expect(shownButtons(calls, 1).flat().map((b) => b.callback_data)).toContain(`t:${id}:thx`);
+    expect(calls.filter((c) => c.method === "editMessageText").at(-1)!.params.reply_markup.inline_keyboard.flat().map((b: { callback_data: string }) => b.callback_data)).toContain(`t:${id}:thx`);
     await feed(app, press(1, `t:${id}:thx`));
     expect(calls.filter((c) => c.method === "sendMessage" && c.params.chat_id === 1).at(-1)!.params.text).toContain("Write a few words");
     await feed(app, dm(1, "Exactly what I needed, thank you"));

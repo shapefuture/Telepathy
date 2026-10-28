@@ -54,7 +54,7 @@ describe("Нить in the app", () => {
     expect(cards).toHaveLength(1);
     expect(cards[0]!.state).toBe("memory");
     expect(cards[0]!.card.html).toContain("Hall B");
-    expect(cards[0]!.card.buttons[0]!.map((b) => b.data.replace(/^t:[^:]+:/, ""))).toEqual(["ok", "ask"]);
+    expect(cards[0]!.card.buttons[0]!.map((b) => b.data.replace(/^t:[^:]+:/, ""))).toEqual(["ok", "team"]);
   });
 
   it("a press runs the bot's own handler: 'Это то, что нужно' closes the card", async () => {

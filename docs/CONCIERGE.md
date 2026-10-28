@@ -58,6 +58,42 @@ Every introduction still goes through the two-step consent, and contacts open on
 Introduction rounds, hiring, introductions on request and deals never message anyone who didn't opt in.
 
 
+## Requests that find nobody (waiting)
+
+A request that no one can take yet is not closed. It **waits** (`needs.status = 'waiting'`) for up to
+14 days, and the requester is told what happens next: the card and the reply say that the request is
+waiting and offer two ways out, «📨 Передать команде клуба» (the club's team, after a confirmation) and
+cancelling it. A waiting request is looked at again when a helper appears: when someone adds a topic
+(`/skills add`, `/bio`, a suggestion they accept), opts in (`/optin`), or resumes (the profile's pause
+switch), and once a day for everything that waits. The requester hears once, when someone is invited
+(«Нашёлся тот, кто может помочь…»). The limits are unchanged: three invitations per request, two open
+requests per week (waiting ones count), and the invitations themselves still need the two-step consent.
+Migration `0025_waiting.sql` turns the no-match requests that have not expired yet into waiting ones.
+
+When nobody can be asked, the card offers the team instead of «Спросить людей», so a button never leads
+nowhere. A suggestion to a helper says how many people asked about a topic in the last month and nobody
+answered, when that is two or more (counts only, and only from people that helper can read).
+
+## Asking for the rest: next-message prompts
+
+A command that needs its text asks for it, and the next private message is the text: `/intro` (what you
+need), `/optin` (what you can help with), and a thank-you (what you can help with, once, while you have
+no skills). One prompt is open at a time; it lasts an hour; any command closes it; «Отмена» closes it at
+once. A message that cannot answer the prompt and reads like a question goes on to the search, so a
+question is never taken as a skill.
+
+## The profile is one card
+
+`/profile` shows what matters at a glance: what you help with, your doors, projects, pause, and how many
+people you helped. «⚙️ Ещё» opens the sheet with the rest (digest, reminders, quiet hours, name in
+answers, calling you for help, language). `/digest` reads the same setting as the sheet, so they agree.
+
+## Menu, description and name
+
+The menu is five things: ask, what's new (catch-up and events), my requests, profile, how to use me. The
+operator's `/admin/setup` also sets the bot's description and short description (both languages) and its
+Russian name «Миндальная Связь». The profile picture cannot be set from the API: it is set in BotFather.
+
 ## Autonomy
 
 `CONCIERGE_AUTONOMY` sets what may run without a person, per action. Each action has a ceiling in
@@ -92,14 +128,20 @@ earned it behaves as `suggest`, whatever the setting says.
 - **Kept:** one row per decision (`concierge_cases`) with the action, counts and the judgement. Generated
   text is erased when any message or member is deleted, at retention purges, and after 30 days. No member
   ids are stored on a case.
+- **The AI summary** under a found answer is written by Beam (Ollama Cloud) when it is configured, and by
+  Workers AI otherwise. It gets the question and the found conversations, redacted: no ids, no names of
+  members, no emails, phones, usernames or links. /privacy says so.
 - **Join answers** are kept only while the decision is open, and deleted on `/forget_me`.
 - **Spam flags** keep the reasons and the message's link, not its text.
 - **Rules that are not AI** (screening, spam, best answers) are reviewed the same way, so their
   autonomy is earned the same way.
 - **Jobs:** `/introduce` keeps the line about the doors someone can open (and `/introduce off` clears it);
-  `/open` keeps the open-to-projects switch. Both are cleared by `/forget_me`. A hiring or introduction
+  `/open` keeps the open-to-projects switch. Both are cleared by `/forget_me`. Turning «call me for help» off also turns off `/open`, `/introduce` and `/rounds`, and deletes the line; turning it on again starts clean. A hiring or introduction
   request keeps the answer to its clarifying question on its card, erased on `/forget_me`.
 - **Deals** keep only the two timestamps and the status (proposed, agreed, declined).
+- **The Mini App** has the same two switches under «Work and introductions» in Me, the census card for
+  owners and group admins (counts only, no names), and an optional tour on first open. The tour is skippable
+  at any step; its only stored flag is in the device's own browser storage. It reads the same rules as the bot.
 
 Tell members in your group rules that requests are read to route them, and that a screening asks
 three questions.
@@ -111,7 +153,6 @@ three questions.
 | `CONCIERGE_MODEL` | Workers AI model. Empty = the summaries' default. `off` disables the AI actions (replay, live suggestions). |
 | `CONCIERGE_AUTONOMY` | Per-action levels, as above. |
 | Group settings card | `Screen join requests`, `Catch spam`, `Introductions on request` (on each group). |
-| Census window | Fixed in code: 180 days for `/jobs`, 30 days for newcomers, 14 days for bumps, 48 hours for thanks. |
 | Census window | Fixed in code: 180 days for `/jobs`, 30 days for newcomers, 14 days for bumps, 48 hours for thanks. |
 
 Telegram rights the bot needs: approve and decline join requests (for screening), delete messages and
@@ -136,6 +177,8 @@ restrict members (for the spam guard). Without them the board says "Didn't go th
   lookalike names or account age, which Telegram doesn't expose to bots.
 - Best answers are topic-level, from words in the request. Two different questions on one topic
   can share a proposal.
+- Waiting requests are looked at again on a skill, an opt-in, a resumed pause and once a day. A helper who
+  is away for a long time is not contacted by this; the daily look only invites people who can take it now.
 - Hints are per group, not per topic. Canonical marking is what makes a topic's answer surface.
 - Automatic decisions are logged but not re-reviewed after they run. A wrong automatic removal is
   found by the member or an admin, not by the gate.

@@ -10,14 +10,14 @@ import { citation } from "../ingest";
 import { effectStatement, type Payload } from "../outbox";
 import { digestHour, ownerIds, timezone } from "../env";
 import { escapeHtml, snippet } from "../text";
-import { DAY, localParts, nowIso } from "../util";
+import { localParts, nowIso } from "../util";
 import type { InlineButton } from "../telegram";
 import { decideBest, topicLabel } from "./best";
 import { setVerdict } from "./gate";
 import { decideJoin } from "./join";
 import { executeLive } from "./live";
 import { dismissSpam, executeModerate } from "./spam";
-import { census, censusView, CENSUS_DAYS, closedSummary, NEWCOMER_MIN, newcomersOf } from "./jobs";
+import { censusText, closedSummary, NEWCOMER_MIN, newcomersOf } from "./jobs";
 import { isoWeek, launchRounds } from "./rounds";
 import { onboardingCard } from "../welcome";
 import { btn, T2 } from "./texts";
@@ -473,11 +473,6 @@ export async function jobsCommand(app: App, chat: number, tgId: number, langCode
     await app.tg.sendMessage(chat, T2(lang).jobsCommandNone);
     return [];
   }
-  const c = await census(app.db, scope.ids, nowIso(new Date(Date.now() - CENSUS_DAYS * DAY)));
-  const doors = await app.db
-    .prepare("SELECT COUNT(*) AS n FROM sources WHERE doors=1 AND enabled=1 AND id IN (SELECT value FROM json_each(?))")
-    .bind(JSON.stringify(scope.ids))
-    .first<{ n: number }>();
-  await app.tg.sendMessage(chat, censusView(c, lang, (doors?.n ?? 0) > 0));
+  await app.tg.sendMessage(chat, await censusText(app.db, scope.ids, lang));
   return [];
 }

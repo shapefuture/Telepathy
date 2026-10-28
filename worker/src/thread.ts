@@ -12,7 +12,9 @@ import { kindOf } from "./concierge/jobs";
 import { introduceCommand } from "./concierge/people";
 import { T2 } from "./concierge/texts";
 import { T, defaultLang, type Lang } from "./i18n";
-import { cancelNeed, IntroError, NoSkillError, requestIntro, type Want } from "./intros";
+import { cmdHelpNeed } from "./assist/bot";
+import { cancelNeed, IntroError, NoSkillError, requestIntro, retryWaiting, type Want } from "./intros";
+import { askSkillsOnce } from "./prompts";
 import { labelIn, offeredSkills, TAXONOMY } from "./experts";
 import { effectStatement } from "./outbox";
 import { answer, type AnswerStatus, type Quote, type SearchFilters } from "./search";
@@ -145,7 +147,7 @@ async function askPeople(app: App, mem: Member, t: ThreadRow, now: Date, picked?
       const m = T(lang);
       const codes = await offeredSkills(app.db, mem.id);
       if (!codes.length) {
-        await app.tg.sendMessage(t.chat_id, m.askNoHelpers);
+        await app.tg.sendMessage(t.chat_id, m.askNoHelpers, { buttons: [[btn(m.bTeam, `t:${t.id}:team`)]] });
         return [];
       }
       const rows: ReturnType<typeof btn>[][] = [];
@@ -186,7 +188,7 @@ export async function threadAction(
     await close(db, t.id, "solved", null, at);
     await paint(app, t.id);
     await toast(m.threadSolvedToast);
-    return [];
+    return askSkillsOnce(app, mem, now);
   }
   if (action === "no") {
     if (t.answer_id) await vote(db, t.answer_id, mem.id, "down");
@@ -275,6 +277,12 @@ export async function threadAction(
     await toast("");
     return bridged.keys;
   }
+  if (action === "team") {
+    // Nobody here can help with it: the club's team gets it, once the person confirms the draft.
+    await cmdHelpNeed(app, t.chat_id, mem, t.question);
+    await toast("");
+    return [];
+  }
   if (action === "cancel") {
     if (!t.need_id) return [];
     const r = await cancelNeed(db, mem.id, t.need_id, at);
@@ -308,7 +316,7 @@ export async function threadAction(
     await close(db, t.id, outcome, helper, at);
     await paint(app, t.id);
     await toast(outcome === "solved" ? m.threadSolvedToast : "");
-    return [];
+    return askSkillsOnce(app, mem, now);
   }
   if (action === "thx") {
     // 🙏 asks for a few words first; the next private message is them (see answerPending).
@@ -361,7 +369,7 @@ async function doorsAnswer(app: App, mem: Member, text: string): Promise<string[
   if (!words) return null;
   await app.db.prepare("DELETE FROM pending_inputs WHERE member_id=? AND kind='doors'").bind(mem.id).run();
   await app.tg.sendMessage(mem.tg_id, await introduceCommand(app, mem, words));
-  return [];
+  return retryWaiting(app.db, nowIso(), { doors: true });
 }
 
 /** The clarifying question for a hiring request: one message, and the asker's next private text answers it. */

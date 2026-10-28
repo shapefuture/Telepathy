@@ -32,8 +32,8 @@ describe("welcome for new members", () => {
     await enableGroup(app);
     await handleUpdate(app, joined(501));
     // The welcome comes first; the onboarding (questions and topics to pick from) follows it.
-    expect(texts(501)[0]!.text).toContain("Я помогу тебе ориентироваться в этом сообществе");
-    expect(texts(501).at(-1)!.text).toContain("Чем можешь помочь");
+    expect(texts(501)[0]!.text).toContain("Помогу сориентироваться в сообществе");
+    expect(texts(501).at(-1)!.text).toContain("Чем можете помочь");
     expect(texts(GROUP).some((m) => m.text.includes("добро пожаловать"))).toBe(false);
     await handleUpdate(app, joined(501, "left", "member")); // left and came back: no second welcome or onboarding
     expect(texts(501)).toHaveLength(2);
@@ -58,7 +58,7 @@ describe("welcome for new members", () => {
     const { app, texts } = world([503]);
     await enableGroup(app);
     await handleUpdate(app, { update_id: upd++, chat_join_request: { chat: { id: GROUP, type: "supergroup", title: "G" }, from: { id: 504, is_bot: false }, user_chat_id: 504 } } as any);
-    expect(texts(504)[0]!.text).toContain("Привет!");
+    expect(texts(504)[0]!.text).toContain("Здравствуйте!");
     await feed(app, groupCmd(OWNER, "/welcome off"));
     await dispatchPending(app.db, app.tg, 10);
     await handleUpdate(app, joined(503));

@@ -1,17 +1,17 @@
 // History replay (ADR-007): before the concierge acts for anyone, run it over past requests and
 // compare what it would have done with what really happened. It only sees what existed before each
-// request (search and conversations are cut off at the request's time), messages nobody, and keeps
-// no names: routing is scored as "someone who really replied was among the people it would ask".
+// request (search and conversations are cut off at the request's time), and keeps no names: routing
+// is scored as "someone who really replied was among the people it would ask".
 
 import type { App } from "../bot";
-import { conversation } from "../ai/threads";
 import { matchSkills } from "../experts";
 import type { Lang } from "../i18n";
 import { effectStatement } from "../outbox";
-import { answer } from "../search";
 import type { InlineButton } from "../telegram";
 import { DAY, nowIso } from "../util";
 import { decide, PROMPT_VERSION } from "./agent";
+import { conversationsFor } from "./context";
+import { stats } from "./gate";
 import { effectiveLevel, parseAutonomy, type Action, type ReviewStats } from "./policy";
 
 /** Cases per cron run: each is one model call and a handful of reads. */
@@ -43,7 +43,7 @@ export async function pendingRequests(db: D1Database, sources: string[], limit: 
       .prepare(
         `SELECT p.id, p.source_id, p.msg_id, p.author_id, p.body, p.event_at FROM passages p JOIN sources s ON s.id = p.source_id AND s.enabled = 1
          WHERE ${HELP} AND p.source_id IN (SELECT value FROM json_each(?))
-           AND NOT EXISTS (SELECT 1 FROM concierge_cases c WHERE c.passage_id = p.id AND c.version = ?)
+           AND NOT EXISTS (SELECT 1 FROM concierge_cases c WHERE c.subject = 'p:' || p.id AND c.version = ?)
          ORDER BY p.event_at DESC LIMIT ?`,
       )
       .bind(JSON.stringify(sources), PROMPT_VERSION, limit)
@@ -52,7 +52,7 @@ export async function pendingRequests(db: D1Database, sources: string[], limit: 
 }
 
 /** Who answered questions on these topics in this group before the request (requester excluded). */
-async function earlierHelpers(db: D1Database, r: Request, codes: string[]): Promise<string[]> {
+export async function earlierHelpers(db: D1Database, r: Request, codes: string[]): Promise<string[]> {
   if (!codes.length) return [];
   const { results } = await db
     .prepare(
@@ -72,7 +72,7 @@ async function earlierHelpers(db: D1Database, r: Request, codes: string[]): Prom
 }
 
 /** What really happened: who replied to the request (not the asker), and how soon. */
-async function reality(db: D1Database, r: Request): Promise<{ repliers: Set<string>; minutes: number | null }> {
+export async function reality(db: D1Database, r: Request): Promise<{ repliers: Set<string>; minutes: number | null }> {
   const { results } = await db
     .prepare(
       "SELECT author_id, event_at FROM passages WHERE source_id = ? AND reply_to = ? AND part = 0 AND removed_at IS NULL AND author_id IS NOT NULL AND author_id != IFNULL(?, '') ORDER BY event_at LIMIT 10",
@@ -85,27 +85,19 @@ async function reality(db: D1Database, r: Request): Promise<{ repliers: Set<stri
 
 /** Replay one past request and store the case. */
 export async function replayOne(app: App, r: Request, lang: Lang, now = new Date()): Promise<void> {
-  const readable = new Set([r.source_id]);
-  const found = await answer(app.db, readable, r.body, { before: r.event_at });
-  const convs: string[] = [];
-  const seen = new Set<number>();
-  for (const q of found.quotes) {
-    const turns = (await conversation(app.db, readable, q.id, r.event_at)).filter((t) => !seen.has(t.id));
-    turns.forEach((t) => seen.add(t.id));
-    if (turns.length) convs.push(turns.map((t) => `- ${t.body}`).join("\n"));
-  }
+  const { convs, found } = await conversationsFor(app.db, new Set([r.source_id]), r.body, r.event_at);
   const plan = await decide(app, r.body, convs, lang);
   const asked = plan.action === "ask_people" ? await earlierHelpers(app.db, r, plan.codes) : [];
   const real = await reality(app.db, r);
   const hit = real.repliers.size ? (asked.some((id) => real.repliers.has(id)) ? 1 : 0) : null;
   await app.db
     .prepare(
-      `INSERT INTO concierge_cases(passage_id, source_id, version, created_at, model, action, error, downgraded, brief, answer, question,
-         quotes_verified, quotes_failed, evidence, codes, candidates, helper_hit, real_replied, real_minutes)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(passage_id, version) DO NOTHING`,
+      `INSERT INTO concierge_cases(subject, mode, source_id, version, created_at, model, action, error, downgraded, brief, answer, question,
+         quotes_verified, quotes_failed, evidence, codes, candidates, helper_hit, real_replied, real_minutes, executed)
+       VALUES (?, 'replay', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1) ON CONFLICT(subject, version) DO NOTHING`,
     )
     .bind(
-      r.id,
+      `p:${r.id}`,
       r.source_id,
       PROMPT_VERSION,
       nowIso(now),
@@ -118,7 +110,7 @@ export async function replayOne(app: App, r: Request, lang: Lang, now = new Date
       plan.question,
       plan.verified,
       plan.failed,
-      seen.size,
+      found,
       JSON.stringify(plan.codes),
       asked.length,
       plan.action === "ask_people" ? hit : null,
@@ -149,7 +141,7 @@ export async function queued(db: D1Database): Promise<Queue | null> {
   return row ? (JSON.parse(row.value) as Queue) : null;
 }
 
-/** Cron step: a couple of cases per run; tells the owner when the run is done. */
+/** Cron step: a couple of cases per run; tells the operator when the run is done. */
 export async function replayStep(app: App, now = new Date()): Promise<number> {
   const q = await queued(app.db);
   if (!q) return 0;
@@ -163,8 +155,8 @@ export async function replayStep(app: App, now = new Date()): Promise<number> {
       // Record it as failed so one bad request can't stall the queue every minute.
       console.error("concierge replay failed", r.id, String(e));
       await app.db
-        .prepare("INSERT INTO concierge_cases(passage_id, source_id, version, created_at, error) VALUES (?,?,?,?, 'replay_failed') ON CONFLICT(passage_id, version) DO NOTHING")
-        .bind(r.id, r.source_id, PROMPT_VERSION, nowIso(now))
+        .prepare("INSERT INTO concierge_cases(subject, mode, source_id, version, created_at, error, executed) VALUES (?, 'replay', ?, ?, ?, 'replay_failed', 1) ON CONFLICT(subject, version) DO NOTHING")
+        .bind(`p:${r.id}`, r.source_id, PROMPT_VERSION, nowIso(now))
         .run();
     }
   }
@@ -211,25 +203,27 @@ export interface Report {
   reviews: Partial<Record<Action, ReviewStats>>;
 }
 
+const REPORT_ACTIONS: Action[] = ["answer", "ask_people", "clarify", "escalate"];
+
+/** Replay numbers (the report counts replayed requests only); reviews come from the gate, all modes. */
 export async function report(db: D1Database, sources: string[]): Promise<Report> {
   const src = JSON.stringify(sources);
-  const [totals, actions, reviews] = await db.batch([
+  const [totals, actions] = await db.batch([
     db
       .prepare(
         `SELECT COUNT(*) AS cases, SUM(action IS NULL) AS failed, SUM(real_replied = 0) AS unanswered,
                 SUM(real_replied = 0 AND ((action = 'answer' AND quotes_verified > 0) OR (action = 'ask_people' AND candidates > 0))) AS could,
                 SUM(helper_hit IS NOT NULL) AS routed, SUM(helper_hit = 1) AS hits
-         FROM concierge_cases WHERE version = ? AND source_id IN (SELECT value FROM json_each(?))`,
+         FROM concierge_cases WHERE mode = 'replay' AND version = ? AND source_id IN (SELECT value FROM json_each(?))`,
       )
       .bind(PROMPT_VERSION, src),
-    db.prepare("SELECT action, COUNT(*) AS n FROM concierge_cases WHERE version = ? AND action IS NOT NULL AND source_id IN (SELECT value FROM json_each(?)) GROUP BY action").bind(PROMPT_VERSION, src),
     db
-      .prepare(
-        "SELECT action, SUM(verdict IN ('good','bad')) AS reviewed, SUM(verdict = 'good') AS good FROM concierge_cases WHERE version = ? AND action IS NOT NULL AND source_id IN (SELECT value FROM json_each(?)) GROUP BY action",
-      )
+      .prepare("SELECT action, COUNT(*) AS n FROM concierge_cases WHERE mode = 'replay' AND version = ? AND action IS NOT NULL AND source_id IN (SELECT value FROM json_each(?)) GROUP BY action")
       .bind(PROMPT_VERSION, src),
   ]);
   const t = (totals!.results[0] ?? {}) as Record<string, number | null>;
+  const reviews: Partial<Record<Action, ReviewStats>> = {};
+  for (const a of REPORT_ACTIONS) reviews[a] = await stats(db, a);
   return {
     cases: t.cases ?? 0,
     failed: t.failed ?? 0,
@@ -238,7 +232,7 @@ export async function report(db: D1Database, sources: string[]): Promise<Report>
     couldHelp: t.could ?? 0,
     routed: t.routed ?? 0,
     hits: t.hits ?? 0,
-    reviews: Object.fromEntries((reviews!.results as { action: Action; reviewed: number; good: number }[]).map((r) => [r.action, { reviewed: r.reviewed ?? 0, good: r.good ?? 0 }])),
+    reviews,
   };
 }
 
@@ -256,13 +250,13 @@ export interface ReviewCase {
   body: string;
 }
 
-/** The next case to judge: text still kept, the request not deleted, in a group the reviewer reads. */
+/** The next replayed case to judge: text still kept, the request not deleted, in a group the reviewer reads. */
 export async function nextForReview(db: D1Database, sources: string[]): Promise<ReviewCase | null> {
   return db
     .prepare(
       `SELECT c.id, c.action, c.brief, c.answer, c.question, c.candidates, c.helper_hit, c.real_replied, c.real_minutes, p.event_at, p.body
-       FROM concierge_cases c JOIN passages p ON p.id = c.passage_id AND p.removed_at IS NULL AND p.body IS NOT NULL
-       WHERE c.version = ? AND c.verdict IS NULL AND c.action IS NOT NULL AND c.brief IS NOT NULL AND c.source_id IN (SELECT value FROM json_each(?))
+       FROM concierge_cases c JOIN passages p ON 'p:' || p.id = c.subject AND p.removed_at IS NULL AND p.body IS NOT NULL
+       WHERE c.mode = 'replay' AND c.version = ? AND c.verdict IS NULL AND c.action IS NOT NULL AND c.brief IS NOT NULL AND c.source_id IN (SELECT value FROM json_each(?))
        ORDER BY c.id LIMIT 1`,
     )
     .bind(PROMPT_VERSION, JSON.stringify(sources))
@@ -363,12 +357,12 @@ export function reportView(r: Report, lang: Lang, autonomyRaw: string | undefine
     for (const a of ["answer", "ask_people", "clarify", "escalate"]) if (r.byAction[a]) lines.push(`• ${m.action[a]}: ${r.byAction[a]}`);
     lines.push("", m.unanswered(r.realUnanswered, r.couldHelp));
     if (r.routed) lines.push(m.hits(r.hits, r.routed));
-    const configured = parseAutonomy(autonomyRaw);
-    lines.push("", m.autonomy);
-    for (const a of ["clarify", "answer", "ask_people", "escalate"] as Action[]) {
-      const s = r.reviews[a];
-      lines.push(`• ${m.action[a]}: ${m.level[effectiveLevel(a, configured, s)]}${s?.reviewed ? ` · ${m.reviewed(s)}` : ""}`);
-    }
+  }
+  const configured = parseAutonomy(autonomyRaw);
+  lines.push("", m.autonomy);
+  for (const a of ["clarify", "answer", "ask_people", "escalate"] as Action[]) {
+    const s = r.reviews[a];
+    lines.push(`• ${m.action[a]}: ${m.level[effectiveLevel(a, configured, s)]}${s?.reviewed ? ` · ${m.reviewed(s)}` : ""}`);
   }
   return { text: lines.join("\n"), buttons: [[btn(m.bRun, "cg:run"), btn(m.bReview, "cg:rev")]] };
 }

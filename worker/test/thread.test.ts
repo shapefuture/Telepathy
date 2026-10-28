@@ -194,7 +194,7 @@ describe("group settings card", () => {
     const { app, calls } = testApp();
     await enableGroup(app);
     await feed(app, groupCmd(OWNER, "/settings"));
-    expect(calls.filter((c) => c.method === "sendMessage" && c.params.chat_id === -1001234567890).at(-1)!.params.reply_markup.inline_keyboard).toHaveLength(3);
+    expect(calls.filter((c) => c.method === "sendMessage" && c.params.chat_id === -1001234567890).at(-1)!.params.reply_markup.inline_keyboard).toHaveLength(5);
     const tap = (user: number, data: string) => ({
       callback_query: { id: String(Math.random()), from: { id: user, is_bot: false }, data, message: { message_id: 7, chat: { id: -1001234567890, type: "supergroup" } } },
     });

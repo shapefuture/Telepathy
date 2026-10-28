@@ -61,7 +61,7 @@ function world(reply: string | ((user: string) => string)) {
       return { response: typeof reply === "string" ? reply : reply(user) };
     },
   };
-  const app = makeApp({ ...(env as any), OLLAMA_API_KEY: undefined, AI }, t.fetcher);
+  const app = makeApp({ ...(env as any), OLLAMA_API_KEY: undefined, CONCIERGE_MODEL: undefined, AI }, t.fetcher);
   return { app, t, prompts };
 }
 
@@ -79,7 +79,7 @@ async function seed(app: any) {
 
 const requestRow = async () =>
   (await env.DB.prepare("SELECT id, source_id, msg_id, author_id, body, event_at FROM passages WHERE body LIKE 'Does anyone know about VAT%'").first<any>())!;
-const caseRow = async () => (await env.DB.prepare("SELECT * FROM concierge_cases").first<any>())!;
+const caseRow = async () => (await env.DB.prepare("SELECT * FROM concierge_cases WHERE mode = 'replay'").first<any>())!;
 
 describe("history replay", () => {
   it("sees only what existed before the request, redacted, and records what really happened", async () => {

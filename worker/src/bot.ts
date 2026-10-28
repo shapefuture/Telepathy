@@ -22,6 +22,10 @@ import { cmdPassport, CONTINUITY_OWNER, ownerContinuity } from "./continuity/bot
 import { hydraStatus } from "./hydra/bot";
 import { touchOwners } from "./hydra/notices";
 import { conciergeCallback, conciergeCommand } from "./concierge/bot";
+import { boardCallback, boardCommand } from "./concierge/board";
+import { startScreen, screenAnswer } from "./concierge/join";
+import { spamCheck } from "./concierge/spam";
+import { roundsCommand } from "./concierge/rounds";
 import { assistCallback, clubDeskCommand, cmdHelpNeed, forgetMissions, listMissions, ownerAssistCommand, OWNER_COMMANDS } from "./assist/bot";
 import { brief } from "./ai/beam";
 import { answer, parseFilters, renderAnswer } from "./search";
@@ -165,7 +169,9 @@ export async function handleUpdate(app: App, u: Update): Promise<string[]> {
   if (u.my_chat_member) return onBotMembership(app, u.my_chat_member);
   if (u.chat_member) return onChatMember(app, u.chat_member);
   if (u.chat_join_request) {
-    await welcomeJoinRequest(app, u.chat_join_request.chat.id, u.chat_join_request.from, u.chat_join_request.user_chat_id);
+    const jr = u.chat_join_request;
+    // A group that screens applicants asks them three questions first; otherwise it welcomes them as before.
+    if (!(await startScreen(app, jr.chat.id, jr.from, jr.user_chat_id))) await welcomeJoinRequest(app, jr.chat.id, jr.from, jr.user_chat_id);
     return [];
   }
   return [];
@@ -219,6 +225,8 @@ async function onMessage(app: App, msg: TgMessage, edited: boolean): Promise<str
     const q = (msg.text ?? "").trim();
     if (!q || edited) return [];
     const asker = msg.from ? await memberByTg(app.db, msg.from.id) : null;
+    const screened = asker ? await screenAnswer(app, asker, q) : null; // a join screening's answer
+    if (screened) return screened;
     const words = asker ? await answerPending(app, asker, q) : null; // the words for a 🙏 just pressed
     if (words) return words;
     // "What can you do?" is about the bot, not a question for the community's memory.
@@ -234,6 +242,7 @@ async function ingest(app: App, msg: TgMessage, edited: boolean): Promise<string
   if (outcome !== "stored" || !source || edited || msg.edit_date) return [];
   const keys: string[] = [];
   const text = msg.text ?? msg.caption ?? "";
+  keys.push(...(await spamCheck(app, msg, source.id)));
   if (text) await detectEvent(app.db, source.id, msg.message_id, text, new Date(), tzOffsetMinutes(new Date(), timezone(app.env)));
   if (!msg.document) {
     const hint = await maybeHint(app.db, source, msg, await langForUser(app, msg.from));
@@ -455,6 +464,8 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
   const from = msg.from!;
   const pre = T(await langForUser(app, from));
   switch (cmd) {
+    case "board":
+      return boardCommand(app, chat, from.id, from.language_code);
     case "start": {
       // An alliance invitation (Союз): the other club's owner sees what would cross, then accepts.
       const invite = /^u([0-9a-f]{16})$/i.exec(args.trim());
@@ -518,6 +529,10 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
   }
   const mem = await knownMember(app, msg);
   if (!mem) return [];
+  if (cmd === "rounds") {
+    await reply(app, chat, await roundsCommand(app, mem, args));
+    return [];
+  }
   if (cmd === "language") {
     const want = args.trim().toLowerCase();
     if (want !== "en" && want !== "ru") {
@@ -909,6 +924,7 @@ async function onCallback(app: App, cb: CallbackQuery): Promise<string[]> {
     if (!(await enabledSource(app.db, chat.id))) await connectGroup(app, { id: chat.id, title: chat.title, username: chat.username }, cb.from);
     return [];
   }
+  if (kind === "bd") return boardCallback(app, cb, data);
   if (kind === "cg") {
     // Concierge replay report and review (operators only).
     if (!isOwner(app, cb.from.id)) {

@@ -1,59 +1,115 @@
-# Concierge: checking it on your history
+# Concierge and the owner's board
 
-The concierge is an AI agent that takes a member's request and moves it to a result: an answer
-from the club's memory, people who know, a clarifying question, or the club's team. It runs on
-Cloudflare Workers AI only. Design and limits: `architecture/ADR-007-autonomous-concierge.md`.
+The concierge is an AI agent that takes a member's request to a result: an answer from the club's
+memory, people who know, a clarifying question, or the club's team. It runs on Cloudflare Workers AI
+only. Design and limits: `architecture/ADR-007-autonomous-concierge.md`.
 
-**Right now it messages nobody.** This first step answers one question before it does: *would it
-have helped?* It goes through your groups' past requests, decides what it would have done using
-only what was written before each one, and compares that with what really happened. You judge its
-decisions, and those judgements decide what it may later do on its own.
+Nothing it does is silent. Every step it proposes goes on the **board**, a single card an admin
+reads once a day. Admins decide with one tap, and every decision is also a review: the reviews are the
+evidence that lets an action run on its own.
 
-## Run it
+## The board (`/board`)
+
+Admins (of a connected group, or operators) get one card per day at the digest hour, and only when
+something needs a decision. Open it any time with `/board` in a private chat with the bot.
+
+| Section | What it is | ✅ does |
+|---|---|---|
+| Join requests | Applicants who answered the three screening questions | Accept or decline the join request |
+| Suspicious messages | A new member's link, or a link/forward with earn-money wording | Delete the message and restrict its author |
+| Unanswered requests | A request unanswered for four hours, with the concierge's proposed step | Send the step (a reply under the request, or a request to people who know) |
+| Repeated questions | A topic asked about three times or more, with a reply the club found useful | Mark that reply as the answer and turn hints on for the group |
+| Gaps | Operators only: needs several members had and nobody could meet | Create capacity or hide it |
+
+Every decision checks that the admin manages the group the item belongs to. A plain member who
+presses a button gets a refusal, and nothing changes.
+
+## Switching things on, and what each one does
+
+Screening and the spam guard are switches on the group's settings card (`/settings`), with the other
+group toggles. Everything else is on by default and only ever proposes until earned.
+
+| Feature | Default | What it does |
+|---|---|---|
+| Join screening | off (`screen`) | Asks applicants three questions in private: who they are, why they're here, what they can help with. The third answer becomes their profile skills (self-claimed, confirmed by their own words). Answers are shown to admins and cleared once decided. |
+| Spam guard | on (`spam_guard`) | Flags only; deletes and restricts once `moderate` is earned. Admins' own posts are never flagged. |
+| Heated exchanges | always on | Notes to admins when several members use sharp words within 30 minutes. Never acts. |
+| Best answers | on | Proposes a reply for a topic asked about three times, once per 90 days. Accepting turns hints on for the group (hints are per group; canonical answers are what they show). |
+| Live suggestions | on when the model is on | Proposes a step for requests unanswered for four hours. |
+| Introduction rounds | off per member | Members opt in with `/rounds on` (they need `/optin` first). Once a week, Mondays UTC, one introduction on a topic they asked about, to someone who opted in too. Then the normal two-step consent. |
+
+## Autonomy
+
+`CONCIERGE_AUTONOMY` sets what may run without a person, per action. Each action has a ceiling in
+code, and "auto" needs **50 reviewed cases with at least 90% judged right** for that action (the
+evidence is the board's ✅/❌ and the replay's ✅/❌, pooled per action and prompt or rule version).
+
+| Action | Ceiling | Where it's used |
+|---|---|---|
+| `answer`, `clarify`, `ask_people`, `escalate` | auto | Live suggestions, replay |
+| `admit` | auto | Join screening: a complete screening is accepted by rule |
+| `moderate` | auto | Spam guard: delete and restrict |
+| `best_answer` | suggest | Repeated questions. The club's canonical answer stays the owner's call |
+| `introduce`, `ask_partners`, `paid_provider` | suggest | Introductions and partner or paid steps (not built yet) |
+
+Example: `CONCIERGE_AUTONOMY=clarify:auto,admit:auto`. Missing = off. Until an action has been
+earned it behaves as `suggest`, whatever the setting says.
+
+## Run the replay first
 
 1. Deploy with migration `0023_concierge.sql` (`npm run db:migrate:remote`). The `AI` binding is
    already in `wrangler.jsonc`.
-2. In a private chat with the bot, as an operator (`OWNER_IDS`): `/concierge`.
-3. Press **▶️ Replay 20** (or send `/concierge run 50`, at most 200). The cron works through two
-   requests a minute and writes when it's done. Only groups you can read are used.
-4. Press **📝 Review**. Each card shows the request, what really happened, and what the concierge
-   would have done. Answer **✅ Right** or **❌ Wrong** (or skip). The card updates in place.
-5. **📊 Report** shows:
-   - requests replayed, and what it would have done with them;
-   - how many really got no reply, and for how many of those it had a checked answer or people to
-     ask (the help your members missed);
-   - when it would have asked people and someone really replied, how often that person was among
-     the ones it picked;
-   - per action, your verdicts and the autonomy each action has now.
+2. In a private chat with the bot, as an operator: `/concierge`, then **▶️ Replay 20**. Two past
+   requests a minute, and it writes when done. Only groups you can read are used.
+3. **📝 Review** shows each replayed decision next to what really happened. Judge them; the report
+   shows how many requests really went unanswered, and how often its routing found the person who
+   really replied.
 
-## Settings (`wrangler.jsonc` vars)
+## What is sent, and what is kept
 
-| Var | Meaning |
+- **To Workers AI:** the request and up to three short earlier conversations from the same group,
+  redacted (no emails, phones, @usernames, links, tokens), with no names, ids or chat titles.
+- **Kept:** one row per decision (`concierge_cases`) with the action, counts and the judgement. Generated
+  text is erased when any message or member is deleted, at retention purges, and after 30 days. No member
+  ids are stored on a case.
+- **Join answers** are kept only while the decision is open, and deleted on `/forget_me`.
+- **Spam flags** keep the reasons and the message's link, not its text.
+- **Rules that are not AI** (screening, spam, best answers) are reviewed the same way, so their
+  autonomy is earned the same way.
+
+Tell members in your group rules that requests are read to route them, and that a screening asks
+three questions.
+
+## Settings
+
+| Var / setting | Meaning |
 |---|---|
-| `CONCIERGE_MODEL` | Workers AI model. Empty = the summaries' default (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`). `off` disables the concierge. Compare models by replaying with each. |
-| `CONCIERGE_AUTONOMY` | What you allow, per action: `clarify`, `answer`, `ask_people`, `follow_up`, `escalate` (can reach `auto`), `introduce`, `ask_partners`, `paid_provider` (never above `suggest`). Example: `clarify:auto,answer:suggest`. Missing = off. |
+| `CONCIERGE_MODEL` | Workers AI model. Empty = the summaries' default. `off` disables the AI actions (replay, live suggestions). |
+| `CONCIERGE_AUTONOMY` | Per-action levels, as above. |
+| Group settings card | `Screen join requests`, `Catch spam` (on each group). |
 
-`auto` takes effect for an action only after **50 reviewed cases with at least 90% judged right**.
-Until then it behaves as `suggest`. This is enforced in code, so a setting can't skip it.
-
-## What is sent to Workers AI, and what is kept
-
-- **Sent:** the request and up to three short earlier conversations from the same group, redacted
-  (no emails, phones, @usernames, links, tokens), with no names, ids or chat titles.
-- **Kept:** one row per replayed request (`concierge_cases`) with the decision, counts and your
-  verdict. The generated text is erased whenever any message or member is deleted, on retention
-  purges, and after 30 days. No member ids are stored on a case.
-- **AI summaries (`docs/AI.md`) are separate.** If `OLLAMA_API_KEY` is set, summaries go to Ollama
-  Cloud first. To keep all AI on Cloudflare, leave it unset.
-
-Tell members in your rules that an AI assistant reads requests to help route them.
+Telegram rights the bot needs: approve and decline join requests (for screening), delete messages and
+restrict members (for the spam guard). Without them the board says "Didn't go through".
 
 ## Reading the result
 
-- Few requests went unanswered → the club already copes. The concierge should save the team's
-  time, not rescue members, so measure that instead.
-- Many unanswered and it had something for them → strong case for suggest mode.
+- Few unanswered requests → the club already copes. The concierge should save the team's time, so
+  measure that instead.
+- Many unanswered and a checked answer available → the case for live suggestions.
 - Routing rarely finds the real helper → the people side is the weak point. Ask helpers to state
   their topics (`/optin`) before trusting it to ask anyone.
-- Many "wrong" verdicts on one action → keep that action off and look at the cases. Change the
-  prompt (it bumps `PROMPT_VERSION`) or the model, and replay again.
+- Many ❌ on one action → keep that action at `suggest` and look at the cases. Change the prompt (it
+  bumps `PROMPT_VERSION`) or the model, and replay again.
+- Spam: if admins keep dismissing flags, look at which reasons they dismiss most. The reasons are a
+  short list, so that is a quick read.
+
+## Known limits
+
+- Heated-exchange detection is a short word list. It notes, and never acts.
+- The spam guard catches new members with links and earn-money wording. It doesn't see
+  lookalike names or account age, which Telegram doesn't expose to bots.
+- Best answers are topic-level, from words in the request. Two different questions on one topic
+  can share a proposal.
+- Hints are per group, not per topic. Canonical marking is what makes a topic's answer surface.
+- Automatic decisions are logged but not re-reviewed after they run. A wrong automatic removal is
+  found by the member or an admin, not by the gate.

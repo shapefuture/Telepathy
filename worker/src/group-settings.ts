@@ -6,17 +6,18 @@ import type { App } from "./bot";
 import { T, type Lang } from "./i18n";
 import { audit } from "./util";
 import { btn } from "./thread-card";
+import { T2 } from "./concierge/texts";
 import type { InlineButton } from "./telegram";
 
 /** The toggles a group admin can change from the card. Column names are fixed, never from input. */
-export const SETTING_COLUMNS = ["hints", "routing", "welcome"] as const;
+export const SETTING_COLUMNS = ["hints", "routing", "welcome", "screen", "spam_guard"] as const;
 export type SettingColumn = (typeof SETTING_COLUMNS)[number];
 
 export async function settingsView(db: D1Database, chatId: number, lang: Lang): Promise<{ text: string; buttons: InlineButton[][] } | null> {
   const src = await db
-    .prepare("SELECT hints, routing, welcome, retention_days FROM sources WHERE chat_id=? AND enabled=1")
+    .prepare("SELECT hints, routing, welcome, screen, spam_guard, retention_days FROM sources WHERE chat_id=? AND enabled=1")
     .bind(chatId)
-    .first<{ hints: number; routing: number; welcome: number; retention_days: number }>();
+    .first<{ hints: number; routing: number; welcome: number; screen: number; spam_guard: number; retention_days: number }>();
   if (!src) return null;
   const m = T(lang);
   const mark = (v: number) => (v ? "✅" : "⬜");
@@ -24,6 +25,8 @@ export async function settingsView(db: D1Database, chatId: number, lang: Lang): 
     ["hints", m.setHints],
     ["routing", m.setRouting],
     ["welcome", m.setWelcome],
+    ["screen", T2(lang).settingScreen],
+    ["spam_guard", T2(lang).settingSpam],
   ];
   const text = [`<b>${m.settingsTitle}</b>`, "", m.setRetention(src.retention_days)].join("\n");
   const buttons: InlineButton[][] = rows.map(([col, label]) => [btn(`${mark(src[col])} ${label}`, `st:${col}:${src[col] ? 0 : 1}`)]);

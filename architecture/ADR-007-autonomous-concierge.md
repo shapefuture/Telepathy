@@ -1,6 +1,6 @@
 # ADR-007: Autonomous concierge on Workers AI — a permission envelope, earned autonomy
 
-**Status:** accepted for the prototype (2026-10-28); first slice built (history replay and review).
+**Status:** accepted for the prototype (2026-10-28). Built: history replay and review; the owner's board; live suggestions; join screening; spam guard; best answers; introduction rounds.
 **Context:** `docs/CONCIERGE.md`, `docs/AI.md`, ADR-002 (disclosure and consent).
 
 ## The job
@@ -76,3 +76,24 @@ resources, and how the concierge is priced. Each needs its own evidence from ste
 - **Proxy outcomes:** "someone replied" is not "the request was resolved". The replay uses it only
   as a floor; live mode measures resolution with the member's own «Помогло?».
 - **Model quality in Russian** varies across Workers AI models; the replay is how to compare them.
+
+## Build record (2026-10-28, second slice)
+
+- **One board, not one feature per notification.** The owner gets one card a day, sections for each
+  kind of decision, and each decision is a single tap. Decisions are checked against the group they
+  belong to (`concierge/board.ts`). This is what removes admin load: the owner reads one card, and
+  nothing is sent on a day with nothing to decide.
+- **Every decision is a case.** Replay, live suggestions, join admission, spam removal and best answers
+  all write one row to `concierge_cases`, judged by a person. One record means one gate, so "auto" is
+  earned the same way for AI and for rules. The gate reads each action's record only within its
+  own version (`gate.ts`).
+- **Rules are not AI.** Join admission, spam removal and best answers are deterministic and quote
+  only existing text. They still have a ceiling and a review record. Admission and removal can
+  become automatic; best answers can't, because the club's canonical answer stays the owner's call.
+- **Screening answers are personal, so they're short-lived.** They are kept only while the decision
+  is open, deleted on `/forget_me`, and never shown to anyone but admins of that group.
+- **No new consent is assumed.** Join screening states what its third answer does. Introduction rounds
+  need an explicit `/rounds on` and `/optin` first. Spam flags never leave the admins.
+- **Known gaps, by design:** the spam guard doesn't see account age or lookalike names (Telegram does
+  not expose them to bots); best answers are topic-level; hints are per group; automatic decisions are
+  logged but not re-reviewed.

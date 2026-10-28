@@ -100,28 +100,15 @@ async function nextCandidate(db: D1Database, needId: string, now: string, notify
   return { introId: r.introId, keys: [...r.keys, ...(await syncNeed(db, needId, now))] };
 }
 
-async function pickCandidate(db: D1Database, needId: string, now: string, notifyNone: boolean): Promise<{ introId: string | null; keys: string[] }> {
-  const need = await db.prepare("SELECT * FROM needs WHERE id=?").bind(needId).first<{ member_id: string; text: string; skills_json: string; status: string; expires_at: string }>();
-  if (!need || !["open", "matching"].includes(need.status)) return { introId: null, keys: [] };
-  const tried = new Set(
-    (await db.prepare("SELECT candidate_id FROM intros WHERE need_id=?").bind(needId).all<{ candidate_id: string }>()).results.map((r) => r.candidate_id),
-  );
+/** Invite one candidate to a need: the intro row, the need's status and the candidate's invitation. */
+export async function inviteCandidate(
+  db: D1Database,
+  needId: string,
+  need: { member_id: string; text: string; skills_json: string },
+  c: { member_id: string; total: number; components: Record<string, number> },
+  now: string,
+): Promise<{ introId: string; keys: string[] }> {
   const codes = JSON.parse(need.skills_json) as string[];
-  const candidates =
-    tried.size >= MAX_CANDIDATES || need.expires_at <= now ? [] : await eligibleCandidates(db, need.member_id, codes, now, tried);
-  const requester = await contact(db, need.member_id);
-  if (!candidates.length) {
-    const key = `need:${needId}:no_match`;
-    const stmts = [db.prepare("UPDATE needs SET status='no_match' WHERE id=?").bind(needId)];
-    if (notifyNone) {
-      stmts.push(
-        effectStatement(db, key, requester.tg, { text: T(requester.lang).introClosedNoMatch }),
-      );
-    }
-    await db.batch(stmts);
-    return { introId: null, keys: notifyNone ? [key] : [] };
-  }
-  const c = candidates[0]!;
   const id = newId();
   const key = `intro:${id}:invite`;
   const cand = await contact(db, c.member_id);
@@ -145,6 +132,30 @@ async function pickCandidate(db: D1Database, needId: string, now: string, notify
     }),
   ]);
   return { introId: id, keys: [key] };
+}
+
+async function pickCandidate(db: D1Database, needId: string, now: string, notifyNone: boolean): Promise<{ introId: string | null; keys: string[] }> {
+  const need = await db.prepare("SELECT * FROM needs WHERE id=?").bind(needId).first<{ member_id: string; text: string; skills_json: string; status: string; expires_at: string }>();
+  if (!need || !["open", "matching"].includes(need.status)) return { introId: null, keys: [] };
+  const tried = new Set(
+    (await db.prepare("SELECT candidate_id FROM intros WHERE need_id=?").bind(needId).all<{ candidate_id: string }>()).results.map((r) => r.candidate_id),
+  );
+  const codes = JSON.parse(need.skills_json) as string[];
+  const candidates =
+    tried.size >= MAX_CANDIDATES || need.expires_at <= now ? [] : await eligibleCandidates(db, need.member_id, codes, now, tried);
+  const requester = await contact(db, need.member_id);
+  if (!candidates.length) {
+    const key = `need:${needId}:no_match`;
+    const stmts = [db.prepare("UPDATE needs SET status='no_match' WHERE id=?").bind(needId)];
+    if (notifyNone) {
+      stmts.push(
+        effectStatement(db, key, requester.tg, { text: T(requester.lang).introClosedNoMatch }),
+      );
+    }
+    await db.batch(stmts);
+    return { introId: null, keys: notifyNone ? [key] : [] };
+  }
+  return inviteCandidate(db, needId, need, candidates[0]!, now);
 }
 
 /** Apply a button press. Returns a short reply and the effect keys to dispatch. */

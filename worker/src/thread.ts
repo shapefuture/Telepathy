@@ -309,7 +309,8 @@ export async function answerPending(app: App, mem: Member, text: string, now = n
   const at = nowIso(now);
   const pending = await app.db.prepare("SELECT kind, ref, expires_at FROM pending_inputs WHERE member_id=?").bind(mem.id).first<{ kind: string; ref: string; expires_at: string }>();
   if (!pending) return null;
-  if (pending.kind !== "thanks" || pending.expires_at <= at) {
+  if (pending.kind !== "thanks") return null; // e.g. a join screening: answered by that flow
+  if (pending.expires_at <= at) {
     await app.db.prepare("DELETE FROM pending_inputs WHERE member_id=?").bind(mem.id).run();
     return null;
   }

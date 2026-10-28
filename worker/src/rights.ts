@@ -26,7 +26,12 @@ export async function forgetMember(db: D1Database, memberId: string, tgId: numbe
       .bind(memberId),
     // AI summaries can quote anyone; they're only a cache, so drop them all rather than keep their words.
     db.prepare("DELETE FROM ai_cache"),
-    scrubStatement(db), // concierge replay text, for the same reason
+    scrubStatement(db), // concierge case text, for the same reason
+    db.prepare("DELETE FROM join_screens WHERE applicant_tg=?").bind(tgId), // answers about them
+    db.prepare("DELETE FROM pending_inputs WHERE member_id=? AND kind='screen'").bind(memberId),
+    db.prepare("DELETE FROM spam_flags WHERE author_tg=?").bind(tgId),
+    db.prepare("DELETE FROM intro_rounds WHERE member_id=?").bind(memberId),
+    db.prepare("UPDATE members SET rounds=0 WHERE id=?").bind(memberId),
   ]);
   const report = { passages: p!.results.length, skills: s!.results.length, intros: i!.results.length };
   await audit(db, "member.forget", memberId, memberId, report);

@@ -2,10 +2,33 @@
 // do: each action has a ceiling, the owner configures a level up to it, and "auto" is only granted
 // once enough of the agent's past decisions of that kind were reviewed and judged right.
 
-export type Action = "clarify" | "answer" | "ask_people" | "follow_up" | "introduce" | "ask_partners" | "paid_provider" | "escalate";
+export type Action =
+  | "clarify"
+  | "answer"
+  | "ask_people"
+  | "follow_up"
+  | "introduce"
+  | "ask_partners"
+  | "paid_provider"
+  | "escalate"
+  | "best_answer"
+  | "admit"
+  | "moderate";
 export type Level = "off" | "suggest" | "auto";
 
-export const ACTIONS: Action[] = ["clarify", "answer", "ask_people", "follow_up", "introduce", "ask_partners", "paid_provider", "escalate"];
+export const ACTIONS: Action[] = [
+  "clarify",
+  "answer",
+  "ask_people",
+  "follow_up",
+  "introduce",
+  "ask_partners",
+  "paid_provider",
+  "escalate",
+  "best_answer",
+  "admit",
+  "moderate",
+];
 const RANK: Record<Level, number> = { off: 0, suggest: 1, auto: 2 };
 const lower = (a: Level, b: Level): Level => (RANK[a] <= RANK[b] ? a : b);
 
@@ -23,6 +46,9 @@ export const CEILING: Record<Action, Level> = {
   introduce: "suggest",
   ask_partners: "suggest",
   paid_provider: "suggest",
+  best_answer: "suggest", // the club's canonical answer is the owner's call
+  admit: "auto", // letting someone in: only for clear-cut screenings, and only once earned
+  moderate: "auto", // deleting a message and restricting its author: only once earned
 };
 
 /** Evidence needed before an action may run on its own. */

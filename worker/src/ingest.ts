@@ -34,6 +34,8 @@ export interface TgMessage {
   document?: TgDocument;
   entities?: { type: string; offset: number; length: number }[];
   migrate_to_chat_id?: number;
+  /** Set for a message forwarded from a channel or group (spam guard). */
+  forward_from_chat?: { id: number };
 }
 
 export interface Source {

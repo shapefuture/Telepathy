@@ -19,7 +19,7 @@ export const ROUTE_MAX_AGE = DAY;
 export const ROUTE_PER_QUESTION = 2;
 export const ROUTE_PER_EXPERT_DAY = 3;
 
-interface OpenQuestion {
+export interface OpenQuestion {
   id: number;
   source_id: string;
   msg_id: number;
@@ -46,8 +46,15 @@ export async function routeUnanswered(db: D1Database, now = new Date()): Promise
     .bind(nowIso(new Date(now.getTime() - ROUTE_AFTER)), nowIso(new Date(now.getTime() - ROUTE_MAX_AGE)))
     .all<OpenQuestion>();
   const keys: string[] = [];
+  for (const q of qs) keys.push(...(await routeQuestion(db, q, now)));
+  return keys;
+}
+
+/** Route one open question to up to ROUTE_PER_QUESTION opted-in experts. Also used when the concierge approves routing. */
+export async function routeQuestion(db: D1Database, q: OpenQuestion, now = new Date()): Promise<string[]> {
+  const keys: string[] = [];
   const dayAgo = nowIso(new Date(now.getTime() - DAY));
-  for (const q of qs) {
+  {
     const codes = matchSkills(q.body);
     const stmts: D1PreparedStatement[] = [];
     if (codes.length) {

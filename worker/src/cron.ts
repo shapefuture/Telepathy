@@ -3,6 +3,11 @@
 
 import { pruneCache } from "./ai/cache";
 import { pruneText, replayStep } from "./concierge/replay";
+import { liveStep } from "./concierge/live";
+import { bestStep } from "./concierge/best";
+import { roundsStep } from "./concierge/rounds";
+import { boardDaily } from "./concierge/board";
+import { expireScreens } from "./concierge/join";
 import type { App } from "./bot";
 import { digestStep } from "./digest";
 import { routeUnanswered, suggestSkills } from "./features";
@@ -105,6 +110,17 @@ export async function runCron(base: App, now = new Date()): Promise<Record<strin
     return n;
   });
   await step("concierge_replay", () => replayStep(app, now));
+  await step("screens", () => expireScreens(app.db, now));
+  await step("live", () => liveStep(app, now));
+  await step("best", async () => {
+    const today = localParts(now, timezone(app.env)).date;
+    const last = await app.db.prepare("SELECT value FROM settings WHERE key='best.day'").first<{ value: string }>();
+    if (last?.value === today) return 0;
+    await app.db.prepare("INSERT INTO settings(key, value) VALUES ('best.day', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(today).run();
+    return bestStep(app.db, now);
+  });
+  await step("rounds", () => roundsStep(app, now));
+  await step("board", () => boardDaily(app, now));
   await step("routed", async () => (await routeUnanswered(app.db, now)).length);
   await step("suggestions", async () => {
     const today = localParts(now, timezone(app.env)).date;

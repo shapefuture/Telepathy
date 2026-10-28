@@ -136,7 +136,7 @@ earned it behaves as `suggest`, whatever the setting says.
 - **Rules that are not AI** (screening, spam, best answers) are reviewed the same way, so their
   autonomy is earned the same way.
 - **Jobs:** `/introduce` keeps the line about the doors someone can open (and `/introduce off` clears it);
-  `/open` keeps the open-to-projects switch. Both are cleared by `/forget_me`. A hiring or introduction
+  `/open` keeps the open-to-projects switch. Both are cleared by `/forget_me`. Turning «call me for help» off also turns off `/open`, `/introduce` and `/rounds`, and deletes the line; turning it on again starts clean. A hiring or introduction
   request keeps the answer to its clarifying question on its card, erased on `/forget_me`.
 - **Deals** keep only the two timestamps and the status (proposed, agreed, declined).
 - **The Mini App** has the same two switches under «Work and introductions» in Me, the census card for

@@ -4,10 +4,10 @@
 // five things; and the wording is one voice (you, gender-neutral, correct plurals).
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { COMMANDS, COMMANDS_RU } from "../src/index";
+import { COMMANDS, COMMANDS_RU, handleFetch } from "../src/index";
 import { ruPlural, T } from "../src/i18n";
 import { quoteHtml, snippet } from "../src/text";
-import { dm, enableGroup, feed, groupMsg, press, shown, shownButtons, testApp } from "./helpers";
+import { dm, enableGroup, feed, groupMsg, press, shown, shownButtons, signInit, testApp } from "./helpers";
 
 const q = <R = any>(sql: string, ...b: unknown[]) => env.DB.prepare(sql).bind(...b).first<R>();
 const all = async <R = any>(sql: string, ...b: unknown[]) => (await env.DB.prepare(sql).bind(...b).all<R>()).results;
@@ -236,5 +236,57 @@ describe("a door opened later finds the request that waits for it", () => {
     await feed(app, dm(11, "/introduce Знаю директоров в банках"));
     expect(texts(11).at(-1)).toContain("Сохранено");
     expect(calls.some((c) => c.method === "sendMessage" && c.params.chat_id === 1 && String(c.params.text).includes("Нашёлся"))).toBe(false);
+  });
+});
+
+/** The Mini App's settings call, as the app sends it (signed initData for one person). */
+async function miniSettings(tg: number, body: unknown): Promise<Response> {
+  const data = await signInit({ auth_date: String(Math.floor(Date.now() / 1000)), user: JSON.stringify({ id: tg }) });
+  return handleFetch(
+    new Request("https://bot.example/app/api/settings", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-telegram-init-data": data },
+      body: JSON.stringify(body),
+    }),
+    env,
+  );
+}
+
+describe("turning «call me for help» off turns off what depends on it", () => {
+  it("the command takes projects, the introductions line and rounds off, says so, and /optin brings none back", async () => {
+    const { app, texts } = testApp(undefined, "ru");
+    await club(app, true);
+    await feed(app, dm(11, "/open on"));
+    await feed(app, dm(11, "/introduce директора в банках"));
+    await feed(app, dm(11, "/rounds on"));
+    expect(await q("SELECT open_work, doors, rounds FROM members WHERE tg_id=11")).toEqual({ open_work: 1, doors: "директора в банках", rounds: 1 });
+    await feed(app, dm(11, "/optout"));
+    expect(texts(11).at(-1)).toContain("тоже выключены");
+    expect(await q("SELECT discoverable, open_work, doors, rounds FROM members WHERE tg_id=11")).toEqual({ discoverable: 0, open_work: 0, doors: null, rounds: 0 });
+    const audited = await all<{ action: string }>("SELECT action FROM audit WHERE subject=(SELECT id FROM members WHERE tg_id=11) AND action LIKE 'consent.%'");
+    expect(audited.map((r) => r.action)).toEqual(expect.arrayContaining(["consent.open_work", "consent.doors", "consent.rounds"]));
+    await feed(app, dm(11, "/optin"));
+    expect(await q("SELECT open_work, doors, rounds FROM members WHERE tg_id=11")).toEqual({ open_work: 0, doors: null, rounds: 0 });
+  });
+
+  it("the profile's switch does the same, and the toast says so", async () => {
+    const { app, calls } = testApp(undefined, "ru");
+    await club(app, true);
+    await feed(app, dm(11, "/open on"));
+    await feed(app, dm(11, "/profile"));
+    await feed(app, press(11, "p:more"));
+    await feed(app, press(11, "p:discoverable:0:m"));
+    expect(await q("SELECT discoverable, open_work FROM members WHERE tg_id=11")).toEqual({ discoverable: 0, open_work: 0 });
+    expect(calls.some((c) => c.method === "answerCallbackQuery" && String(c.params.text).includes("тоже выключены"))).toBe(true);
+  });
+
+  it("the Mini App's switch does the same", async () => {
+    const { app } = testApp(undefined, "ru");
+    await club(app, true);
+    await feed(app, dm(11, "/open on"));
+    await feed(app, dm(11, "/introduce директора в банках"));
+    const res = await miniSettings(11, { discoverable: false });
+    expect(res.status).toBe(200);
+    expect(await q("SELECT discoverable, open_work, doors FROM members WHERE tg_id=11")).toEqual({ discoverable: 0, open_work: 0, doors: null });
   });
 });

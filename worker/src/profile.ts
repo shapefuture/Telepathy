@@ -4,7 +4,7 @@
 import type { App } from "./bot";
 import { langOf, memberByTg, type Member } from "./acl";
 import { digestHour, timezone } from "./env";
-import { setOpenWork } from "./concierge/people";
+import { setOpenWork, withdrawIntroductions } from "./concierge/people";
 import { btn, T2 } from "./concierge/texts";
 import { skillName } from "./experts";
 import { T, type Lang } from "./i18n";
@@ -138,10 +138,19 @@ export async function profileAction(app: App, mem: Member, a: string, b: string,
       await db.prepare("UPDATE members SET display_name=? WHERE id=?").bind(on ? (firstName ?? null) : null, mem.id).run();
       return back(m0.saved);
     case "discoverable": {
-      if (!!mem.discoverable === on) return back(on ? m0.optinAlready("") : m0.optoutAlready);
-      await db.prepare("UPDATE members SET discoverable=? WHERE id=?").bind(on ? 1 : 0, mem.id).run();
-      await audit(db, "consent.discovery", mem.id, mem.id, { granted: on });
-      return back(on ? m0.saved : m0.optoutAlready, on ? await skillKeysAfter(app, mem.id, now) : []);
+      if (!on) {
+        const wasOn = !!mem.discoverable;
+        const cleared = await withdrawIntroductions(db, mem.id);
+        if (wasOn) {
+          await db.prepare("UPDATE members SET discoverable=0 WHERE id=?").bind(mem.id).run();
+          await audit(db, "consent.discovery", mem.id, mem.id, { granted: false });
+        }
+        return back(cleared.projects || cleared.doors || cleared.rounds ? m0.optoutCleared : m0.optoutAlready);
+      }
+      if (mem.discoverable) return back(m0.optinAlready(""));
+      await db.prepare("UPDATE members SET discoverable=1 WHERE id=?").bind(mem.id).run();
+      await audit(db, "consent.discovery", mem.id, mem.id, { granted: true });
+      return back(m0.saved, await skillKeysAfter(app, mem.id, now));
     }
     case "available": {
       if (!!mem.available === on) return back(m0.alreadySet);

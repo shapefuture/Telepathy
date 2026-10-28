@@ -39,7 +39,7 @@ import { renderThread, faceOf, namesFor } from "./thread-card";
 import { pulseCard } from "./pulse";
 import { scopeOf } from "./concierge/board";
 import { censusText } from "./concierge/jobs";
-import { cleanDoors, clearDoors, saveDoors, setOpenWork } from "./concierge/people";
+import { cleanDoors, clearDoors, saveDoors, setOpenWork, withdrawIntroductions } from "./concierge/people";
 import { alliancesOf, clubsOf } from "./alliance";
 import { topicCounts } from "./wow";
 import { arkLine, knowsCard } from "./ark";
@@ -189,6 +189,8 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
   if (key === "POST settings") {
     for (const f of FLAGS) if (typeof body[f] === "boolean") await db.prepare(`UPDATE members SET ${f}=? WHERE id=?`).bind(body[f] ? 1 : 0, m.id).run();
     if (typeof body.discoverable === "boolean") await audit(db, "consent.discovery", m.id, m.id, { granted: body.discoverable, via: "app" });
+    // Off: projects, the introductions line and rounds go off with it, as they do in the bot.
+    if (body.discoverable === false) await withdrawIntroductions(db, m.id);
     if (body.lang === "en" || body.lang === "ru") await db.prepare("UPDATE members SET lang=?, lang_explicit=1 WHERE id=?").bind(body.lang, m.id).run();
     return out({ ok: true });
   }

@@ -39,6 +39,23 @@ export async function clearDoors(app: App, mem: Member): Promise<void> {
   await audit(app.db, "consent.doors", mem.id, mem.id, { granted: false });
 }
 
+/**
+ * Turning «call me for help» off turns off what depends on it: hiring offers (/open), the introductions
+ * line (/introduce, which is deleted) and introduction rounds (/rounds). Left on, they would come back
+ * silently with the next /optin. Returns what was switched off, so the reply can say so.
+ */
+export async function withdrawIntroductions(db: D1Database, memberId: string): Promise<{ projects: boolean; doors: boolean; rounds: boolean }> {
+  const cur = await db.prepare("SELECT open_work, doors, rounds FROM members WHERE id=?").bind(memberId).first<{ open_work: number; doors: string | null; rounds: number }>();
+  const cleared = { projects: !!cur?.open_work, doors: !!cur?.doors, rounds: !!cur?.rounds };
+  if (!cleared.projects && !cleared.doors && !cleared.rounds) return cleared;
+  await db.prepare("UPDATE members SET open_work=0, doors=NULL, rounds=0 WHERE id=?").bind(memberId).run();
+  const why = { granted: false, why: "call me for help off" };
+  if (cleared.projects) await audit(db, "consent.open_work", memberId, memberId, why);
+  if (cleared.doors) await audit(db, "consent.doors", memberId, memberId, why);
+  if (cleared.rounds) await audit(db, "consent.rounds", memberId, memberId, why);
+  return cleared;
+}
+
 /** /open on | off | (status): be offered hiring requests from people in your groups. */
 export async function openCommand(app: App, mem: Member, args: string): Promise<string> {
   const t = T2(langOf(mem));

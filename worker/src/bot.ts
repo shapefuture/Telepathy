@@ -28,7 +28,7 @@ import { boardCallback, boardCommand, jobsCommand } from "./concierge/board";
 import { startScreen, screenAnswer } from "./concierge/join";
 import { spamCheck } from "./concierge/spam";
 import { roundsCommand } from "./concierge/rounds";
-import { introduceCommand, openCommand } from "./concierge/people";
+import { introduceCommand, openCommand, withdrawIntroductions } from "./concierge/people";
 import { T2 } from "./concierge/texts";
 import { assistCallback, clubDeskCommand, cmdHelpNeed, forgetMissions, listMissions, ownerAssistCommand, OWNER_COMMANDS } from "./assist/bot";
 import { brief } from "./ai/beam";
@@ -641,16 +641,27 @@ async function privateCommand(app: App, msg: TgMessage, cmd: string, args: strin
     case "optin":
     case "optout": {
       const on = cmd === "optin";
-      if (!!mem.discoverable === on) {
-        const codes = (await mySkills(app, mem.id)).filter((x) => x.state === "confirmed").map((x) => x.code);
-        await reply(app, chat, on ? m.optinAlready(labelsFor(codes, lang)) : m.optoutAlready);
-        if (on) await armPrompt(app.db, mem.id, "bio");
+      if (!on) {
+        // Off: projects, the introductions line and rounds go off with it (concierge/people.ts).
+        const wasOn = !!mem.discoverable;
+        const cleared = await withdrawIntroductions(app.db, mem.id);
+        if (wasOn) {
+          await app.db.prepare("UPDATE members SET discoverable=0 WHERE id=?").bind(mem.id).run();
+          await audit(app.db, "consent.discovery", mem.id, mem.id, { granted: false });
+        }
+        const any = cleared.projects || cleared.doors || cleared.rounds;
+        await reply(app, chat, !wasOn && !any ? m.optoutAlready : any ? `${m.optout}\n${m.optoutCleared}` : m.optout);
         return [];
       }
-      await app.db.prepare("UPDATE members SET discoverable=? WHERE id=?").bind(on ? 1 : 0, mem.id).run();
-      await audit(app.db, "consent.discovery", mem.id, mem.id, { granted: on });
-      await reply(app, chat, on ? m.optin : m.optout);
-      if (!on) return [];
+      if (mem.discoverable) {
+        const codes = (await mySkills(app, mem.id)).filter((x) => x.state === "confirmed").map((x) => x.code);
+        await reply(app, chat, m.optinAlready(labelsFor(codes, lang)));
+        await armPrompt(app.db, mem.id, "bio");
+        return [];
+      }
+      await app.db.prepare("UPDATE members SET discoverable=1 WHERE id=?").bind(mem.id).run();
+      await audit(app.db, "consent.discovery", mem.id, mem.id, { granted: true });
+      await reply(app, chat, m.optin);
       await armPrompt(app.db, mem.id, "bio");
       return skillKeysAfter(app, mem.id);
     }

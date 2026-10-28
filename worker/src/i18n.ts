@@ -69,7 +69,7 @@ const EN = {
     "• An AI summary is written when the club has it switched on. It gets your question and the found messages, without authors or links; phone numbers and emails are removed from them.\n" +
     "• Data is stored in Cloudflare D1. PDF, Word and PowerPoint files are turned into text on GitHub's servers, and the files themselves are not kept there.\n" +
     "• An introduction happens only when you both agree; contacts open after that.\n" +
-    "• Hiring offers (/open) and introductions on request (/introduce) stay off until you turn them on. The /introduce line is matched only against requests and is never shown.\n" +
+    "• Hiring offers (/open) and introductions on request (/introduce) stay off until you turn them on. The /introduce line is matched only against requests and is never shown. Turning off “Can call me for help” also turns off /open, /introduce and /rounds, and deletes the /introduce line.\n" +
     "• Group admins see only counts of request kinds (/jobs), never who asked.\n" +
     "• Answer feedback (👍/👎) is private and only improves ranking.\n" +
     "• Full history is kept. /forget_me deletes your messages, your profile, your /open and /introduce settings, and stops collection. Reply /forget to one of your messages in a group to delete only that one.</blockquote>",
@@ -203,6 +203,7 @@ const EN = {
   optinAlready: (labels: string) =>
     labels ? `You can already be called on for help: <b>${labels}</b>. Add a topic by sending it in a line. Pause: /optout.` : "You can already be called on for help. What can you help with? Send one line.",
   optout: "You're no longer called on for help. Invitations you already got can still be answered.",
+  optoutCleared: "Projects, introductions on request and introduction rounds are off too, and the introductions line is deleted. Turn any of them on again to get it back.",
   optoutAlready: "You're not being called on for help already.",
 
   // skills & experts
@@ -590,7 +591,7 @@ const RU: Messages = {
     "• Пересказ ответа пишет ИИ, если он подключён в клубе. Ему уходят ваш вопрос и найденные сообщения — без авторов и ссылок; телефоны и почту из них убираю.\n" +
     "• Данные хранятся в Cloudflare D1. Файлы PDF, Word и PowerPoint переводятся в текст на серверах GitHub, сами файлы там не хранятся.\n" +
     "• Знакомство происходит, только когда согласны оба; контакты открываются после этого.\n" +
-    "• Предложение проектов (/open) и знакомства по запросу (/introduce) выключены, пока вы их не включите. Строка из /introduce сверяется только с запросами и никому не показывается.\n" +
+    "• Предложение проектов (/open) и знакомства по запросу (/introduce) выключены, пока вы их не включите. Строка из /introduce сверяется только с запросами и никому не показывается. Если выключить «Звать меня на помощь», проекты, знакомства по запросу и круги (/rounds) тоже выключаются, а строка из /introduce удаляется.\n" +
     "• Администраторы групп видят только количество запросов по видам (/jobs), но не того, кто спрашивал.\n" +
     "• Оценки ответов (👍/👎) приватны и только улучшают поиск.\n" +
     "• История хранится полностью. /forget_me удаляет ваши сообщения, профиль и настройки /open и /introduce и останавливает сбор. Ответьте /forget на своё сообщение в группе, чтобы удалить только его.</blockquote>",
@@ -722,6 +723,7 @@ const RU: Messages = {
       ? `Вас уже могут позвать на помощь: <b>${labels}</b>. Добавить тему — напишите её одной строкой. Пауза — /optout.`
       : "Вас уже могут позвать на помощь. С чем можете помочь? Напишите одной строкой.",
   optout: "Вас больше не зовут на помощь. Уже полученные приглашения можно принять или отклонить.",
+  optoutCleared: "Проекты, знакомства по запросу и круги знакомств тоже выключены, а строка знакомств удалена. Чтобы вернуть что-то из этого, включите это заново.",
   optoutAlready: "Вас и так не зовут на помощь.",
 
   skillsTitle: "<b>Навыки</b>",

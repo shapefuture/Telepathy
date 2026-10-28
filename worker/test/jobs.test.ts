@@ -6,12 +6,13 @@ import { describe, expect, it } from "vitest";
 import { ensureMember } from "../src/acl";
 import { boardDaily } from "../src/concierge/board";
 import { census, kindOf, newcomersOf, recommendationsFor } from "../src/concierge/jobs";
-import { makeApp } from "../src/index";
+import { handleFetch, makeApp } from "../src/index";
+import { T } from "../src/i18n";
 import { forgetMember } from "../src/rights";
 import { pulseCard, pulseStep } from "../src/pulse";
 import { wowCard } from "../src/wow";
 import { nowIso } from "../src/util";
-import { dm, enableGroup, feed, fakeTelegram, GROUP, nextMsg, OWNER, press, shown, shownButtons } from "./helpers";
+import { dm, enableGroup, feed, fakeTelegram, GROUP, nextMsg, OWNER, press, shown, shownButtons, signInit } from "./helpers";
 
 const DAY = 86_400;
 const now = () => Math.floor(Date.now() / 1000);
@@ -372,5 +373,62 @@ describe("the board's line of what closed", () => {
     expect(await pulseStep(env.DB, new Date("2026-10-26T10:00:00Z"), "UTC", 9)).toHaveLength(1);
     await feed(app, dm(OWNER, "/board"));
     expect(shown(calls, OWNER)).toContain("Week of 2026-10-26: answered Recommendations 1");
+  });
+});
+
+describe("the help and the privacy notice name the switches", () => {
+  it("in both languages; the notice says what /forget_me clears", () => {
+    for (const lang of ["en", "ru"] as const) {
+      for (const cmd of ["/open", "/introduce", "/jobs"]) expect(T(lang).help).toContain(cmd);
+      expect(T(lang).privacy).toContain("/open");
+      expect(T(lang).privacy).toContain("/introduce");
+    }
+    expect(T("en").privacy).toContain("/forget_me deletes your messages, your profile, your /open and /introduce settings");
+    expect(T("ru").privacy).toContain("/forget_me удаляет ваши сообщения, профиль и настройки /open и /introduce");
+  });
+});
+
+describe("the Mini App: the two switches and the census", () => {
+  /** One call to the Mini App's API, signed the way Telegram's web app signs it. */
+  async function mini(tg: number, method: string, path: string, body?: unknown) {
+    const data = await signInit({ auth_date: String(now()), user: JSON.stringify({ id: tg }) });
+    const res = await handleFetch(
+      new Request(`https://bot.example/app/api/${path}`, {
+        method,
+        headers: { "content-type": "application/json", "x-telegram-init-data": data },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      }),
+      env,
+    );
+    return { status: res.status, body: (await res.json()) as any };
+  }
+
+  it("needs /optin before either switch; the line is cleaned; off clears it", async () => {
+    const { app } = world();
+    await enableGroup(app);
+    await post(app, 31, "hello", now());
+    expect((await mini(31, "GET", "profile")).body).toMatchObject({ openWork: false, doors: null });
+    expect((await mini(31, "POST", "open", { on: true })).body).toEqual({ ok: false, status: "needs_optin" });
+    expect((await mini(31, "POST", "doors", { text: "accountants in Kazan" })).body).toEqual({ ok: false, status: "needs_optin" });
+    await mini(31, "POST", "settings", { discoverable: true });
+    expect((await mini(31, "POST", "open", { on: true })).body).toEqual({ ok: true, openWork: true });
+    expect((await mini(31, "POST", "doors", { text: " accountants <in> Kazan " })).body).toEqual({ ok: true, doors: "accountants in Kazan" });
+    expect((await mini(31, "GET", "profile")).body).toMatchObject({ openWork: true, doors: "accountants in Kazan" });
+    expect((await mini(31, "POST", "doors", { text: "   " })).body).toEqual({ ok: false, status: "empty" });
+    expect((await mini(31, "POST", "doors", { off: true })).body).toEqual({ ok: true, doors: null });
+    expect((await mini(31, "POST", "open", { on: false })).body).toEqual({ ok: true, openWork: false });
+    expect((await mini(31, "POST", "open", { on: "yes" })).status).toBe(400);
+  });
+
+  it("the census in the app is the one /jobs sends; members are refused", async () => {
+    const { app, calls } = world();
+    await enableGroup(app);
+    await seedAsks(app);
+    expect((await mini(21, "GET", "jobs")).status).toBe(403);
+    await feed(app, dm(OWNER, "/jobs"));
+    const census = await mini(OWNER, "GET", "jobs");
+    expect(census.status).toBe(200);
+    expect(census.body.text).toContain("4 requests");
+    expect(census.body.text).toBe(shown(calls, OWNER));
   });
 });

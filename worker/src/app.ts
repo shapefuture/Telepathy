@@ -37,6 +37,9 @@ import { handleUpdate, type Update } from "./bot";
 import { openThread } from "./thread";
 import { renderThread, faceOf, namesFor } from "./thread-card";
 import { pulseCard } from "./pulse";
+import { scopeOf } from "./concierge/board";
+import { censusText } from "./concierge/jobs";
+import { cleanDoors, clearDoors, saveDoors, setOpenWork } from "./concierge/people";
 import { alliancesOf, clubsOf } from "./alliance";
 import { topicCounts } from "./wow";
 import { arkLine, knowsCard } from "./ark";
@@ -171,6 +174,9 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
       groupAdmin: owner || (await managedChats(app, user.id)).length > 0,
       label: app.env.COMMUNITY_LABEL || "Community",
       flags: Object.fromEntries(FLAGS.map((f) => [f, !!m[f as keyof Member]])),
+      // The two switches behind the jobs people bring (concierge/people.ts), as /open and /introduce show them.
+      openWork: !!m.open_work,
+      doors: m.doors ?? null,
       skills,
       skillLabels: skills.map((c) => ({ code: c, label: jobLabel(c, lang) })),
       counts: { requests: n(req!), offers: n(offers!), invites: n(invites!) },
@@ -185,6 +191,28 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
     if (typeof body.discoverable === "boolean") await audit(db, "consent.discovery", m.id, m.id, { granted: body.discoverable, via: "app" });
     if (body.lang === "en" || body.lang === "ru") await db.prepare("UPDATE members SET lang=?, lang_explicit=1 WHERE id=?").bind(body.lang, m.id).run();
     return out({ ok: true });
+  }
+  // The two switches, with the rules of /open and /introduce: both need /optin first (concierge/people.ts).
+  if (key === "POST open") {
+    if (typeof body.on !== "boolean") return out({ ok: false }, undefined, 400);
+    const r = await setOpenWork(app, m, body.on);
+    return r === "needs_optin" ? out({ ok: false, status: r }) : out({ ok: true, openWork: r === "on" });
+  }
+  if (key === "POST doors") {
+    const text = cleanDoors(typeof body.text === "string" ? body.text : "");
+    if (body.off === true || text.toLowerCase() === "off") {
+      await clearDoors(app, m);
+      return out({ ok: true, doors: null });
+    }
+    if (!text) return out({ ok: false, status: "empty" });
+    if ((await saveDoors(app, m, text)) === "needs_optin") return out({ ok: false, status: "needs_optin" });
+    return out({ ok: true, doors: text });
+  }
+  // What people ask the groups this person manages: the /jobs census, for owners and group admins only.
+  if (key === "GET jobs") {
+    const scope = await scopeOf(app, user.id);
+    if (!scope.ids.length) return out({ error: "group admins only" }, undefined, 403);
+    return out({ text: await censusText(db, scope.ids, lang) });
   }
   if (key === "GET skills") return out([...TAXONOMY.values()].map((s) => ({ code: s.code, label: labelIn(s, lang), full: label(s) })));
   // A link to a site or pasted bio text: add the skills found, keep nothing else.

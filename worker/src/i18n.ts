@@ -37,6 +37,7 @@ const EN = {
     "🔎 <b>Ask</b>\nJust type your question here.\nIn a group: /ask <i>question</i> — I'll answer from that group.\n\n" +
     "🤝 <b>Find a person</b>\n/intro <i>what you need</i> — I'll find who can help\n/help <i>what you need</i> — ask the community team for help\n/requests — your requests\n\n" +
     "📅 <b>Stay in the loop</b>\n/catchup — what's new\n/events — upcoming meetups\n/digest on — a daily summary\n\n" +
+    "💼 <b>Work and introductions</b>\n/open on | off — be offered hiring requests (needs /optin)\n/introduce <i>who you can open doors to</i> — asked when a request fits (needs /optin); /introduce off stops\n/jobs — what people ask your groups (group admins)\n\n" +
     "🙂 <b>About you</b>\n/profile — settings\n/skills — what you're good at\n/optin — let people find you as an expert\n/language ru — по-русски\n\n" +
     "🔒 <b>Privacy</b>\n/privacy — what I keep\n/forget_me — delete everything about you",
   privacy:
@@ -46,9 +47,11 @@ const EN = {
     "• Answers quote messages verbatim with a link, only from groups you can read.\n" +
     "• Data is stored in Cloudflare D1. Nothing is sent to AI services. PDF, Word and PowerPoint files are converted to text on GitHub's servers and not kept there.\n" +
     "• You are not discoverable as an expert unless you run /optin yourself.\n" +
+    "• Hiring offers (/open) and introductions on request (/introduce) stay off until you turn them on, and need /optin first. The /introduce line is only matched against requests and is never shown to anyone.\n" +
+    "• Group admins see counts of the kinds of requests asked in their groups (/jobs), never who asked.\n" +
     "• Introductions need both people to agree before any contact is shared.\n" +
     "• Answer feedback (👍/👎) is private and only improves ranking.\n" +
-    "• Full history is kept. /forget_me deletes your messages and profile and stops collection; reply /forget to one of your messages in the group to delete it.",
+    "• Full history is kept. /forget_me deletes your messages, your profile, your /open and /introduce settings, and stops collection; reply /forget to one of your messages in the group to delete it.",
   languageSet: "Language set to English.",
   languageUsage: "Usage: <code>/language en</code> or <code>/language ru</code>",
 
@@ -514,6 +517,7 @@ const RU: Messages = {
     "🔎 <b>Спросить</b>\nПросто напиши вопрос сюда.\nВ группе: /ask <i>вопрос</i> — отвечу из этой группы.\n\n" +
     "🤝 <b>Найти человека</b>\n/intro <i>что нужно</i> — найду, кто поможет\n/help <i>что нужно</i> — попросить помощи у команды сообщества\n/requests — твои запросы\n\n" +
     "📅 <b>Быть в курсе</b>\n/catchup — что нового\n/events — ближайшие встречи\n/digest on — сводка раз в день\n\n" +
+    "💼 <b>Работа и знакомства</b>\n/open on | off — предлагать тебе запросы исполнителей (нужен /optin)\n/introduce <i>кого или куда ты можешь познакомить</i> — спрошу, когда запрос подходит (нужен /optin); /introduce off — выключить\n/jobs — что спрашивают в твоих группах (для админов групп)\n\n" +
     "🙂 <b>О тебе</b>\n/profile — настройки\n/skills — что ты умеешь\n/optin — разрешить находить тебя как эксперта\n/language en — English\n\n" +
     "🔒 <b>Приватность</b>\n/privacy — что я храню\n/forget_me — удалить всё о тебе",
   privacy:
@@ -523,9 +527,11 @@ const RU: Messages = {
     "• Ответы — дословные цитаты со ссылкой, только из групп, которые вы можете читать.\n" +
     "• Данные хранятся в Cloudflare D1. Ничего не отправляется в ИИ-сервисы. Файлы PDF, Word и PowerPoint превращаются в текст на серверах GitHub и там не хранятся.\n" +
     "• Вас не видно как эксперта, пока вы сами не выполните /optin.\n" +
+    "• Предложения работы (/open) и знакомства по запросу (/introduce) выключены, пока вы сами их не включите; нужен /optin. Строка из /introduce сверяется только с запросами и никому не показывается.\n" +
+    "• Администраторы групп видят только количество запросов по видам в своих группах (/jobs), но не того, кто спрашивал.\n" +
     "• Для знакомства нужно согласие обоих, прежде чем кто-то получит контакт.\n" +
     "• Оценки ответов (👍/👎) приватны и только улучшают поиск.\n" +
-    "• История хранится полностью. /forget_me удаляет ваши сообщения и профиль и останавливает сбор; ответьте /forget на своё сообщение в группе, чтобы удалить его.",
+    "• История хранится полностью. /forget_me удаляет ваши сообщения, профиль и настройки /open и /introduce и останавливает сбор; ответьте /forget на своё сообщение в группе, чтобы удалить его.",
   languageSet: "Язык интерфейса: русский.",
   languageUsage: "Использование: <code>/language ru</code> или <code>/language en</code>",
 

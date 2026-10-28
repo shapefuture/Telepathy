@@ -29,6 +29,8 @@ export interface Member {
   display_name?: string | null;
   /** The doors line for introductions on request (concierge/people.ts). Null unless the member wrote one. */
   doors?: string | null;
+  /** Open to projects: offered hiring requests from people in the groups (concierge/people.ts). */
+  open_work?: number;
   /** Quiet hours in UTC (0-23); null when off. Experts in them are not asked. */
   quiet_from?: number | null;
   quiet_to?: number | null;

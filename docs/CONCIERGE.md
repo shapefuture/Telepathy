@@ -100,6 +100,9 @@ earned it behaves as `suggest`, whatever the setting says.
   `/open` keeps the open-to-projects switch. Both are cleared by `/forget_me`. A hiring or introduction
   request keeps the answer to its clarifying question on its card, erased on `/forget_me`.
 - **Deals** keep only the two timestamps and the status (proposed, agreed, declined).
+- **The Mini App** has the same two switches under «Work and introductions» in Me, the census card for
+  owners and group admins (counts only, no names), and an optional tour on first open. The tour is skippable
+  at any step; its only stored flag is in the device's own browser storage. It reads the same rules as the bot.
 
 Tell members in your group rules that requests are read to route them, and that a screening asks
 three questions.
@@ -111,7 +114,6 @@ three questions.
 | `CONCIERGE_MODEL` | Workers AI model. Empty = the summaries' default. `off` disables the AI actions (replay, live suggestions). |
 | `CONCIERGE_AUTONOMY` | Per-action levels, as above. |
 | Group settings card | `Screen join requests`, `Catch spam`, `Introductions on request` (on each group). |
-| Census window | Fixed in code: 180 days for `/jobs`, 30 days for newcomers, 14 days for bumps, 48 hours for thanks. |
 | Census window | Fixed in code: 180 days for `/jobs`, 30 days for newcomers, 14 days for bumps, 48 hours for thanks. |
 
 Telegram rights the bot needs: approve and decline join requests (for screening), delete messages and

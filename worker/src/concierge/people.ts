@@ -44,6 +44,8 @@ export async function openCommand(app: App, mem: Member, args: string): Promise<
   const t = T2(langOf(mem));
   const arg = args.trim().toLowerCase();
   if (arg === "on" || arg === "off") {
+    const cur = await app.db.prepare("SELECT open_work FROM members WHERE id=?").bind(mem.id).first<{ open_work: number }>();
+    if (!!cur?.open_work === (arg === "on")) return arg === "on" ? t.openAlreadyOn : t.openAlreadyOff;
     const r = await setOpenWork(app, mem, arg === "on");
     if (r === "needs_optin") return t.openNeedsOptIn;
     return r === "on" ? t.openOn : t.openOff;

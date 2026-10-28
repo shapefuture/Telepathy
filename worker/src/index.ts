@@ -25,30 +25,27 @@ import { nowIso, safeEqual } from "./util";
 export const ALLOWED_UPDATES = ["message", "edited_message", "callback_query", "my_chat_member", "chat_member", "chat_join_request"];
 
 // Command menu (the list under "/"), in DEFAULT_LANG for everyone.
+/** The menu: the five things people do most. Everything else is a command away (/help lists them). */
 export const COMMANDS_RU = [
-  { command: "ask", description: "Задать вопрос сообществу" },
-  { command: "app", description: "Открыть приложение" },
-  { command: "catchup", description: "Что нового" },
-  { command: "events", description: "Ближайшие встречи" },
-  { command: "intro", description: "Найти человека, который поможет" },
+  { command: "ask", description: "Спросить: напишите вопрос" },
+  { command: "catchup", description: "Что нового и встречи" },
   { command: "requests", description: "Мои запросы" },
-  { command: "profile", description: "Настройки" },
-  { command: "passport", description: "Остаться на связи без Telegram" },
+  { command: "profile", description: "Мой профиль и настройки" },
   { command: "help", description: "Как пользоваться" },
-  { command: "privacy", description: "Что я храню" },
 ];
 export const COMMANDS = [
-  { command: "ask", description: "Ask the community a question" },
-  { command: "app", description: "Open the app" },
-  { command: "catchup", description: "What's new" },
-  { command: "events", description: "Upcoming meetups" },
-  { command: "intro", description: "Find someone who can help" },
+  { command: "ask", description: "Ask: type your question" },
+  { command: "catchup", description: "What's new and upcoming events" },
   { command: "requests", description: "My requests" },
-  { command: "profile", description: "Settings" },
-  { command: "passport", description: "Stay connected without Telegram" },
+  { command: "profile", description: "My profile and settings" },
   { command: "help", description: "How to use me" },
-  { command: "privacy", description: "What I keep" },
 ];
+/** What the bot is, in the profile Telegram shows before anyone taps Start. */
+export const DESCRIPTION_RU = "Ответы из памяти клуба и люди, которые помогут. Напишите вопрос — найду, что уже обсуждали, и спрошу тех, кто готов помочь. Контакты открываются, только когда согласны оба.";
+export const DESCRIPTION_EN = "Answers from the club's memory, and the people who can help. Ask a question: I find what was already discussed and ask those ready to help. Contacts open only when you both agree.";
+export const SHORT_DESCRIPTION_RU = "Ответы из памяти клуба и помощь людей";
+export const SHORT_DESCRIPTION_EN = "Answers from the club's memory and people who can help";
+export const BOT_NAME_RU = "Миндальная связь";
 /** In groups, only what works there. */
 export const GROUP_COMMANDS_RU = [{ command: "ask", description: "Спросить: отвечу из этой группы" }];
 export const GROUP_COMMANDS = [{ command: "ask", description: "Ask: I answer from this group" }];
@@ -158,7 +155,23 @@ export async function handleFetch(req: Request, env: Env, fetcher?: Fetcher, net
       await app.tg.call("setMyCommands", { commands: ru ? GROUP_COMMANDS_RU : GROUP_COMMANDS, scope: { type: "all_group_chats" } });
       // P13-11: Mini App in the chat menu button.
       const menu = await app.tg.call("setChatMenuButton", { menu_button: { type: "web_app", text: (env.DEFAULT_LANG ?? "ru") === "en" ? "App" : "Приложение", web_app: { url: `${url.origin}/app` } } });
-      return json({ webhook: hook, commands: cmds, menu, url: `${url.origin}/telegram`, app: `${url.origin}/app` });
+      // The bot's own profile in Telegram, in both languages; the Russian name spelled as the club writes it.
+      const profile: Record<string, string> = {};
+      const steps: [string, Record<string, unknown>][] = [
+        ["description_ru", { method: "setMyDescription", params: { description: DESCRIPTION_RU, language_code: "ru" } }],
+        ["description_en", { method: "setMyDescription", params: { description: DESCRIPTION_EN, language_code: "en" } }],
+        ["short_ru", { method: "setMyShortDescription", params: { short_description: SHORT_DESCRIPTION_RU, language_code: "ru" } }],
+        ["short_en", { method: "setMyShortDescription", params: { short_description: SHORT_DESCRIPTION_EN, language_code: "en" } }],
+        ["name_ru", { method: "setMyName", params: { name: BOT_NAME_RU, language_code: "ru" } }],
+      ];
+      for (const [label, step] of steps) {
+        try {
+          profile[label] = JSON.stringify(await app.tg.call(step.method as string, step.params as Record<string, unknown>));
+        } catch (e) {
+          profile[label] = `failed: ${String(e)}`;
+        }
+      }
+      return json({ webhook: hook, commands: cmds, menu, profile, url: `${url.origin}/telegram`, app: `${url.origin}/app` });
     }
     if (req.method === "GET" && url.pathname === "/admin/status") return json(await status(app.db));
     if (req.method === "POST" && url.pathname === "/admin/cron") return json(await runCron(app));

@@ -12,7 +12,7 @@ import type { App } from "./bot";
 import { digestStep } from "./digest";
 import { routeUnanswered, suggestSkills } from "./features";
 import { digestHour, timezone } from "./env";
-import { expireDue, sendReminders } from "./intros";
+import { expireDue, retryWaiting, sendReminders } from "./intros";
 import { dispatchPending, recoverStuck } from "./outbox";
 import { applyRetention } from "./rights";
 import { liveCommitment, release } from "./assist/capacity";
@@ -129,6 +129,14 @@ export async function runCron(base: App, now = new Date()): Promise<Record<strin
     const n = (await suggestSkills(app.db, now)).length;
     await app.db.prepare("INSERT INTO settings(key, value) VALUES ('suggest.day', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(today).run();
     return n;
+  });
+  await step("waiting", async () => {
+    // Waiting requests get a fresh look once a day: helpers may be back (a pause ended, quiet hours passed).
+    const today = localParts(now, timezone(app.env)).date;
+    const last = await app.db.prepare("SELECT value FROM settings WHERE key='waiting.day'").first<{ value: string }>();
+    if (last?.value === today) return 0;
+    await app.db.prepare("INSERT INTO settings(key, value) VALUES ('waiting.day', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(today).run();
+    return (await retryWaiting(app.db, nowIso(now), { limit: 20 })).length;
   });
   await step("missions_expired", async () => {
     const ids = await expireMissions(app.db, nowIso(now));

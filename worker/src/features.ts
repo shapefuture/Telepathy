@@ -151,8 +151,10 @@ export async function suggestSkills(db: D1Database, now = new Date()): Promise<s
       const key = `suggest:${memberId}:${code}`;
       if (known) continue;
       const t = T(e.lang);
+      const label = escapeHtml(labelIn(TAXONOMY.get(code)!, e.lang));
+      const unmet = await unmetFor(db, memberId, code, since);
       const r = await effectStatement(db, key, e.tg, {
-        text: t.suggestSkill(escapeHtml(labelIn(TAXONOMY.get(code)!, e.lang))),
+        text: unmet >= 2 ? t.suggestSkillUnmet(label, unmet) : t.suggestSkill(label),
         buttons: [[{ text: t.bAddSkill, callback_data: `s:${code}:add` }, { text: t.bNoThanks, callback_data: `s:${code}:no` }]],
       }).run();
       if (r.meta.changes) keys.push(key);
@@ -160,6 +162,18 @@ export async function suggestSkills(db: D1Database, now = new Date()): Promise<s
     }
   }
   return keys;
+}
+
+/** Requests on this topic from people this member can read, that nobody could answer, in the last 30 days. */
+async function unmetFor(db: D1Database, memberId: string, code: string, since: string): Promise<number> {
+  const r = await db
+    .prepare(
+      "SELECT COUNT(*) AS n FROM needs n WHERE n.created_at >= ? AND n.status IN ('waiting','no_match','expired') AND n.skills_json LIKE ? AND n.member_id != ? " +
+        "AND n.member_id IN (SELECT a.member_id FROM source_access a JOIN source_access b ON b.source_id = a.source_id AND b.member_id = ? AND b.revoked_at IS NULL WHERE a.revoked_at IS NULL)",
+    )
+    .bind(since, `%"${code}"%`, memberId, memberId)
+    .first<{ n: number }>();
+  return r?.n ?? 0;
 }
 
 export async function answerSuggestion(db: D1Database, memberId: string, code: string, accept: boolean): Promise<boolean> {

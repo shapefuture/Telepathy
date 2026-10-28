@@ -36,7 +36,7 @@ describe("the expert's side", () => {
     const asked = await requestIntro(env.DB, await idOf(1), "I need an accountant for VAT");
     await dispatchPending(app.db, app.tg, 40, asked.keys);
     const invite = sentTo(calls, 11).at(-1)!;
-    expect(invite.params.text).toContain("Introduction request");
+    expect(invite.params.text).toContain("Request for help");
     expect(invite.params.text).toContain("Why you");
     expect(invite.params.text).toContain("6 time(s)");
     expect(JSON.stringify(invite.params.reply_markup)).toContain("Not now");

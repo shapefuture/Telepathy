@@ -148,7 +148,7 @@ describe("hiring", () => {
     expect((await q<{ clarify: string }>("SELECT clarify FROM threads WHERE id=?", id))!.clarify).toBe("Бюджет 50 тысяч, сдать к маю");
     const invited = await env.DB.prepare("SELECT candidate_id FROM intros").all<{ candidate_id: string }>();
     expect(invited.results.map((r) => r.candidate_id)).toEqual([await idOf(42)]);
-    expect(calls.filter((c) => c.method === "sendMessage" && c.params.chat_id === 42).at(-1)!.params.text).toContain("Introduction request");
+    expect(calls.filter((c) => c.method === "sendMessage" && c.params.chat_id === 42).at(-1)!.params.text).toContain("Request for help");
   });
 
   it("'skip' asks people with the request as it is", async () => {
@@ -173,13 +173,13 @@ describe("open to projects", () => {
     await enableGroup(app);
     await post(app, 51, "hello", now() - DAY);
     await feed(app, dm(51, "/open on"));
-    expect(shown(calls, 51)).toContain("First /optin");
+    expect(shown(calls, 51)).toContain("First let people call you for help: /optin");
     await feed(app, dm(51, "/optin"));
     await feed(app, dm(51, "/open on"));
-    expect(shown(calls, 51)).toContain("From now on I can offer you hiring requests");
+    expect(shown(calls, 51)).toContain("will be offered to you");
     expect(await q("SELECT open_work FROM members WHERE tg_id=51")).toEqual({ open_work: 1 });
     await feed(app, dm(51, "/open"));
-    expect(shown(calls, 51)).toContain("Open to projects: on");
+    expect(shown(calls, 51)).toContain("Offering projects: yes");
     await feed(app, dm(51, "/open off"));
     expect(await q("SELECT open_work FROM members WHERE tg_id=51")).toEqual({ open_work: 0 });
 
@@ -222,7 +222,7 @@ describe("warm introductions", () => {
     await enableGroup(app);
     await post(app, 53, "hello", now() - DAY);
     await feed(app, dm(53, "/introduce Знаю бухгалтеров"));
-    expect(shown(calls, 53)).toContain("First /optin");
+    expect(shown(calls, 53)).toContain("First let people call you for help: /optin");
     await feed(app, dm(53, "/optin"));
     await feed(app, dm(53, "/introduce Знаю бухгалтеров"));
     expect(await q("SELECT doors FROM members WHERE tg_id=53")).toEqual({ doors: "Знаю бухгалтеров" });
@@ -350,15 +350,16 @@ describe("the profile's introduction switch", () => {
     await feed(app, dm(93, "/profile"));
     expect(shownButtons(calls, 93).flat().map((b) => b.callback_data)).toContain("dr:ask");
     await feed(app, press(93, "dr:ask"));
-    expect(calls.some((c) => c.method === "answerCallbackQuery" && String(c.params.text).includes("First /optin"))).toBe(true);
+    expect(calls.some((c) => c.method === "answerCallbackQuery" && String(c.params.text).includes("First let people call you for help: /optin"))).toBe(true);
     await feed(app, dm(93, "/optin"));
     await feed(app, press(93, "dr:ask"));
     expect(shown(calls, 93)).toContain("Write one line");
     await feed(app, dm(93, "Знаю директоров в банках"));
     expect(await q("SELECT doors FROM members WHERE tg_id=93")).toEqual({ doors: "Знаю директоров в банках" });
     await feed(app, dm(93, "/profile"));
-    expect(shownButtons(calls, 93).flat().map((b) => b.callback_data)).toContain("dr:off");
-    await feed(app, press(93, "dr:off"));
+    await feed(app, press(93, "p:more")); // the stop switch lives on the «Ещё» sheet
+    expect(shownButtons(calls, 93).flat().map((b) => b.callback_data)).toContain("dr:off:m");
+    await feed(app, press(93, "dr:off:m"));
     expect(await q("SELECT doors FROM members WHERE tg_id=93")).toEqual({ doors: null });
   });
 });

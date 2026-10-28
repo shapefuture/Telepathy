@@ -4,7 +4,7 @@
 // on to the next candidate (max 3). Every send goes through the effect ledger.
 
 import { defaultLang } from "./i18n";
-import { doorCandidates, eligibleCandidates, helpCount, labelsFor, matchSkills, type Candidate } from "./experts";
+import { CUSTOM_PREFIX, doorCandidates, eligibleCandidates, helpCount, labelsFor, matchSkills, TAXONOMY, type Candidate } from "./experts";
 import { T2 } from "./concierge/texts";
 import { T, type Lang } from "./i18n";
 import { effectStatement } from "./outbox";
@@ -25,6 +25,8 @@ export const REQUEST_TTL = 14 * DAY;
 export const REMINDER_AFTER = 24 * HOUR;
 export const REQUESTER_WEEKLY_CAP = 2;
 export const MAX_CANDIDATES = 3;
+/** Requests still open: a waiting one has no helper yet and gets another look when one appears. */
+const OPEN_STATUSES = ["open", "matching", "waiting"];
 
 const BOTH: Actor[] = ["requester", "candidate"];
 export const TRANSITIONS: Record<string, { to: Status; actors: Actor[] }> = {
@@ -84,7 +86,7 @@ export async function requestIntro(
     throw new NoSkillError(T(lang).introNoSkill);
   }
   const open = await db
-    .prepare("SELECT COUNT(*) AS n FROM needs WHERE member_id=? AND created_at>=? AND status IN ('open','matching')")
+    .prepare("SELECT COUNT(*) AS n FROM needs WHERE member_id=? AND created_at>=? AND status IN ('open','matching','waiting')")
     .bind(requesterId, addMs(now, -7 * DAY))
     .first<{ n: number }>();
   if ((open?.n ?? 0) >= REQUESTER_WEEKLY_CAP) {
@@ -148,25 +150,65 @@ async function pickCandidate(db: D1Database, needId: string, now: string, notify
     .prepare("SELECT * FROM needs WHERE id=?")
     .bind(needId)
     .first<{ member_id: string; text: string; skills_json: string; want: string | null; status: string; expires_at: string }>();
-  if (!need || !["open", "matching"].includes(need.status)) return { introId: null, keys: [] };
+  if (!need || !OPEN_STATUSES.includes(need.status) || need.expires_at <= now) return { introId: null, keys: [] };
   const tried = new Set(
     (await db.prepare("SELECT candidate_id FROM intros WHERE need_id=?").bind(needId).all<{ candidate_id: string }>()).results.map((r) => r.candidate_id),
   );
   const codes = JSON.parse(need.skills_json) as string[];
-  const candidates = tried.size >= MAX_CANDIDATES || need.expires_at <= now ? [] : await candidatesFor(db, need, codes, now, tried);
+  const candidates = tried.size >= MAX_CANDIDATES ? [] : await candidatesFor(db, need, codes, now, tried);
+  if (candidates.length) return inviteCandidate(db, needId, need, candidates[0]!, now);
+  // Nobody left to ask. After three invitations the request closes; before that it waits for someone to appear.
   const requester = await contact(db, need.member_id);
-  if (!candidates.length) {
-    const key = `need:${needId}:no_match`;
-    const stmts = [db.prepare("UPDATE needs SET status='no_match' WHERE id=?").bind(needId)];
-    if (notifyNone) {
-      stmts.push(
-        effectStatement(db, key, requester.tg, { text: T(requester.lang).introClosedNoMatch }),
-      );
-    }
-    await db.batch(stmts);
-    return { introId: null, keys: notifyNone ? [key] : [] };
+  const closed = tried.size >= MAX_CANDIDATES;
+  const stmts = [db.prepare("UPDATE needs SET status=? WHERE id=? AND status IN ('open','matching','waiting')").bind(closed ? "no_match" : "waiting", needId)];
+  const keys: string[] = [];
+  if (notifyNone) {
+    const key = closed ? `need:${needId}:no_match` : `need:${needId}:waiting:${tried.size}`;
+    stmts.push(effectStatement(db, key, requester.tg, { text: closed ? T(requester.lang).introClosedNoMatch : T(requester.lang).introWaiting }));
+    keys.push(key);
   }
-  return inviteCandidate(db, needId, need, candidates[0]!, now);
+  await db.batch(stmts);
+  return { introId: null, keys };
+}
+
+/**
+ * Waiting requests get another look: a helper appeared for their topics (or their doors), or the
+ * daily sweep runs. Bounded per call. The requester hears once per invitation, when someone is found.
+ */
+export async function retryWaiting(db: D1Database, now: string, opts: { codes?: string[]; doors?: boolean; limit?: number } = {}): Promise<string[]> {
+  const limit = opts.limit ?? 5;
+  type Row = { id: string; member_id: string; text: string; skills_json: string };
+  let rows: Row[];
+  if (opts.doors) {
+    rows = (await db.prepare("SELECT id, member_id, text, skills_json FROM needs WHERE status='waiting' AND want='door' AND expires_at > ? ORDER BY created_at LIMIT ?").bind(now, limit).all<Row>()).results;
+  } else if (opts.codes) {
+    const codes = opts.codes.filter((c) => TAXONOMY.has(c) || c.startsWith(CUSTOM_PREFIX));
+    if (!codes.length) return [];
+    const match = codes.map(() => "skills_json LIKE ?").join(" OR ");
+    rows = (
+      await db
+        .prepare(`SELECT id, member_id, text, skills_json FROM needs WHERE status='waiting' AND (want IS NULL OR want='hire') AND expires_at > ? AND (${match}) ORDER BY created_at LIMIT ?`)
+        .bind(now, ...codes.map((c) => `%"${c}"%`), limit)
+        .all<Row>()
+    ).results;
+  } else {
+    rows = (await db.prepare("SELECT id, member_id, text, skills_json FROM needs WHERE status='waiting' AND expires_at > ? ORDER BY created_at LIMIT ?").bind(now, limit).all<Row>()).results;
+  }
+  const keys: string[] = [];
+  for (const r of rows) {
+    const found = await nextCandidate(db, r.id, now, false);
+    keys.push(...found.keys);
+    if (!found.introId) continue;
+    const req = await db.prepare("SELECT tg_id, lang FROM members WHERE id=?").bind(r.member_id).first<{ tg_id: number; lang: Lang | null }>();
+    if (!req) continue;
+    const lang = req.lang ?? defaultLang();
+    const codesOf = JSON.parse(r.skills_json) as string[];
+    const what = codesOf.length ? labelsFor(codesOf, lang) : r.text.slice(0, 80);
+    const key = `need:${r.id}:found:${found.introId}`;
+    const sent = await effectStatement(db, key, req.tg_id, { text: T(lang).waitingFound(escapeHtml(what)) }).run();
+    if (sent.meta.changes) keys.push(key);
+  }
+  return keys;
 }
 
 /** Who may be invited depends on the request: people with the skills, people open to projects, or people who opened doors. */
@@ -270,7 +312,7 @@ export async function cancelNeed(db: D1Database, requesterId: string, needId: st
     .all<{ id: string }>();
   for (const r of live.results) keys.push(...(await act(db, r.id, requesterId, "cancel", now)).keys);
   const res = await db
-    .prepare("UPDATE needs SET status='cancelled' WHERE id=? AND member_id=? AND status IN ('open','matching','no_match')")
+    .prepare("UPDATE needs SET status='cancelled' WHERE id=? AND member_id=? AND status IN ('open','matching','waiting','no_match')")
     .bind(needId, requesterId)
     .run();
   keys.push(...(await syncNeed(db, needId, now)));
@@ -294,8 +336,8 @@ export async function expireDue(db: D1Database, now = nowIso()): Promise<string[
     keys.push(...(await nextCandidate(db, intro.need_id, now)).keys);
   }
   // Only requests that expire in this sweep get a card edit; older expired ones were already shown.
-  const expiring = await db.prepare("SELECT id FROM needs WHERE status IN ('open','matching') AND expires_at <= ?").bind(now).all<{ id: string }>();
-  await db.prepare("UPDATE needs SET status='expired' WHERE status IN ('open','matching') AND expires_at <= ?").bind(now).run();
+  const expiring = await db.prepare("SELECT id FROM needs WHERE status IN ('open','matching','waiting') AND expires_at <= ?").bind(now).all<{ id: string }>();
+  await db.prepare("UPDATE needs SET status='expired' WHERE status IN ('open','matching','waiting') AND expires_at <= ?").bind(now).run();
   for (const n of expiring.results) keys.push(...(await syncNeed(db, n.id, now)));
   return keys;
 }

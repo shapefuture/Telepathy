@@ -131,6 +131,23 @@ export async function offeredSkills(db: D1Database, requesterId: string, limit =
 }
 
 /** `openWork`: only people who said they're open to projects (hiring requests, plan: «Ищу исполнителя»). */
+/** Whether anyone could be asked for this person's request right now: someone offers a topic or a door. */
+export async function askable(db: D1Database, requesterId: string): Promise<boolean> {
+  if ((await offeredSkills(db, requesterId, 1)).length) return true;
+  const door = await db
+    .prepare(
+      `SELECT 1 FROM members m
+       JOIN source_access a ON a.member_id = m.id AND a.revoked_at IS NULL
+       JOIN source_access b ON b.source_id = a.source_id AND b.member_id = ? AND b.revoked_at IS NULL
+       JOIN sources s ON s.id = a.source_id AND s.enabled = 1 AND s.doors = 1
+       WHERE m.doors IS NOT NULL AND m.discoverable = 1 AND m.available = 1 AND m.removed_at IS NULL AND m.collection_opt_out = 0 AND m.id != ?
+       LIMIT 1`,
+    )
+    .bind(requesterId, requesterId)
+    .first();
+  return !!door;
+}
+
 export async function eligibleCandidates(
   db: D1Database,
   requesterId: string,

@@ -505,7 +505,7 @@ async function route(app: App, m: Member, user: InitUser, owner: boolean, method
         offers,
       });
     }
-    const needs = (await db.prepare("SELECT id, text, status FROM needs WHERE member_id=? AND status IN ('open','matching') ORDER BY created_at DESC").bind(m.id).all<{ id: string; text: string; status: string }>()).results;
+    const needs = (await db.prepare("SELECT id, text, status FROM needs WHERE member_id=? AND status IN ('open','matching','waiting') ORDER BY created_at DESC").bind(m.id).all<{ id: string; text: string; status: string }>()).results;
     const intros = (
       await db
         .prepare(

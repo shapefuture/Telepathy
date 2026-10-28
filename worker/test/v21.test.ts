@@ -42,9 +42,9 @@ describe("P13-04 Russian / English interface", () => {
     await feed(app, dm(6, "/optin", "ru"));
     await feed(app, dm(6, "/skills add accounting", "ru"));
     await feed(app, dm(5, "/intro need an accountant for my startup", "en"));
-    expect(lastFor(sent(6)).text).toContain("Запрос на знакомство");
+    expect(lastFor(sent(6)).text).toContain("Просьба о помощи");
     expect(lastFor(sent(6)).text).toContain("Бухгалтерия");
-    expect(lastFor(sent(5)).text).toContain("Request created");
+    expect(lastFor(sent(5)).text).toContain("Request sent");
   });
 });
 

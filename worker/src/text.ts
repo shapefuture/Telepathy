@@ -136,10 +136,22 @@ export function snippet(body: string, terms: string[], width = 280): string {
   const positions = terms.map((t) => folded.indexOf(stemKey(t))).filter((p) => p >= 0);
   const pos = positions.length ? Math.min(...positions) : 0;
   let start = Math.max(0, pos - Math.floor(width / 3));
-  const end = Math.min(body.length, start + width);
+  let end = Math.min(body.length, start + width);
   start = Math.max(0, end - width);
+  // Cut between words, never inside one: a quote should not end on "сделат…".
+  if (start > 0) {
+    const space = body.indexOf(" ", start);
+    if (space !== -1 && space < end) start = space + 1;
+  }
+  if (end < body.length) {
+    const space = body.lastIndexOf(" ", end);
+    if (space > start) end = space;
+  }
   return (start > 0 ? "…" : "") + body.slice(start, end).trim() + (end < body.length ? "…" : "");
 }
+
+/** A quoted message as a Telegram block; long ones fold away until opened. Pass escaped HTML. */
+export const quoteHtml = (html: string): string => (html.length > 160 ? `<blockquote expandable>${html}</blockquote>` : `<blockquote>${html}</blockquote>`);
 
 export function escapeHtml(s: string): string {
   return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");

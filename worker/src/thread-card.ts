@@ -9,7 +9,8 @@ import { T2 } from "./concierge/texts";
 import { defaultLang, T, type Lang, type Messages } from "./i18n";
 import type { Quote } from "./search";
 import type { InlineButton, Telegram } from "./telegram";
-import { escapeHtml } from "./text";
+import { askable } from "./experts";
+import { escapeHtml, quoteHtml } from "./text";
 import { addMs, DAY, nowIso } from "./util";
 
 /** "Помогло?" comes this long after contacts were opened (plan: "a few days later"). */
@@ -91,6 +92,11 @@ export function personLabel(memberId: string, name: string | null | undefined, m
   return `${faceOf(memberId)} ${name ? escapeHtml(name) : m.memberAnon}`;
 }
 
+/** "Спросить людей" when someone could be asked; otherwise the way out that works: the team of the club. */
+async function askButton(db: D1Database, t: ThreadRow, m: Messages): Promise<InlineButton> {
+  return (await askable(db, t.member_id)) ? btn(m.bAskPeople, `t:${t.id}:ask`) : btn(m.bTeam, `t:${t.id}:team`);
+}
+
 async function latestIntro(db: D1Database, needId: string): Promise<IntroRow | null> {
   return db.prepare("SELECT id, status, candidate_id, requester_id FROM intros WHERE need_id=? ORDER BY created_at DESC, rowid DESC LIMIT 1").bind(needId).first<IntroRow>();
 }
@@ -134,16 +140,16 @@ export async function renderThread(db: D1Database, threadId: string, now = new D
     const quotes = quotesOf(t.quotes_json);
     const names = await namesFor(db, quotes.map((q) => q.author_id ?? "").filter(Boolean));
     const lines = [`<b>${m.threadMemoryHead}</b>`];
-    if (t.brief) lines.push(`<i>${escapeHtml(t.brief)}</i>`, `<i>${m.aiNote}</i>`);
+    if (t.brief) lines.push(escapeHtml(t.brief), m.aiNote);
     for (const q of quotes) {
       const who = q.author_id ? personLabel(q.author_id, names.get(q.author_id), m) : m.memberAnon;
       const source = q.url ? ` · <a href="${escapeHtml(q.url)}">${m.source}</a>` : "";
       const doc = q.label ? ` · ${escapeHtml(q.label)}` : ""; // document passages carry their file and time
-      lines.push(`\n<blockquote>${escapeHtml(q.text)}</blockquote>${who} · ${monthLabel(q.event_at, t.lang ?? defaultLang())}${doc}${source}`);
+      lines.push(`\n${quoteHtml(escapeHtml(q.text))}${who} · ${monthLabel(q.event_at, t.lang ?? defaultLang())}${doc}${source}`);
     }
     const extra = await extrasFor(db, t, lang);
     lines.push(...extra.lines, `\n${m.threadMemoryAsk}`);
-    return card(lines.join("\n"), [[btn(m.bThatsIt, `t:${id}:ok`), btn(m.bAskPeople, `t:${id}:ask`)], [btn(m.bNotThat, `t:${id}:no`)], ...extra.buttons]);
+    return card(lines.join("\n"), [[btn(m.bThatsIt, `t:${id}:ok`), await askButton(db, t, m)], [btn(m.bNotThat, `t:${id}:no`)], ...extra.buttons]);
   }
   if (t.state === "closed") return card(t.brief ?? m.threadStopped); // brief carries a note here, e.g. "no access"
   if (t.bridge_id) {
@@ -166,7 +172,7 @@ export async function renderThread(db: D1Database, threadId: string, now = new D
       .bind(t.member_id, t.member_id)
       .first();
     const extra = await extrasFor(db, t, lang);
-    return card([m.threadNothing, ...extra.lines].join("\n"), [[btn(m.bAskPeople, `t:${id}:ask`)], ...(clubs ? [[btn(m.bBridge, `t:${id}:bridge`)]] : []), ...extra.buttons]);
+    return card([m.threadNothing, ...extra.lines].join("\n"), [[await askButton(db, t, m)], ...(clubs ? [[btn(m.bBridge, `t:${id}:bridge`)]] : []), ...extra.buttons]);
   }
   const need = await db.prepare("SELECT status FROM needs WHERE id=?").bind(t.need_id).first<{ status: string }>();
   const intro = await latestIntro(db, t.need_id);
@@ -193,8 +199,9 @@ export async function renderThread(db: D1Database, threadId: string, now = new D
   }
   // Nobody is on the hook right now: the search is over, or it is about to ask the next person.
   if (need?.status === "cancelled") return card(m.threadCancelled);
-  if (need?.status === "expired") return card(m.threadExpired, [[btn(m.bAskPeople, `t:${id}:ask`)]]);
-  if (need?.status === "no_match") return card(m.threadNoMatch);
+  if (need?.status === "expired") return card(m.threadExpired, [[await askButton(db, t, m)]]);
+  if (need?.status === "no_match") return card(m.introClosedNoMatch, [[btn(m.bTeam, `t:${id}:team`)]]);
+  if (need?.status === "waiting") return card(m.threadNoMatch, [[btn(m.bCancelAsk, `t:${id}:cancel`)], [btn(m.bTeam, `t:${id}:team`)]]);
   return card(m.threadAsking(asked), [[btn(m.bCancelAsk, `t:${id}:cancel`)]]);
 }
 

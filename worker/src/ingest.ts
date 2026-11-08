@@ -34,8 +34,13 @@ export interface TgMessage {
   document?: TgDocument;
   entities?: { type: string; offset: number; length: number }[];
   migrate_to_chat_id?: number;
-  /** Set for a message forwarded from a channel or group (spam guard). */
-  forward_from_chat?: { id: number };
+  /** Current Bot API source metadata for forwarded messages. */
+  forward_origin?:
+    | { type: "channel"; chat: { id: number; type: string; title?: string; username?: string }; message_id: number }
+    | { type: "chat"; sender_chat: { id: number; type: string; title?: string; username?: string } }
+    | { type: "user" | "hidden_user" };
+  /** Legacy source metadata, retained for older Telegram clients and the spam guard. */
+  forward_from_chat?: { id: number; type: string; title?: string; username?: string };
 }
 
 export interface Source {

@@ -1,6 +1,6 @@
 import { env } from "cloudflare:test";
 import { strFromU8, unzipSync } from "fflate";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { makeArchive, makeLeanArchive, makeZip, safeFileName, uploadTmpfiles, type ExportMessage } from "../export/archive";
 import { exportLeanMessage, exportMessage } from "../export/messages";
 import { normalizeLimit, selectDate, selectMessage } from "../export/selection";
@@ -9,6 +9,9 @@ import type { Message } from "@mtcute/web";
 import { botApiChatId, countMessages } from "../scripts/import-lib.mjs";
 import { handleFetch } from "../src/index";
 import type { Env } from "../src/env";
+import { forwardedChat, offerForwardedExport } from "../src/export-forward";
+import type { App } from "../src/bot";
+import type { TgMessage } from "../src/ingest";
 
 const message = (id: number): ExportMessage => ({
   id,
@@ -36,6 +39,29 @@ async function initData(id: number) {
   const hash = [...new Uint8Array(await crypto.subtle.sign("HMAC", await key(secret), enc.encode(check)))].map((b) => b.toString(16).padStart(2, "0")).join("");
   return new URLSearchParams({ ...fields, hash }).toString();
 }
+
+describe("forwarded chat export shortcut", () => {
+  const base = { message_id: 1, chat: { id: 7, type: "private" }, from: { id: 7 }, date: 1 } satisfies TgMessage;
+  it("reads current channel/group origins and the legacy fallback", () => {
+    expect(forwardedChat({ ...base, forward_origin: { type: "channel", chat: { id: -100123, type: "channel", title: "News" }, message_id: 9 } })).toMatchObject({ id: -100123, title: "News" });
+    expect(forwardedChat({ ...base, forward_origin: { type: "chat", sender_chat: { id: -42, type: "group", title: "Club" } } })).toMatchObject({ id: -42, title: "Club" });
+    expect(forwardedChat({ ...base, forward_from_chat: { id: -99, type: "supergroup", title: "Legacy" } })).toMatchObject({ id: -99, title: "Legacy" });
+    expect(forwardedChat({ ...base, forward_origin: { type: "user" } })).toBeNull();
+    expect(forwardedChat(base)).toBeNull();
+  });
+  it("offers a signed-in-user Mini App button with the chat deep link", async () => {
+    const sendMessage = vi.fn().mockResolvedValue({});
+    const app = { env: { PUBLIC_URL: "https://telepathy.example" }, tg: { sendMessage } } as unknown as App;
+    const msg: TgMessage = { ...base, forward_origin: { type: "channel", chat: { id: -100123, type: "channel", title: "News" }, message_id: 9 } };
+    await expect(offerForwardedExport(app, msg)).resolves.toBe(true);
+    expect(sendMessage).toHaveBeenCalledWith(7, expect.stringContaining("Chat ID"), {
+      buttons: [[{ text: "Open chat exporter", web_app: { url: "https://telepathy.example/export?start=chat_-100123" } }]],
+      replyTo: 1,
+    });
+    await expect(offerForwardedExport(app, base)).resolves.toBe(false);
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe("standalone chat archive", () => {
   it("creates a valid ZIP with sorted, documented JSON", async () => {

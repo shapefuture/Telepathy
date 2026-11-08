@@ -21,7 +21,13 @@ Mini App `initData`.
 
 1. Signs the user into Telegram directly over Telegram WebSocket endpoints with mtcute. Phone codes,
    cloud passwords, and the temporary session remain in the tab's memory and never reach the Worker.
-2. Lists group/channel dialogs, also accepting a public username or numeric chat ID.
+2. Lists group/channel dialogs, also accepting a public username or numeric chat ID. As a shortcut,
+   forward any group/channel message to the bot in a private chat. Telegram's current
+   `forward_origin` metadata (or legacy `forward_from_chat`) supplies the source chat ID; the bot
+   replies with an **Open chat exporter** button that preselects that chat. Forwarded user messages
+   are ignored by this shortcut. The deep link is only a navigation hint—not proof of access—and
+   the user's own MTProto session still enforces Telegram membership and permissions. The bot does
+   not join, read, ingest, or answer questions about the forwarded source message.
 3. Optionally restricts the selection by an inclusive **From** date, exclusive **Until** date, or
    positive message limit. **Lean messages only** prefilters out service events and emits just the
    chat identity and each message's `id`, `text`, ISO `date`, author (`from`, `from_id`, optional

@@ -48,6 +48,7 @@ import { eventByShort, fullKey, rsvp, shortKey, wantToSee, whoGoes } from "./gat
 import { arkLine, callEveryone, exportFor, forgetPart, knowsCard } from "./ark";
 import { welcomeJoinRequest, welcomeJoiner } from "./welcome";
 import { escapeHtml } from "./text";
+import { offerForwardedExport } from "./export-forward";
 import { addMs, audit, DAY, HOUR, localParts, nowIso, tzOffsetMinutes } from "./util";
 
 export interface App {
@@ -224,6 +225,9 @@ async function onMessage(app: App, msg: TgMessage, edited: boolean): Promise<str
     return keys;
   }
   if (msg.chat.type !== "private" || !msg.from) return [];
+  // A forwarded group/channel message is an export shortcut, not a community question. Telegram's
+  // signed update supplies the source chat id; the standalone app later checks user access itself.
+  if (!edited && (await offerForwardedExport(app, msg))) return [];
   // In private, a plain message is a question: no command needed.
   if (!command) {
     const q = (msg.text ?? "").trim();

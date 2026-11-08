@@ -38,6 +38,11 @@ called; the egress guard denies them by default.
   delete your data. Owners can set a per-group retention limit with `/retention N`.
 - **Ops:** verified daily backups, `/status` metrics, crash-safe sends (`/uncertain` to
   reconcile), systemd unit and Dockerfile.
+- **Standalone chat export:** the separate `/export` Telegram Mini App turns any group/channel the
+  signed-in user can read into JSON in a ZIP, locally in the browser, with an optional consented
+  tmpfiles upload. Forward a group/channel message to the bot to open the exporter with its source
+  chat preselected. No bot membership or Telepathy database is involved. See
+  [`docs/CHAT_EXPORT.md`](docs/CHAT_EXPORT.md).
 
 ## Cloudflare Worker (v2, primary)
 

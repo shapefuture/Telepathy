@@ -2,6 +2,7 @@
 
 import { handleUpdate, status, type App, type Update } from "./bot";
 import { handleApp } from "./app";
+import { handleExport } from "./export";
 import { agentCard, handleA2A } from "./federation/a2a";
 import { fedEnabled, handleFederation, relayRelocation } from "./federation/gateway";
 import { handlePortal } from "./continuity/portal";
@@ -111,6 +112,7 @@ export async function handleFetch(req: Request, env: Env, fetcher?: Fetcher, net
     }
   }
   if (url.pathname === "/app" || url.pathname.startsWith("/app/api/")) return handleApp(req, env, fetcher, net);
+  if (url.pathname === "/export" || url.pathname.startsWith("/export/api/")) return handleExport(req, env);
 
   if (req.method === "POST" && url.pathname === "/telegram") {
     // Telegram echoes the secret we registered with setWebhook (P11-02).
@@ -171,7 +173,7 @@ export async function handleFetch(req: Request, env: Env, fetcher?: Fetcher, net
           profile[label] = `failed: ${String(e)}`;
         }
       }
-      return json({ webhook: hook, commands: cmds, menu, profile, url: `${url.origin}/telegram`, app: `${url.origin}/app` });
+      return json({ webhook: hook, commands: cmds, menu, profile, url: `${url.origin}/telegram`, app: `${url.origin}/app`, export: `${url.origin}/export` });
     }
     if (req.method === "GET" && url.pathname === "/admin/status") return json(await status(app.db));
     if (req.method === "POST" && url.pathname === "/admin/cron") return json(await runCron(app));

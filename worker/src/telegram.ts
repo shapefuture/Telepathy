@@ -9,13 +9,18 @@ export interface InlineButton {
   text: string;
   callback_data: string;
 }
+/** Opens a Mini App inside Telegram (Bot API InlineKeyboardButton.web_app). */
+export interface WebAppInlineButton {
+  text: string;
+  web_app: { url: string };
+}
 
 export interface Telegram {
   call<T = unknown>(method: string, params: Record<string, unknown>): Promise<T>;
   sendMessage(
     chatId: number,
     text: string,
-    opts?: { buttons?: InlineButton[][]; replyTo?: number },
+    opts?: { buttons?: (InlineButton | WebAppInlineButton)[][]; replyTo?: number },
   ): Promise<{ message_id: number }>;
   /** Send a small generated file (e.g. an .ics calendar) as a document. */
   sendFile(chatId: number, fileName: string, content: string, mime: string, caption?: string): Promise<{ message_id: number }>;

@@ -7,3 +7,4 @@ import/
 backfill/
 *.session
 public/history/
+public/export/

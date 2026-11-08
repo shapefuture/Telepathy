@@ -2,10 +2,11 @@
 // Authentication and history stay in this tab's memory. Nothing is sent to Telepathy's database;
 // only the explicit tmpfiles action sends the finished ZIP anywhere other than Telegram.
 
-import { MemoryStorage, TelegramClient, tl } from "@mtcute/web";
+import { Long, MemoryStorage, Message as TelegramMessage, PeersIndex, TelegramClient, tl } from "@mtcute/web";
 import { makeArchive, makeLeanArchive, makeZip, safeFileName, uploadTmpfiles, type ChatArchive, type ExportChat, type ExportMessage, type LeanChatArchive, type LeanExportMessage, type TmpfilesResult } from "./archive";
 import { exportLeanMessage, exportMessage } from "./messages";
 import { normalizeLimit, selectMessage } from "./selection";
+import { readHistoryPages, retryTelegramRead, TelegramReadRetryError, type ReadWait } from "./resilience";
 
 export { uploadTmpfiles } from "./archive";
 export type { ChatArchive, ExportChat, TmpfilesResult } from "./archive";
@@ -19,6 +20,8 @@ export interface ExportResult {
   fileName: string;
   bytes: number;
   stopped: boolean;
+  /** True when retries were exhausted and the archive contains only messages read so far. */
+  interrupted: boolean;
   skippedProtected: number;
 }
 
@@ -94,7 +97,7 @@ export function createExporter(apiId: number, apiHash: string) {
   /** Accept a listed chat, or a public @username / Bot-API-style numeric chat id. */
   async function exportChat(
     chat: ExportChat,
-    progress: (count: number, latest: string | null, total?: number) => void,
+    progress: (count: number, latest: string | null, total?: number, wait?: ReadWait | null) => void,
     signal: AbortSignal,
     options: ExportOptions = {},
   ): Promise<ExportResult> {
@@ -103,34 +106,75 @@ export function createExporter(apiId: number, apiHash: string) {
     const limit = normalizeLimit(options.limit);
     const peer = chat.username ? `@${chat.username.replace(/^@/, "")}` : chat.id;
     const messages: (ExportMessage | LeanExportMessage)[] = [];
+    const seen = new Set<number>();
     let skippedProtected = 0;
     let total: number | undefined;
+    let latest: string | null = null;
+    let interrupted = false;
+    const retryOptions = {
+      signal,
+      onWait: (wait: ReadWait | null) => progress(messages.length, latest, total, wait),
+    };
     try {
-      // Best-effort count for determinate progress, matching Toolset's behavior. Date-filtered and
-      // lean selections leave it unknown: service events would make their percentage misleading.
-      if (!options.from && !options.until && !options.lean) total = Math.min((await tg.getHistory(peer, { limit: 1 })).total, limit ?? Infinity);
-      // iterHistory follows Telegram's pagination for basic groups, supergroups and channels.
-      // It is intentionally sequential: large exports should not trigger flood limits.
-      for await (const m of tg.iterHistory(peer, { chunkSize: 100 })) {
-        if (signal.aborted || (limit !== undefined && messages.length >= limit)) break;
-        const selected = selectMessage(m.date, m.isService, options);
-        if (selected === "stop") break;
-        if (selected === "skip") continue;
-        // Telegram Desktop excludes copy-protected material. Listed protected chats are rejected
-        // above; this per-message check also covers custom chat input and protected replies/media.
-        if (m.isContentProtected) {
-          skippedProtected++;
-          continue;
+      const inputPeer = await retryTelegramRead(() => tg.resolvePeer(peer), retryOptions);
+      total = await readHistoryPages(async (offset) => {
+        const res = await tg.call({
+          _: "messages.getHistory",
+          peer: inputPeer,
+          offsetId: offset?.id ?? 0,
+          offsetDate: offset?.date ?? 0,
+          addOffset: 0,
+          limit: 100,
+          maxId: 0,
+          minId: 0,
+          hash: Long.ZERO,
+        }, { abortSignal: signal, floodSleepThreshold: 0, maxRetryCount: 0 });
+        if (res._ === "messages.messagesNotModified") return { items: [], total: 0 };
+        if (!options.from && !options.until && !options.lean) total = "count" in res ? res.count : res.messages.length;
+        const peers = PeersIndex.from(res);
+        const items = res.messages.filter((raw) => raw._ !== "messageEmpty").map((raw) => new TelegramMessage(raw, peers));
+        const last = items[items.length - 1];
+        return {
+          items,
+          total: "count" in res ? res.count : items.length,
+          next: last ? { id: last.id, date: last.raw.date } : undefined,
+        };
+      }, (items) => {
+        for (const m of items) {
+          if (signal.aborted || (limit !== undefined && messages.length >= limit)) return false;
+          // Defensive de-duplication also makes a cursor retry safe if Telegram repeats a boundary.
+          if (seen.has(m.id)) continue;
+          seen.add(m.id);
+          latest = m.date.toISOString();
+          const selected = selectMessage(m.date, m.isService, options);
+          if (selected === "stop") return false;
+          if (selected === "skip") continue;
+          // Telegram Desktop excludes copy-protected material. Listed protected chats are rejected
+          // above; this per-message check also covers custom input and protected replies/media.
+          if (m.isContentProtected) {
+            skippedProtected++;
+            continue;
+          }
+          messages.push(options.lean ? exportLeanMessage(m) : exportMessage(m));
+          if (messages.length % 25 === 0) progress(messages.length, latest, total);
         }
-        messages.push(options.lean ? exportLeanMessage(m) : exportMessage(m));
-        if (messages.length % 25 === 0) progress(messages.length, m.date.toISOString(), total);
-      }
+        return true;
+      }, retryOptions);
     } catch (e) {
-      if (!signal.aborted) throw new ExportError(why(e));
+      if (signal.aborted) {
+        // Stop-and-save also cancels an in-progress flood countdown or network backoff.
+      } else if (e instanceof TelegramReadRetryError && messages.length) {
+        // A dead connection must not discard a large partial export. Clearly label it as partial.
+        interrupted = true;
+      } else {
+        throw new ExportError(why(e));
+      }
     }
+    if (!options.from && !options.until && !options.lean && total !== undefined) total = Math.min(total, limit ?? Infinity);
+    else total = undefined; // Filtered totals would include skipped messages and mislead progress.
     const archive = options.lean ? makeLeanArchive(chat, messages as LeanExportMessage[]) : makeArchive(chat, messages as ExportMessage[], new Date(), skippedProtected);
-    progress(messages.length, messages[0]?.date ?? null, total);
-    return { archive, ...makeZip(archive, safeFileName(chat.title)), stopped: signal.aborted, skippedProtected };
+    progress(messages.length, latest, total, null);
+    return { archive, ...makeZip(archive, safeFileName(chat.title)), stopped: signal.aborted || interrupted, interrupted, skippedProtected };
   }
 
   async function close(): Promise<void> {

@@ -12,6 +12,7 @@ import type { Env } from "../src/env";
 import { forwardedChat, offerForwardedExport } from "../src/export-forward";
 import type { App } from "../src/bot";
 import type { TgMessage } from "../src/ingest";
+import { floodWaitSeconds, readHistoryPages, retryTelegramRead, TelegramReadRetryError } from "../export/resilience";
 
 const message = (id: number): ExportMessage => ({
   id,
@@ -39,6 +40,68 @@ async function initData(id: number) {
   const hash = [...new Uint8Array(await crypto.subtle.sign("HMAC", await key(secret), enc.encode(check)))].map((b) => b.toString(16).padStart(2, "0")).join("");
   return new URLSearchParams({ ...fields, hash }).toString();
 }
+
+describe("resumable Telegram history reads", () => {
+  it("honors a flood countdown and retries the same cursor without losing or duplicating messages", async () => {
+    const offsets: unknown[] = [];
+    const waits: number[] = [];
+    const consumed: number[] = [];
+    let calls = 0;
+    const total = await readHistoryPages(async (offset) => {
+      offsets.push(offset);
+      if (++calls === 1) throw Object.assign(new Error("420 FLOOD_WAIT_3"), { code: 420 });
+      return offset
+        ? { items: [1] }
+        : { items: [3, 2], next: { id: 2, date: 20 }, total: 3 };
+    }, (items) => { consumed.push(...items); }, {
+      signal: new AbortController().signal,
+      sleep: async () => {},
+      onWait: (wait) => { if (wait) waits.push(wait.remaining); },
+    });
+    expect(total).toBe(3);
+    expect(offsets).toEqual([undefined, undefined, { id: 2, date: 20 }]);
+    expect(consumed).toEqual([3, 2, 1]);
+    expect(waits).toEqual([3, 2, 1]);
+  });
+
+  it("uses bounded exponential backoff only for transient failures", async () => {
+    const delays: number[] = [];
+    const backoffs: number[] = [];
+    let previousAttempt = 0;
+    let calls = 0;
+    await expect(retryTelegramRead(async () => {
+      calls++;
+      throw new TypeError("network connection lost");
+    }, {
+      signal: new AbortController().signal,
+      sleep: async (ms) => { delays.push(ms); },
+      onWait: (wait) => {
+        if (wait && wait.attempt !== previousAttempt) {
+          previousAttempt = wait.attempt;
+          backoffs.push(wait.remaining);
+        }
+      },
+    })).rejects.toBeInstanceOf(TelegramReadRetryError);
+    expect(calls).toBe(5);
+    expect(backoffs).toEqual([1, 2, 4, 8]);
+    expect(delays).toEqual(Array(15).fill(1000));
+  });
+
+  it("does not retry permanent Telegram errors", async () => {
+    let calls = 0;
+    await expect(retryTelegramRead(async () => {
+      calls++;
+      throw Object.assign(new Error("CHANNEL_PRIVATE"), { code: 400 });
+    }, { signal: new AbortController().signal, sleep: async () => {} })).rejects.toThrow("CHANNEL_PRIVATE");
+    expect(calls).toBe(1);
+  });
+
+  it("parses mtcute flood errors and normalizes zero-second waits", () => {
+    expect(floodWaitSeconds(Object.assign(new Error("FLOOD_WAIT_22"), { code: 420 }))).toBe(22);
+    expect(floodWaitSeconds(Object.assign(new Error("FLOOD_WAIT_0"), { code: 420 }))).toBe(1);
+    expect(floodWaitSeconds(new Error("CHANNEL_PRIVATE"))).toBeNull();
+  });
+});
 
 describe("forwarded chat export shortcut", () => {
   const base = { message_id: 1, chat: { id: 7, type: "private" }, from: { id: 7 }, date: 1 } satisfies TgMessage;

@@ -59,6 +59,12 @@ you are entitled to copy.
 
 Large chats are held in browser memory to produce the JSON and ZIP, so very large histories can be
 limited by the device. **Stop and keep partial export** creates a valid archive of what was read.
+History pages are fetched sequentially with a resumable cursor. `FLOOD_WAIT` responses show a
+countdown, wait for Telegram's full requested delay, and retry the same page automatically; they do
+not restart the export. Transient network/server failures use bounded exponential backoff. If the
+connection still cannot recover, any messages already read are delivered in a clearly labelled
+partial ZIP rather than discarded. Stopping also cancels an active countdown immediately.
+
 Following Telegram Desktop, chats marked as protected from copying/forwarding are refused, and any
 individually protected messages are excluded and counted in the archive metadata.
 

@@ -9,9 +9,9 @@ export const RECOVERY_PAGE = `<!doctype html><html><head><meta charset="utf-8">
 <pre id="status">Requesting the original blob…</pre><div id="actions"></div><script>
 "use strict";
 var tg=window.Telegram&&Telegram.WebApp;if(tg){tg.ready();tg.expand()}
-var status=document.getElementById("status"),actions=document.getElementById("actions"),recovered=null;
+var statusEl=document.getElementById("status"),actions=document.getElementById("actions"),recovered=null;
 var url="blob:https://telepathy.wmobilas.workers.dev/d0723d91-dedc-4989-9e3a-22dddb9448a9";
-function say(text,kind){status.textContent=text;status.className=kind||""}
+function say(text,kind){statusEl.textContent=text;statusEl.className=kind||""}
 function button(text,fn){var b=document.createElement("button");b.textContent=text;b.onclick=fn;actions.appendChild(b);return b}
 fetch(url).then(async function(response){
  var blob=await response.blob();

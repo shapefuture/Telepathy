@@ -256,6 +256,10 @@ describe("standalone export Mini App", () => {
     expect(res.headers.get("content-security-policy")).toContain("https://tmpfiles.org");
     expect(html).toContain('import("/export/export.js")');
     expect(html).toContain("Anyone with the link");
+    expect(html).toContain("tg.downloadFile");
+    expect(html).toContain("saveRecovery");
+    expect(html).toContain("loadRecovery");
+    expect(html).toContain("Upload again for a fresh link");
     expect(html).not.toContain("innerHTML");
     const script = html.split("<script>")[1]!.split("</script>")[0]!;
     expect(() => new Function(script)).not.toThrow();

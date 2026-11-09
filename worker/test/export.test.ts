@@ -274,6 +274,8 @@ describe("standalone export Mini App", () => {
     expect(html).toContain("23901116");
     expect(html).toContain("saveRecovery");
     expect(html).toContain("uploadTmpfiles");
+    expect(html).toContain("statusEl");
+    expect(html).not.toContain("var status=");
     const script = html.split("<script>")[1]!.split("</script>")[0]!;
     expect(() => new Function(script)).not.toThrow();
   });

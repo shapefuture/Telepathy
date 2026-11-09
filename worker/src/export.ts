@@ -2,6 +2,7 @@
 // chat content never passes through the Worker. The browser talks to Telegram and tmpfiles directly.
 
 import { EXPORT_PAGE } from "./export-page";
+import { RECOVERY_PAGE } from "./recovery-page";
 import type { Env } from "./env";
 import { verifyInitUser } from "./app";
 
@@ -12,13 +13,13 @@ const json = (value: unknown, status = 200) =>
 // page itself requires a separate checkbox plus confirmation before sending an archive there.
 const CSP =
   "default-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://telegram.org; " +
-  "style-src 'unsafe-inline'; connect-src 'self' wss://*.web.telegram.org https://tmpfiles.org; " +
+  "style-src 'unsafe-inline'; connect-src 'self' blob: wss://*.web.telegram.org https://tmpfiles.org; " +
   "img-src 'self' data:; base-uri 'none'; form-action 'none'; object-src 'none'";
 
 export async function handleExport(req: Request, env: Env): Promise<Response> {
   const path = new URL(req.url).pathname;
-  if (req.method === "GET" && path === "/export") {
-    return new Response(EXPORT_PAGE, {
+  if (req.method === "GET" && (path === "/export" || path === "/export/recover")) {
+    return new Response(path === "/export/recover" ? RECOVERY_PAGE : EXPORT_PAGE, {
       headers: {
         "content-type": "text/html; charset=utf-8",
         "content-security-policy": CSP,

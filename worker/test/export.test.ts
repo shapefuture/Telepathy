@@ -265,6 +265,19 @@ describe("standalone export Mini App", () => {
     expect(() => new Function(script)).not.toThrow();
   });
 
+  it("serves the same-origin WebKit blob rescue page without authentication", async () => {
+    const res = await handleFetch(new Request("https://telepathy.wmobilas.workers.dev/export/recover"), env as unknown as Env);
+    const html = await res.text();
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-security-policy")).toContain("connect-src 'self' blob:");
+    expect(html).toContain("blob:https://telepathy.wmobilas.workers.dev/d0723d91-dedc-4989-9e3a-22dddb9448a9");
+    expect(html).toContain("23901116");
+    expect(html).toContain("saveRecovery");
+    expect(html).toContain("uploadTmpfiles");
+    const script = html.split("<script>")[1]!.split("</script>")[0]!;
+    expect(() => new Function(script)).not.toThrow();
+  });
+
   it("shares configured app keys only with signed Telegram initData, without requiring club membership", async () => {
     const e = { ...env, TG_API_ID: "1234", TG_API_HASH: "test-hash" } as unknown as Env;
     const denied = await handleFetch(new Request("https://bot.example/export/api/config"), e);

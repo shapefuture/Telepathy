@@ -228,6 +228,14 @@ async function onMessage(app: App, msg: TgMessage, edited: boolean): Promise<str
   // A forwarded group/channel message is an export shortcut, not a community question. Telegram's
   // signed update supplies the source chat id; the standalone app later checks user access itself.
   if (!edited && (await offerForwardedExport(app, msg))) return [];
+  // Temporary rescue for a ZIP still held by Telegram's WebKit blob registry. Opens a NEW window.
+  if (!edited && command?.cmd === "recover" && app.env.PUBLIC_URL) {
+    const origin = app.env.PUBLIC_URL.replace(/\/$/, "");
+    await app.tg.sendMessage(msg.chat.id, "Open this recovery test in a separate Mini App window. Leave the original ZIP result window open.", {
+      buttons: [[{ text: "Attempt ZIP recovery", web_app: { url: `${origin}/export/recover` } }]],
+    });
+    return [];
+  }
   // In private, a plain message is a question: no command needed.
   if (!command) {
     const q = (msg.text ?? "").trim();

@@ -9,6 +9,7 @@ import { normalizeLimit, selectMessage } from "./selection";
 import { readHistoryPages, retryTelegramRead, TelegramReadRetryError, type ReadWait } from "./resilience";
 
 export { uploadTmpfiles } from "./archive";
+export { deleteRecovery, loadRecovery, saveRecovery } from "./recovery";
 export type { ChatArchive, ExportChat, TmpfilesResult } from "./archive";
 
 export class ExportError extends Error {}

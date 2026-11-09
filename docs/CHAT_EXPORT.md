@@ -43,12 +43,18 @@ Mini App `initData`.
    **Media files themselves are not downloaded**; `file`/`photo` contain Telegram's standard
    not-included placeholder. Raw Telegram access hashes are never serialized.
 5. Sorts messages by ID and creates a ZIP locally using fflate. The ZIP contains `result.json`, a
-   small `metadata.json` summary, and a README describing the format and privacy implications. The
-   user can always download this ZIP.
+   small `metadata.json` summary, and a README describing the format and privacy implications. A
+   recovery copy is stored in this browser's IndexedDB until it is replaced or explicitly deleted;
+   it never goes to Telepathy. Reopening `/export` offers that ZIP without requiring Telegram
+   sign-in. Ordinary browsers download the local blob directly. Telegram WebViews cannot download
+   blob URLs, so their **Download ZIP** action uploads the existing ZIP to tmpfiles after explicit
+   confirmation and passes the resulting HTTPS URL to Telegram's native `downloadFile` method.
+   Where supported, **Share ZIP** offers the local file through the device share sheet instead.
 6. If the user explicitly selects tmpfiles and confirms the public-link warning, uploads the ZIP
    directly from the browser to `https://tmpfiles.org/api/v1/upload`, then displays the `/dl/`
    download URL. Archives above 100 MiB are not uploaded. An upload failure never discards the local
-   download.
+   download or recovery copy. **Upload again for a fresh link** remains available after success or
+   expiry and always reuses the finished ZIP; it never reads the Telegram history again.
 7. Logs out and destroys the temporary Telegram session when the user finishes. Closing the tab also
    attempts cleanup; if offline, the user can revoke the session in Telegram **Settings → Devices**.
 
